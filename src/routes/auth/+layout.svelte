@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 </script>
 
 <svelte:head>
@@ -11,21 +12,24 @@
 </svelte:head>
 
 <div
-	class="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12 sm:px-6 lg:px-8"
+	class="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10 px-4 py-12 sm:px-6 lg:px-8"
 >
+	<div class="absolute top-4 right-4 z-10">
+		<ThemeToggle />
+	</div>
 	<div class="w-full max-w-md space-y-8">
 		<div class="text-center">
-			<h1 class="mb-2 text-4xl font-bold text-gray-900">EternaBrand</h1>
-			<p class="text-lg font-medium text-blue-600">AI Brand Guideline Assistant</p>
+			<h1 class="mb-2 text-4xl font-bold text-foreground">EternaBrand</h1>
+			<p class="text-lg font-medium text-primary">AI Brand Guideline Assistant</p>
 		</div>
 
-		<div class="rounded-lg bg-white px-6 py-8 shadow-xl">
+		<div class="rounded-lg bg-card px-6 py-8 shadow-xl border border-border">
 			<slot />
 		</div>
 
 		<div class="text-center">
-			<p class="text-sm text-gray-600">
-				<a href="/" class="font-medium text-blue-600 hover:text-blue-500"> ← Back to Home </a>
+			<p class="text-sm text-muted-foreground">
+				<a href="/" class="font-medium text-primary hover:text-primary/80"> ← Back to Home </a>
 			</p>
 		</div>
 	</div>

@@ -11,6 +11,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Eye, EyeOff, ArrowRight } from 'lucide-svelte';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
 	let isLogin = true;
 	let email = '';
@@ -47,13 +48,16 @@
 </svelte:head>
 
 <div
-	class="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4"
+	class="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10 p-4"
 >
+	<div class="absolute top-4 right-4 z-10">
+		<ThemeToggle />
+	</div>
 	<div class="w-full max-w-md">
 		<!-- Logo/Brand -->
 		<div class="mb-8 text-center">
-			<h1 class="mb-2 text-3xl font-bold text-gray-900">EternaBrand</h1>
-			<p class="text-gray-600">AI Brand Guideline Assistant</p>
+			<h1 class="mb-2 text-3xl font-bold text-foreground">EternaBrand</h1>
+			<p class="text-muted-foreground">AI Brand Guideline Assistant</p>
 		</div>
 
 		<Card>
@@ -108,7 +112,7 @@
 						<Separator />
 					</div>
 					<div class="relative flex justify-center text-xs uppercase">
-						<span class="bg-white px-2 text-gray-500">Or continue with email</span>
+						<span class="bg-background px-2 text-muted-foreground">Or continue with email</span>
 					</div>
 				</div>
 
@@ -160,9 +164,9 @@
 								onclick={() => (showPassword = !showPassword)}
 							>
 								{#if showPassword}
-									<EyeOff class="h-4 w-4 text-gray-400" />
+								<EyeOff class="h-4 w-4 text-muted-foreground" />
 								{:else}
-									<Eye class="h-4 w-4 text-gray-400" />
+								<Eye class="h-4 w-4 text-muted-foreground" />
 								{/if}
 							</button>
 						</div>
@@ -186,9 +190,9 @@
 									onclick={() => (showConfirmPassword = !showConfirmPassword)}
 								>
 									{#if showConfirmPassword}
-										<EyeOff class="h-4 w-4 text-gray-400" />
-									{:else}
-										<Eye class="h-4 w-4 text-gray-400" />
+								<EyeOff class="h-4 w-4 text-muted-foreground" />
+								{:else}
+								<Eye class="h-4 w-4 text-muted-foreground" />
 									{/if}
 								</button>
 							</div>
@@ -199,9 +203,9 @@
 						<div class="flex items-center justify-between">
 							<label class="flex items-center space-x-2">
 								<input type="checkbox" class="rounded" />
-								<span class="text-sm text-gray-600">Remember me</span>
-							</label>
-							<button type="button" class="text-sm text-blue-600 hover:underline">
+							<span class="text-sm text-muted-foreground">Remember me</span>
+						</label>
+						<button type="button" class="text-sm text-primary hover:underline">
 								Forgot password?
 							</button>
 						</div>
@@ -215,11 +219,11 @@
 
 				<!-- Toggle Mode -->
 				<div class="text-center">
-					<p class="text-sm text-gray-600">
+					<p class="text-sm text-muted-foreground">
 						{isLogin ? "Don't have an account?" : 'Already have an account?'}
 						<button
 							type="button"
-							class="font-medium text-blue-600 hover:underline"
+							class="font-medium text-primary hover:underline"
 							onclick={toggleMode}
 						>
 							{isLogin ? 'Sign up' : 'Sign in'}
@@ -228,11 +232,11 @@
 				</div>
 
 				{#if !isLogin}
-					<p class="text-center text-xs text-gray-500">
+					<p class="text-center text-xs text-muted-foreground">
 						By creating an account, you agree to our
-						<button type="button" class="text-blue-600 hover:underline">Terms of Service</button>
+						<button type="button" class="text-primary hover:underline">Terms of Service</button>
 						and
-						<button type="button" class="text-blue-600 hover:underline">Privacy Policy</button>
+						<button type="button" class="text-primary hover:underline">Privacy Policy</button>
 					</p>
 				{/if}
 			</CardContent>

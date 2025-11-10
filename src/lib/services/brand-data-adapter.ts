@@ -87,16 +87,88 @@ function parseBrandPositioning(content: string | any): any {
 function parseColorPalette(content: string | any): any {
 	// If already an object, return formatted
 	if (typeof content === 'object' && content !== null) {
+		// Check for new JSON structure with arrays (primary, secondary, accent, neutrals, background)
+		if (content.primary && Array.isArray(content.primary)) {
+			// New structure: flatten all color arrays into a single palette
+			const allColors: any[] = [];
+			
+			// Collect colors from all categories
+			if (Array.isArray(content.primary)) {
+				allColors.push(...content.primary.map((c: any) => ({
+					...c,
+					category: 'Primary',
+					rgb: Array.isArray(c.rgb) ? `RGB(${c.rgb.join(', ')})` : (c.rgb || hexToRgb(c.hex || '#000000'))
+				})));
+			}
+			if (Array.isArray(content.secondary)) {
+				allColors.push(...content.secondary.map((c: any) => ({
+					...c,
+					category: 'Secondary',
+					rgb: Array.isArray(c.rgb) ? `RGB(${c.rgb.join(', ')})` : (c.rgb || hexToRgb(c.hex || '#000000'))
+				})));
+			}
+			if (Array.isArray(content.accent)) {
+				allColors.push(...content.accent.map((c: any) => ({
+					...c,
+					category: 'Accent',
+					rgb: Array.isArray(c.rgb) ? `RGB(${c.rgb.join(', ')})` : (c.rgb || hexToRgb(c.hex || '#000000'))
+				})));
+			}
+			if (Array.isArray(content.neutrals)) {
+				allColors.push(...content.neutrals.map((c: any) => ({
+					...c,
+					category: 'Neutral',
+					rgb: Array.isArray(c.rgb) ? `RGB(${c.rgb.join(', ')})` : (c.rgb || hexToRgb(c.hex || '#000000'))
+				})));
+			}
+			if (Array.isArray(content.background)) {
+				allColors.push(...content.background.map((c: any) => ({
+					...c,
+					category: 'Background',
+					rgb: Array.isArray(c.rgb) ? `RGB(${c.rgb.join(', ')})` : (c.rgb || hexToRgb(c.hex || '#000000'))
+				})));
+			}
+			
+			// Return first 8 colors, plus keep the original structure for backward compatibility
+			const palette = allColors.slice(0, 8);
+			
+			return {
+				primary: allColors[0] || null,
+				secondary: allColors[1] || null,
+				accent: allColors[2] || null,
+				neutral: allColors[3] || null,
+				// Add all colors array for new templates
+				allColors: palette,
+				// Keep original structure for backward compatibility
+				original: content
+			};
+		}
+		
+		// Legacy structure: core_palette array
 		const colors = content.core_palette || content.colors || content;
 		if (Array.isArray(colors)) {
 			return {
 				primary: colors[0] || null,
 				secondary: colors[1] || null,
 				accent: colors[2] || null,
-				neutral: colors[3] || null
+				neutral: colors[3] || null,
+				allColors: colors.slice(0, 8).map((c: any) => ({
+					...c,
+					rgb: Array.isArray(c.rgb) ? `RGB(${c.rgb.join(', ')})` : (c.rgb || hexToRgb(c.hex || '#000000'))
+				}))
 			};
 		}
 		return colors;
+	}
+	
+	// Parse from text - try to parse as JSON first
+	try {
+		const parsed = typeof content === 'string' ? JSON.parse(content) : content;
+		if (typeof parsed === 'object' && parsed !== null) {
+			return parseColorPalette(parsed); // Recursively parse the parsed object
+		}
+	} catch {
+		// Not JSON, continue with text parsing
 	}
 	
 	// Parse from text
@@ -105,15 +177,17 @@ function parseColorPalette(content: string | any): any {
 		primary: null,
 		secondary: null,
 		accent: null,
-		neutral: null
+		neutral: null,
+		allColors: []
 	};
 	
 	// Extract hex colors
 	const hexMatches = text.match(/#[0-9A-Fa-f]{6}/g) || [];
 	const colorNames = text.match(/(?:Primary|Secondary|Accent|Neutral|Main|Support)[^#\n]*?(?=#|$)/gi) || [];
 	
-	// Try to match colors with their descriptions
-	for (let i = 0; i < Math.min(hexMatches.length, 4); i++) {
+	// Try to match colors with their descriptions (extract up to 8)
+	const maxColors = Math.min(hexMatches.length, 8);
+	for (let i = 0; i < maxColors; i++) {
 		const hex = hexMatches[i];
 		const rgbMatch = text.match(new RegExp(`${hex}[^\\n]*?(?:rgb|RGB)\\s*\\(([^)]+)\\)`));
 		const nameMatch = colorNames[i] || '';
@@ -124,6 +198,8 @@ function parseColorPalette(content: string | any): any {
 			name: extractColorName(nameMatch) || `Color ${i + 1}`,
 			usage: extractColorUsage(text, hex) || 'Brand color'
 		};
+		
+		result.allColors.push(colorObj);
 		
 		if (i === 0) result.primary = colorObj;
 		else if (i === 1) result.secondary = colorObj;

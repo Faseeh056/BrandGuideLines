@@ -227,6 +227,87 @@ function replaceTemplateVars(html: string, brandInput: any, fileName?: string, t
 	result = result.replace(/\{\{NEUTRAL_RGB\}\}/g, neutral.rgb || '');
 	result = result.replace(/\{\{NEUTRAL_USAGE\}\}/g, neutral.usage || 'Text and borders');
 	
+	// Support 8 colors for color palette slide
+	const allColors = colors.allColors || [];
+	
+	// Build default colors array using primary/secondary/accent/neutral first
+	const defaultColors = [
+		primary,
+		secondary,
+		accent,
+		neutral,
+		{ hex: '#F59E0B', name: 'Color 5', rgb: 'RGB(245, 158, 11)', usage: 'Brand color' },
+		{ hex: '#EF4444', name: 'Color 6', rgb: 'RGB(239, 68, 68)', usage: 'Brand color' },
+		{ hex: '#8B5CF6', name: 'Color 7', rgb: 'RGB(139, 92, 246)', usage: 'Brand color' },
+		{ hex: '#06B6D4', name: 'Color 8', rgb: 'RGB(6, 182, 212)', usage: 'Brand color' }
+	];
+	
+	// Use allColors if available and has at least 4 colors, otherwise build from individual colors
+	let colorPalette: any[];
+	if (allColors.length >= 8) {
+		colorPalette = allColors.slice(0, 8);
+	} else if (allColors.length >= 4) {
+		// Use allColors and fill remaining with defaults
+		colorPalette = [...allColors, ...defaultColors.slice(allColors.length, 8)];
+	} else if (allColors.length > 0) {
+		// Use allColors and fill with primary/secondary/accent/neutral first, then defaults
+		const baseColors = [primary, secondary, accent, neutral].filter(c => c && c.hex);
+		const combined = [...allColors];
+		// Add base colors that aren't already in allColors
+		for (const baseColor of baseColors) {
+			if (!combined.find((c: any) => c.hex === baseColor.hex)) {
+				combined.push(baseColor);
+			}
+		}
+		colorPalette = [...combined.slice(0, 8), ...defaultColors.slice(combined.length, 8)].slice(0, 8);
+	} else {
+		// Use primary/secondary/accent/neutral first, then defaults
+		colorPalette = [primary, secondary, accent, neutral, ...defaultColors.slice(4, 8)].filter(c => c && c.hex).slice(0, 8);
+	}
+	
+	// Helper function to convert hex to rgba with opacity
+	function hexToRgba(hex: string, opacity: number = 1): string {
+		if (!hex || !hex.startsWith('#')) return `rgba(0, 0, 0, ${opacity})`;
+		const r = parseInt(hex.slice(1, 3), 16);
+		const g = parseInt(hex.slice(3, 5), 16);
+		const b = parseInt(hex.slice(5, 7), 16);
+		return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+	}
+	
+	// Helper function to lighten a color (for backgrounds)
+	function lightenColor(hex: string, amount: number = 0.9): string {
+		if (!hex || !hex.startsWith('#')) return hex;
+		const r = parseInt(hex.slice(1, 3), 16);
+		const g = parseInt(hex.slice(3, 5), 16);
+		const b = parseInt(hex.slice(5, 7), 16);
+		// Lighten by mixing with white
+		const newR = Math.round(r + (255 - r) * amount);
+		const newG = Math.round(g + (255 - g) * amount);
+		const newB = Math.round(b + (255 - b) * amount);
+		return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+	}
+	
+	// Replace COLOR_1 through COLOR_8 placeholders
+	for (let i = 0; i < 8; i++) {
+		const color = colorPalette[i] || defaultColors[i];
+		const num = i + 1;
+		const hex = color.hex || '#000000';
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_HEX\\}\\}`, 'g'), hex);
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_NAME\\}\\}`, 'g'), color.name || `Color ${num}`);
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_RGB\\}\\}`, 'g'), color.rgb || '');
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_USAGE\\}\\}`, 'g'), color.usage || color.category || 'Brand color');
+		// Add light variants for backgrounds
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_LIGHT\\}\\}`, 'g'), lightenColor(hex, 0.85));
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_LIGHTER\\}\\}`, 'g'), lightenColor(hex, 0.92));
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_RGBA_5\\}\\}`, 'g'), hexToRgba(hex, 0.05));
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_RGBA_8\\}\\}`, 'g'), hexToRgba(hex, 0.08));
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_RGBA_10\\}\\}`, 'g'), hexToRgba(hex, 0.1));
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_RGBA_12\\}\\}`, 'g'), hexToRgba(hex, 0.12));
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_RGBA_15\\}\\}`, 'g'), hexToRgba(hex, 0.15));
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_RGBA_20\\}\\}`, 'g'), hexToRgba(hex, 0.2));
+		result = result.replace(new RegExp(`\\{\\{COLOR_${num}_RGBA_30\\}\\}`, 'g'), hexToRgba(hex, 0.3));
+	}
+	
 	// Typography
 	const typo = brandInput.typography || {};
 	const primaryFont = typo.primaryFont || { name: 'Arial', weights: ['Regular', 'Bold'], usage: 'Headlines' };

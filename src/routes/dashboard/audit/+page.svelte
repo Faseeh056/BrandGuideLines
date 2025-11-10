@@ -327,31 +327,31 @@
 	<div class="space-y-8">
 		<!-- Header -->
 		<div class="text-center">
-			<h1 class="text-3xl font-bold text-gray-900 mb-2">AI Brand Audit</h1>
-			<p class="text-gray-600">Upload brand guidelines PDF, then analyze your website with AI-powered detection.</p>
+			<h1 class="text-3xl font-bold text-foreground mb-2">AI Brand Audit</h1>
+			<p class="text-muted-foreground">Upload brand guidelines PDF, then analyze your website with AI-powered detection.</p>
 		</div>
 
 		<!-- Progress Steps -->
 		<div class="flex items-center justify-center space-x-4 mb-8">
 			<div class="flex items-center">
-				<div class="flex items-center justify-center w-8 h-8 rounded-full {currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">
+				<div class="flex items-center justify-center w-8 h-8 rounded-full {currentStep >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}">
 					1
 				</div>
-				<span class="ml-2 text-sm font-medium {currentStep >= 1 ? 'text-blue-600' : 'text-gray-500'}">Company & PDF</span>
+				<span class="ml-2 text-sm font-medium {currentStep >= 1 ? 'text-primary' : 'text-muted-foreground'}">Company & PDF</span>
 			</div>
-			<div class="w-8 h-0.5 bg-gray-200"></div>
+			<div class="w-8 h-0.5 bg-muted"></div>
 			<div class="flex items-center">
-				<div class="flex items-center justify-center w-8 h-8 rounded-full {currentStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">
+				<div class="flex items-center justify-center w-8 h-8 rounded-full {currentStep >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}">
 					2
 				</div>
-				<span class="ml-2 text-sm font-medium {currentStep >= 2 ? 'text-blue-600' : 'text-gray-500'}">Enter URL</span>
+				<span class="ml-2 text-sm font-medium {currentStep >= 2 ? 'text-primary' : 'text-muted-foreground'}">Enter URL</span>
 			</div>
-			<div class="w-8 h-0.5 bg-gray-200"></div>
+			<div class="w-8 h-0.5 bg-muted"></div>
 			<div class="flex items-center">
-				<div class="flex items-center justify-center w-8 h-8 rounded-full {currentStep >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}">
+				<div class="flex items-center justify-center w-8 h-8 rounded-full {currentStep >= 3 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}">
 					3
 				</div>
-				<span class="ml-2 text-sm font-medium {currentStep >= 3 ? 'text-blue-600' : 'text-gray-500'}">Analysis</span>
+				<span class="ml-2 text-sm font-medium {currentStep >= 3 ? 'text-primary' : 'text-muted-foreground'}">Analysis</span>
 			</div>
 		</div>
 
@@ -360,7 +360,7 @@
 			<Card>
 				<CardHeader>
 					<CardTitle class="flex items-center">
-						<span class="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white text-sm font-bold">1</span>
+						<span class="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white text-sm font-bold">1</span>
 						Enter Company Name & Upload PDF
 					</CardTitle>
 					<CardDescription>Enter your company name and upload your brand guidelines PDF to extract brand information</CardDescription>
@@ -376,15 +376,15 @@
 							class="w-full"
 							disabled={isUploading}
 						/>
-						<p class="text-xs text-gray-500">This will be used to identify your brand guidelines in the database</p>
+						<p class="text-xs text-muted-foreground">This will be used to identify your brand guidelines in the database</p>
 					</div>
 
 					<!-- File Upload Section -->
-					<div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
-						<Upload class="mx-auto h-12 w-12 text-gray-400 mb-4" />
+					<div class="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+						<Upload class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
 						<div class="space-y-2">
-							<p class="text-lg font-medium text-gray-900">Upload Brand Guidelines PDF</p>
-							<p class="text-sm text-gray-500">Drag and drop your PDF file here, or click to browse</p>
+							<p class="text-lg font-medium text-foreground">Upload Brand Guidelines PDF</p>
+							<p class="text-sm text-muted-foreground">Drag and drop your PDF file here, or click to browse</p>
 						</div>
 						<input
 							type="file"
@@ -410,23 +410,23 @@
 							{/if}
 						</button>
 						{#if !companyName.trim()}
-							<p class="text-xs text-red-500 mt-2">Please enter a company name first</p>
+							<p class="text-xs text-destructive mt-2">Please enter a company name first</p>
 						{/if}
 						<!-- Debug info -->
-						<p class="text-xs text-blue-500 mt-1">
+						<p class="text-xs text-primary mt-1">
 							Debug: companyName="{companyName}" | isUploading={isUploading} | disabled={isUploading || !companyName.trim()}
 						</p>
 					</div>
 
 					{#if uploadingMessage}
-						<div class="rounded-lg bg-green-50 p-4">
+						<div class="rounded-lg bg-primary/10 p-4">
 							<p class="text-sm text-green-800">{uploadingMessage}</p>
 						</div>
 					{/if}
 
 
 					{#if scrapingMessage}
-						<div class="rounded-lg bg-green-50 p-4">
+						<div class="rounded-lg bg-primary/10 p-4">
 							<p class="text-sm text-green-800">{scrapingMessage}</p>
 						</div>
 					{/if}
@@ -445,7 +445,7 @@
 			<Card>
 				<CardHeader>
 					<CardTitle class="flex items-center">
-						<span class="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white text-sm font-bold">2</span>
+						<span class="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white text-sm font-bold">2</span>
 						Scrape Website
 					</CardTitle>
 					<CardDescription>Enter the website URL to scrape and analyze against the uploaded brand guidelines</CardDescription>
@@ -453,8 +453,8 @@
 				<CardContent class="space-y-4">
 					{#if isLoadingBrand}
 						<div class="rounded-lg bg-gray-50 p-4 text-center">
-							<RefreshCw class="mx-auto h-6 w-6 animate-spin text-gray-400 mb-2" />
-							<p class="text-sm text-gray-600">Loading saved brand guidelines...</p>
+							<RefreshCw class="mx-auto h-6 w-6 animate-spin text-muted-foreground mb-2" />
+							<p class="text-sm text-muted-foreground">Loading saved brand guidelines...</p>
 						</div>
 					{:else if selectedBrand}
 						<div class="rounded-lg bg-blue-50 p-4 border border-blue-200">
@@ -463,8 +463,8 @@
 									<p class="text-sm text-blue-800 font-medium">
 										<strong>Brand Guidelines Loaded:</strong> {selectedBrand.brandName || selectedBrand.companyName || 'Brand'}
 									</p>
-									<p class="text-xs text-blue-600 mt-1">ID: {selectedBrand.id}</p>
-									<p class="text-xs text-blue-500 mt-2">You can test this guideline with different URLs without re-uploading</p>
+									<p class="text-xs text-primary mt-1">ID: {selectedBrand.id}</p>
+									<p class="text-xs text-primary mt-2">You can test this guideline with different URLs without re-uploading</p>
 								</div>
 								<button
 									onclick={changeBrandGuideline}
@@ -488,7 +488,7 @@
 					<div class="space-y-2">
 						<Label for="website-url">Website URL</Label>
 						<div class="relative">
-							<Link class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
+							<Link class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
 							<Input
 								id="website-url"
 								bind:value={websiteUrl}
@@ -508,13 +508,13 @@
 							/>
 							<span>Enable Visual Audit Mode</span>
 						</Label>
-						<p class="text-xs text-gray-500">
+						<p class="text-xs text-muted-foreground">
 							Visual mode provides annotated screenshots with interactive issue highlighting
 						</p>
 					</div>
 
 					{#if scrapingMessage}
-						<div class="rounded-lg bg-green-50 p-4">
+						<div class="rounded-lg bg-primary/10 p-4">
 							<p class="text-sm text-green-800">{scrapingMessage}</p>
 						</div>
 					{/if}
@@ -526,12 +526,12 @@
 					{/if}
 
 					<!-- Debug info -->
-					<div class="text-xs text-gray-500 mb-2">
+					<div class="text-xs text-muted-foreground mb-2">
 						Debug: websiteUrl="{websiteUrl}" | isScraping={isScraping} | disabled={!websiteUrl.trim() || isScraping}
 					</div>
 					
 					<button
-						class="w-full h-10 px-8 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+						class="w-full h-10 px-8 rounded-md bg-primary text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
 						disabled={!websiteUrl.trim() || isScraping}
 						onclick={scrapeWebsite}
 					>
@@ -552,10 +552,10 @@
 				{#if isScraping}
 					<Card>
 						<CardContent class="p-8 text-center">
-							<RefreshCw class="mx-auto mb-4 h-16 w-16 animate-spin text-blue-600" />
-							<h3 class="mb-2 text-lg font-medium text-gray-900">Analyzing Website</h3>
-							<p class="text-gray-600">This may take a few moments...</p>
-							<div class="mt-4 space-y-2 text-sm text-gray-500">
+							<RefreshCw class="mx-auto mb-4 h-16 w-16 animate-spin text-primary" />
+							<h3 class="mb-2 text-lg font-medium text-foreground">Analyzing Website</h3>
+							<p class="text-muted-foreground">This may take a few moments...</p>
+							<div class="mt-4 space-y-2 text-sm text-muted-foreground">
 								<p>✓ Loading webpage</p>
 								<p>✓ Extracting colors and typography</p>
 								<p>⏳ Analyzing logo usage</p>

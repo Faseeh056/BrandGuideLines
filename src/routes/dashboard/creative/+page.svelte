@@ -76,8 +76,8 @@
 
 <div class="max-w-6xl">
 	<div class="mb-8">
-		<h1 class="mb-2 text-3xl font-bold text-gray-900">Creative Generator</h1>
-		<p class="text-gray-600">Create branded social media posts and campaign creatives with AI</p>
+		<h1 class="mb-2 text-3xl font-bold text-foreground">Creative Generator</h1>
+		<p class="text-muted-foreground">Create branded social media posts and campaign creatives with AI</p>
 	</div>
 
 	<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -207,9 +207,9 @@
 				<Card>
 					<CardContent class="p-8 text-center">
 						<RefreshCw class="mx-auto mb-4 h-16 w-16 animate-spin text-purple-600" />
-						<h3 class="mb-2 text-lg font-medium text-gray-900">Creating Your Creatives</h3>
-						<p class="text-gray-600">AI is crafting the perfect branded content...</p>
-						<div class="mt-4 space-y-2 text-sm text-gray-500">
+						<h3 class="mb-2 text-lg font-medium text-foreground">Creating Your Creatives</h3>
+						<p class="text-muted-foreground">AI is crafting the perfect branded content...</p>
+						<div class="mt-4 space-y-2 text-sm text-muted-foreground">
 							<p>✓ Analyzing brand guidelines</p>
 							<p>✓ Selecting optimal layouts</p>
 							<p>⏳ Generating copy variations</p>
@@ -220,7 +220,7 @@
 			{:else if showCreatives}
 				<div class="space-y-6">
 					<div class="flex items-center justify-between">
-						<h2 class="text-xl font-semibold text-gray-900">Generated Creatives</h2>
+						<h2 class="text-xl font-semibold text-foreground">Generated Creatives</h2>
 						<Button variant="outline" size="sm" onclick={generateCreatives}>
 							<RefreshCw class="mr-2 h-4 w-4" />
 							Regenerate
@@ -247,17 +247,17 @@
 											>
 												<Sparkles class="h-6 w-6 text-white" />
 											</div>
-											<p class="text-sm font-medium text-gray-900">{campaignGoal || 'Campaign'}</p>
-											<p class="text-xs text-gray-500">{selectedPlatform || 'Social'} Creative</p>
+											<p class="text-sm font-medium text-foreground">{campaignGoal || 'Campaign'}</p>
+											<p class="text-xs text-muted-foreground">{selectedPlatform || 'Social'} Creative</p>
 										</div>
 									</div>
-									<p class="text-sm text-gray-600">AI-generated creative preview</p>
+									<p class="text-sm text-muted-foreground">AI-generated creative preview</p>
 								</div>
 
 								<!-- Sample Copy -->
-								<div class="rounded-lg bg-gray-50 p-4">
-									<h4 class="mb-2 text-sm font-medium text-gray-900">Generated Copy:</h4>
-									<p class="mb-3 text-sm text-gray-700">
+								<div class="rounded-lg bg-muted p-4">
+									<h4 class="mb-2 text-sm font-medium text-foreground">Generated Copy:</h4>
+									<p class="mb-3 text-sm text-foreground">
 										🚀 Ready to transform your {campaignGoal?.toLowerCase() || 'business'}?
 										{productHighlights
 											? `Our ${productHighlights.slice(0, 50)}...`
@@ -309,7 +309,7 @@
 					<Card>
 						<CardContent class="p-4">
 							<div class="flex items-center justify-between">
-								<p class="text-sm text-gray-600">Export all creatives</p>
+								<p class="text-sm text-muted-foreground">Export all creatives</p>
 								<div class="flex gap-2">
 									<Button variant="outline" size="sm">
 										<Download class="mr-2 h-3 w-3" />
@@ -326,7 +326,7 @@
 				</div>
 			{:else}
 				<Card class="flex h-96 items-center justify-center">
-					<div class="text-center text-gray-500">
+					<div class="text-center text-muted-foreground">
 						<Sparkles class="mx-auto mb-4 h-16 w-16 opacity-50" />
 						<p class="mb-2 text-lg font-medium">Creative Previews</p>
 						<p class="text-sm">Fill out the campaign details to generate branded creatives</p>

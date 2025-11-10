@@ -38,6 +38,7 @@
 	import { exportAsPDF, exportAsText, type ExportOptions } from '$lib/utils/export';
 	import { downloadBrandGuidelinesPptx } from '$lib/utils/pptx-client';
 	import ProgressiveGenerator from '$lib/components/ProgressiveGenerator.svelte';
+	import ThemeSelect from '$lib/components/ThemeSelect.svelte';
 
 	// Form fields
 	let brandName = '';
@@ -643,12 +644,12 @@ ${customPrompt}`;
 				'<div class="my-6 flex justify-center"><img src="$2" alt="$1" class="max-h-32 max-w-full object-contain" /></div>'
 			)
 			// Convert markdown headers to HTML
-			.replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold text-gray-900 mt-6 mb-3">$1</h3>')
-			.replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-gray-900 mt-8 mb-4">$1</h2>')
-			.replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-gray-900 mt-8 mb-6">$1</h1>')
+			.replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold text-foreground mt-6 mb-3">$1</h3>')
+			.replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-foreground mt-8 mb-4">$1</h2>')
+			.replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-foreground mt-8 mb-6">$1</h1>')
 			// Convert bold text (remove asterisks and make bold)
-			.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
-			.replace(/\*(.*?)\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+			.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
+			.replace(/\*(.*?)\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
 			// Convert bullet points
 			.replace(/^\* (.*$)/gim, '<li class="ml-4 mb-1">$1</li>')
 			.replace(/^- (.*$)/gim, '<li class="ml-4 mb-1">$1</li>')
@@ -722,7 +723,7 @@ ${customPrompt}`;
 			// No logo section found, add a new one at the beginning
 			const logoSection = `
 				<div class="mt-6 mb-6">
-					<h3 class="text-lg font-bold text-gray-900 mt-6 mb-3">Logo Guidelines</h3>
+					<h3 class="text-lg font-bold text-foreground mt-6 mb-3">Logo Guidelines</h3>
 					<div class="my-6 flex justify-center">
 						<img 
 							src="${logoPath}" 
@@ -752,11 +753,11 @@ ${customPrompt}`;
 					.map((hex) => {
 						const colorName = getColorName(hex);
 						return `
-						<div class="flex items-center gap-3 mb-3 p-3 bg-gray-50 rounded-lg">
-							<div class="w-12 h-12 rounded-lg border-2 border-gray-200 shadow-sm" style="background-color: ${hex}"></div>
+						<div class="flex items-center gap-3 mb-3 p-3 bg-muted rounded-lg">
+							<div class="w-12 h-12 rounded-lg border-2 border-border shadow-sm" style="background-color: ${hex}"></div>
 							<div>
-								<div class="font-semibold text-gray-900">${colorName}</div>
-								<div class="text-sm text-gray-600 font-mono">${hex.toUpperCase()}</div>
+								<div class="font-semibold text-foreground">${colorName}</div>
+								<div class="text-sm text-muted-foreground font-mono">${hex.toUpperCase()}</div>
 							</div>
 						</div>
 					`;
@@ -766,7 +767,7 @@ ${customPrompt}`;
 				return (
 					colorSection.replace(
 						/(<p class="mb-4">.*?<\/p>)/s,
-						`$1<div class="mt-4 mb-6"><h4 class="text-md font-semibold text-gray-900 mb-3">Color Swatches</h4>${colorSwatches}</div>`
+						`$1<div class="mt-4 mb-6"><h4 class="text-md font-semibold text-foreground mb-3">Color Swatches</h4>${colorSwatches}</div>`
 					) + nextSection
 				);
 			}
@@ -799,15 +800,15 @@ ${customPrompt}`;
 					.map((font) => {
 						const cleanFont = font.trim();
 						return `
-						<div class="mb-6 p-4 bg-gray-50 rounded-lg">
+						<div class="mb-6 p-4 bg-muted rounded-lg">
 							<div class="mb-3">
-								<h4 class="text-lg font-semibold text-gray-900 mb-2">${cleanFont}</h4>
-								<p class="text-sm text-gray-600">Primary Font</p>
+								<h4 class="text-lg font-semibold text-foreground mb-2">${cleanFont}</h4>
+								<p class="text-sm text-muted-foreground">Primary Font</p>
 							</div>
 							<div class="space-y-2">
-								<div class="text-2xl font-bold text-gray-900" style="font-family: '${cleanFont}', serif;">ABCDEFGHIJKLMNOPQRSTUVWXYZ</div>
-								<div class="text-lg text-gray-700" style="font-family: '${cleanFont}', serif;">abcdefghijklmnopqrstuvwxyz</div>
-								<div class="text-lg text-gray-700" style="font-family: '${cleanFont}', serif;">1234567890 !@#$%^&*()</div>
+								<div class="text-2xl font-bold text-foreground" style="font-family: '${cleanFont}', serif;">ABCDEFGHIJKLMNOPQRSTUVWXYZ</div>
+								<div class="text-lg text-foreground" style="font-family: '${cleanFont}', serif;">abcdefghijklmnopqrstuvwxyz</div>
+								<div class="text-lg text-foreground" style="font-family: '${cleanFont}', serif;">1234567890 !@#$%^&*()</div>
 							</div>
 						</div>
 					`;
@@ -817,7 +818,7 @@ ${customPrompt}`;
 				return (
 					typographySection.replace(
 						/(<p class="mb-4">.*?<\/p>)/s,
-						`$1<div class="mt-4 mb-6"><h4 class="text-md font-semibold text-gray-900 mb-3">Font Showcase</h4>${typographyShowcase}</div>`
+						`$1<div class="mt-4 mb-6"><h4 class="text-md font-semibold text-foreground mb-3">Font Showcase</h4>${typographyShowcase}</div>`
 					) + nextSection
 				);
 			}
@@ -1037,8 +1038,8 @@ ${customPrompt}`;
 	<div class="mb-8">
 		<div class="flex items-center justify-between">
 			<div>
-				<h1 class="mb-2 text-3xl font-bold text-gray-900">Brand Builder</h1>
-				<p class="text-gray-600">Create brand guidelines step-by-step with AI assistance</p>
+				<h1 class="mb-2 text-3xl font-bold text-foreground">Brand Builder</h1>
+				<p class="text-muted-foreground">Create brand guidelines step-by-step with AI assistance</p>
 			</div>
 			<div class="flex gap-2">
 				<Button variant="outline" size="sm" onclick={goToHistory}>
@@ -1055,7 +1056,7 @@ ${customPrompt}`;
 			<Card>
 				<CardHeader>
 					<CardTitle class="flex items-center gap-2">
-						<Zap class="h-5 w-5 text-blue-600" />
+						<Zap class="h-5 w-5 text-primary" />
 						Brand Information
 					</CardTitle>
 					<CardDescription>
@@ -1067,8 +1068,8 @@ ${customPrompt}`;
 							<!-- Brand Identity Section -->
 							<div class="space-y-4">
 								<div class="mb-3 flex items-center gap-2">
-									<div class="h-2 w-2 rounded-full bg-blue-600"></div>
-									<h3 class="text-lg font-semibold text-gray-900">Brand Identity</h3>
+									<div class="h-2 w-2 rounded-full bg-primary"></div>
+									<h3 class="text-lg font-semibold text-foreground">Brand Identity</h3>
 								</div>
 
 								<div class="space-y-2">
@@ -1081,24 +1082,20 @@ ${customPrompt}`;
 										required
 										class="text-base"
 									/>
-									<p class="text-xs text-gray-500">The official name of your brand or company</p>
+									<p class="text-xs text-muted-foreground">The official name of your brand or company</p>
 								</div>
 
 								<div class="space-y-2">
 									<Label for="brand-domain">Brand Domain *</Label>
-									<select
+									<ThemeSelect
 										id="brand-domain"
 										name="brandDomain"
 										bind:value={brandDomain}
-										class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+										placeholder="Select your brand domain"
+										options={domainOptions}
 										required
-									>
-										<option value="">Select your brand domain</option>
-										{#each domainOptions as domain (domain)}
-											<option value={domain}>{domain}</option>
-										{/each}
-									</select>
-									<p class="text-xs text-gray-500">
+									/>
+									<p class="text-xs text-muted-foreground">
 										This determines the specialized AI adaptations and industry-specific guidelines
 									</p>
 								</div>
@@ -1124,7 +1121,7 @@ ${customPrompt}`;
 										placeholder="Describe your brand's core values, mission, and what makes you unique..."
 										rows={4}
 									/>
-									<p class="text-xs text-gray-500">
+									<p class="text-xs text-muted-foreground">
 										Help us understand your brand's purpose and personality
 									</p>
 								</div>
@@ -1135,40 +1132,32 @@ ${customPrompt}`;
 							<!-- Brand Positioning Section -->
 							<div class="space-y-4">
 								<div class="mb-3 flex items-center gap-2">
-									<div class="h-2 w-2 rounded-full bg-green-600"></div>
-									<h3 class="text-lg font-semibold text-gray-900">Brand Positioning</h3>
+									<div class="h-2 w-2 rounded-full bg-primary"></div>
+									<h3 class="text-lg font-semibold text-foreground">Brand Positioning</h3>
 								</div>
 
 								<div class="space-y-2">
 									<Label for="mood">Brand Mood & Personality</Label>
-									<select
+									<ThemeSelect
 										id="mood"
 										name="mood"
 										bind:value={selectedMood}
-										class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-									>
-										<option value="">Select brand mood</option>
-										{#each mockMoodOptions as mood (mood)}
-											<option value={mood}>{mood}</option>
-										{/each}
-									</select>
-									<p class="text-xs text-gray-500">How should your brand feel and communicate?</p>
+										placeholder="Select brand mood"
+										options={mockMoodOptions}
+									/>
+									<p class="text-xs text-muted-foreground">How should your brand feel and communicate?</p>
 								</div>
 
 								<div class="space-y-2">
 									<Label for="audience">Target Audience</Label>
-									<select
+									<ThemeSelect
 										id="audience"
 										name="audience"
 										bind:value={selectedAudience}
-										class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-									>
-										<option value="">Select target audience</option>
-										{#each mockTargetAudiences as audience (audience)}
-											<option value={audience}>{audience}</option>
-										{/each}
-									</select>
-									<p class="text-xs text-gray-500">Who are your primary customers or users?</p>
+										placeholder="Select target audience"
+										options={mockTargetAudiences}
+									/>
+									<p class="text-xs text-muted-foreground">Who are your primary customers or users?</p>
 								</div>
 							</div>
 
@@ -1177,8 +1166,8 @@ ${customPrompt}`;
 							<!-- Contact Information Section -->
 							<div class="space-y-4">
 								<div class="mb-3 flex items-center gap-2">
-									<div class="h-2 w-2 rounded-full bg-purple-600"></div>
-									<h3 class="text-lg font-semibold text-gray-900">Contact Information</h3>
+									<div class="h-2 w-2 rounded-full bg-accent"></div>
+									<h3 class="text-lg font-semibold text-foreground">Contact Information</h3>
 								</div>
 
 								<div class="grid grid-cols-2 gap-4">
@@ -1232,8 +1221,8 @@ ${customPrompt}`;
 							<!-- Additional Details Section -->
 							<div class="space-y-4">
 								<div class="mb-3 flex items-center gap-2">
-									<div class="h-2 w-2 rounded-full bg-purple-600"></div>
-									<h3 class="text-lg font-semibold text-gray-900">Additional Details</h3>
+									<div class="h-2 w-2 rounded-full bg-accent"></div>
+									<h3 class="text-lg font-semibold text-foreground">Additional Details</h3>
 								</div>
 
 								<div class="space-y-2">
@@ -1245,7 +1234,7 @@ ${customPrompt}`;
 										placeholder="Describe your brand vision, style preferences, tagline ideas, or any specific requirements for the brand guidelines..."
 										rows={4}
 									/>
-									<p class="text-xs text-gray-500">
+									<p class="text-xs text-muted-foreground">
 										Include taglines, style preferences, color inspirations, or any specific
 										requirements
 									</p>
@@ -1263,14 +1252,14 @@ ${customPrompt}`;
 				<CardContent class="space-y-4">
 					{#if logoPreview}
 						<!-- Logo Preview -->
-						<div class="relative rounded-lg border border-gray-200 p-4">
+						<div class="relative rounded-lg border border-border p-4">
 							<div class="mb-3 flex items-center justify-between">
-								<h4 class="text-sm font-medium text-gray-900">Logo Preview</h4>
+								<h4 class="text-sm font-medium text-foreground">Logo Preview</h4>
 								<Button
 									variant="ghost"
 									size="sm"
 									onclick={removeLogo}
-									class="text-red-600 hover:text-red-700"
+									class="text-destructive hover:text-destructive"
 								>
 									<Trash2 class="h-4 w-4" />
 								</Button>
@@ -1282,13 +1271,13 @@ ${customPrompt}`;
 									class="max-h-32 max-w-full object-contain"
 								/>
 							</div>
-							<p class="mt-2 text-center text-xs text-gray-500">Brand Logo Analysis</p>
+							<p class="mt-2 text-center text-xs text-muted-foreground">Brand Logo Analysis</p>
 						</div>
 
 						<!-- Logo Analysis Section -->
-						<div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-							<h4 class="mb-3 text-sm font-semibold text-blue-900">Logo Analysis</h4>
-							<div class="text-sm leading-relaxed text-blue-800">
+						<div class="mt-4 rounded-lg border border-primary/20 bg-primary/10 p-4">
+							<h4 class="mb-3 text-sm font-semibold text-primary">Logo Analysis</h4>
+							<div class="text-sm leading-relaxed text-primary">
 								<p class="mb-3">
 									<strong>Visual Elements:</strong> The logo features a modern, clean design with geometric
 									shapes and contemporary typography. The composition suggests professionalism and innovation.
@@ -1310,16 +1299,16 @@ ${customPrompt}`;
 						</div>
 					{:else}
 						<!-- Upload Area -->
-						<div class="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center">
-							<Upload class="mx-auto mb-4 h-12 w-12 text-gray-400" />
+						<div class="rounded-lg border-2 border-dashed border-border p-6 text-center">
+							<Upload class="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
 							<div class="space-y-2">
-								<p class="text-sm font-medium text-gray-900">Upload your logo</p>
-								<p class="text-xs text-gray-500">PNG, JPG, SVG up to 5MB</p>
+								<p class="text-sm font-medium text-foreground">Upload your logo</p>
+								<p class="text-xs text-muted-foreground">PNG, JPG, SVG up to 5MB</p>
 							</div>
 							<input
 								id="logo-upload"
 								type="file"
-								class="mt-4 block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+								class="mt-4 block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
 								accept="image/*"
 								onchange={handleLogoUpload}
 							/>
@@ -1327,7 +1316,7 @@ ${customPrompt}`;
 					{/if}
 
 					<div class="text-center">
-						<p class="mb-2 text-sm text-gray-500">or</p>
+						<p class="mb-2 text-sm text-muted-foreground">or</p>
 						<Button variant="outline" class="w-full">Generate Logo with AI</Button>
 					</div>
 				</CardContent>
@@ -1347,7 +1336,7 @@ ${customPrompt}`;
 
 			{#if !brandName.trim() || !brandDomain || !shortDescription.trim()}
 				<div class="text-center">
-					<p class="text-sm text-gray-500">
+					<p class="text-sm text-muted-foreground">
 						{#if !brandName.trim()}
 							Brand name is required
 						{:else if !brandDomain}
@@ -1389,10 +1378,10 @@ ${customPrompt}`;
 				<Card>
 					<CardContent class="p-6">
 						<div class="flex items-start gap-3">
-							<AlertCircle class="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+							<AlertCircle class="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" />
 							<div>
-								<h3 class="text-sm font-medium text-red-800">Generation Error</h3>
-								<p class="mt-1 text-sm text-red-700">{errorMessage}</p>
+								<h3 class="text-sm font-medium text-destructive">Generation Error</h3>
+								<p class="mt-1 text-sm text-destructive">{errorMessage}</p>
 								<Button
 									variant="outline"
 									size="sm"
@@ -1412,11 +1401,11 @@ ${customPrompt}`;
 			<!-- Brand guidelines completed -->
 			<Card>
 				<CardContent class="p-8 text-center">
-					<CheckCircle class="mx-auto mb-4 h-16 w-16 text-green-500" />
-					<h2 class="mb-2 text-2xl font-bold text-gray-900">
+					<CheckCircle class="mx-auto mb-4 h-16 w-16 text-primary" />
+					<h2 class="mb-2 text-2xl font-bold text-foreground">
 						Brand Guidelines Created Successfully!
 					</h2>
-					<p class="mb-6 text-gray-600">
+					<p class="mb-6 text-muted-foreground">
 						Your brand guidelines have been generated and saved. You can view them in your history or download as PowerPoint.
 					</p>
 					<div class="flex justify-center gap-4">
@@ -1436,7 +1425,7 @@ ${customPrompt}`;
 			</Card>
 			{:else}
 				<Card class="flex h-96 items-center justify-center">
-					<div class="text-center text-gray-500">
+					<div class="text-center text-muted-foreground">
 						<Zap class="mx-auto mb-4 h-16 w-16 opacity-50" />
 						<p class="mb-2 text-lg font-medium">Brand Guidelines Preview</p>
 						<p class="text-sm">

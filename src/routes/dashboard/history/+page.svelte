@@ -430,12 +430,12 @@
 				'<div class="my-6 flex justify-center"><img src="$2" alt="$1" class="max-h-32 max-w-full object-contain" /></div>'
 			)
 			// Convert markdown headers to HTML
-			.replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold text-gray-900 mt-6 mb-3">$1</h3>')
-			.replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-gray-900 mt-8 mb-4">$1</h2>')
-			.replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-gray-900 mt-8 mb-6">$1</h1>')
+			.replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold text-foreground mt-6 mb-3">$1</h3>')
+			.replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold text-foreground mt-8 mb-4">$1</h2>')
+			.replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-foreground mt-8 mb-6">$1</h1>')
 			// Convert bold text (remove asterisks and make bold)
-			.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
-			.replace(/\*(.*?)\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+			.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
+			.replace(/\*(.*?)\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
 			// Convert bullet points
 			.replace(/^\* (.*$)/gim, '<li class="ml-4 mb-1">$1</li>')
 			.replace(/^- (.*$)/gim, '<li class="ml-4 mb-1">$1</li>')
@@ -490,15 +490,15 @@
 						const usage = getColorUsage(index);
 
 						return `
-						<div class="flex items-center gap-3 mb-3 p-3 bg-gray-50 rounded-lg">
-							<div class="w-12 h-12 rounded-lg border-2 border-gray-200 shadow-sm" style="background-color: ${hex}"></div>
+						<div class="flex items-center gap-3 mb-3 p-3 bg-muted rounded-lg">
+							<div class="w-12 h-12 rounded-lg border-2 border-border shadow-sm" style="background-color: ${hex}"></div>
 							<div class="flex-1">
-								<div class="font-semibold text-gray-900">${colorName}</div>
-								<div class="text-sm text-gray-600 font-mono">${hex.toUpperCase()}</div>
-								<div class="text-xs text-gray-500 mt-1">
+								<div class="font-semibold text-foreground">${colorName}</div>
+								<div class="text-sm text-muted-foreground font-mono">${hex.toUpperCase()}</div>
+								<div class="text-xs text-muted-foreground mt-1">
 									<div>RGB: ${rgb}</div>
 									<div>CMYK: ${cmyk}</div>
-									<div class="mt-1 text-gray-600">${usage}</div>
+									<div class="mt-1 text-muted-foreground">${usage}</div>
 								</div>
 							</div>
 						</div>
@@ -509,7 +509,7 @@
 				return (
 					colorSection.replace(
 						/(<p class="mb-4">.*?<\/p>)/s,
-						`$1<div class="mt-4 mb-6"><h4 class="text-md font-semibold text-gray-900 mb-3">Color Swatches</h4>${colorSwatches}</div>`
+						`$1<div class="mt-4 mb-6"><h4 class="text-md font-semibold text-foreground mb-3">Color Swatches</h4>${colorSwatches}</div>`
 					) + nextSection
 				);
 			}
@@ -547,16 +547,16 @@
 						const weights = 'Regular, Medium, Bold';
 
 						return `
-						<div class="mb-6 p-4 bg-gray-50 rounded-lg">
+						<div class="mb-6 p-4 bg-muted rounded-lg">
 							<div class="mb-3">
-								<h4 class="text-lg font-semibold text-gray-900 mb-2">${cleanFont}</h4>
-								<p class="text-sm text-gray-600 mb-1">${usage}</p>
-								<p class="text-xs text-gray-500">Weights: ${weights}</p>
+								<h4 class="text-lg font-semibold text-foreground mb-2">${cleanFont}</h4>
+								<p class="text-sm text-muted-foreground mb-1">${usage}</p>
+								<p class="text-xs text-muted-foreground">Weights: ${weights}</p>
 							</div>
 							<div class="space-y-2">
-								<div class="text-2xl font-bold text-gray-900" style="font-family: '${cleanFont}', serif;">ABCDEFGHIJKLMNOPQRSTUVWXYZ</div>
-								<div class="text-lg text-gray-700" style="font-family: '${cleanFont}', serif;">abcdefghijklmnopqrstuvwxyz</div>
-								<div class="text-lg text-gray-700" style="font-family: '${cleanFont}', serif;">1234567890 !@#$%^&*()</div>
+								<div class="text-2xl font-bold text-foreground" style="font-family: '${cleanFont}', serif;">ABCDEFGHIJKLMNOPQRSTUVWXYZ</div>
+								<div class="text-lg text-foreground" style="font-family: '${cleanFont}', serif;">abcdefghijklmnopqrstuvwxyz</div>
+								<div class="text-lg text-foreground" style="font-family: '${cleanFont}', serif;">1234567890 !@#$%^&*()</div>
 							</div>
 						</div>
 					`;
@@ -566,7 +566,7 @@
 				return (
 					typographySection.replace(
 						/(<p class="mb-4">.*?<\/p>)/s,
-						`$1<div class="mt-4 mb-6"><h4 class="text-md font-semibold text-gray-900 mb-3">Font Showcase</h4>${typographyShowcase}</div>`
+						`$1<div class="mt-4 mb-6"><h4 class="text-md font-semibold text-foreground mb-3">Font Showcase</h4>${typographyShowcase}</div>`
 					) + nextSection
 				);
 			}
@@ -609,7 +609,7 @@
 			// No logo section found, add a simple logo section at the beginning
 			const logoSection = `
 				<div class="mt-6 mb-6">
-					<h3 class="text-lg font-bold text-gray-900 mt-6 mb-3">Logo Guidelines</h3>
+					<h3 class="text-lg font-bold text-foreground mt-6 mb-3">Logo Guidelines</h3>
 					<div class="my-6 flex justify-center">
 						<img 
 							src="${logoPath}" 
@@ -1304,8 +1304,8 @@
 	<div class="mb-8">
 		<div class="flex items-center justify-between">
 			<div>
-				<h1 class="mb-2 text-3xl font-bold text-gray-900">Brand Guidelines History</h1>
-				<p class="text-gray-600">View and manage your previously generated brand guidelines</p>
+				<h1 class="mb-2 text-3xl font-bold text-foreground">Brand Guidelines History</h1>
+				<p class="text-muted-foreground">View and manage your previously generated brand guidelines</p>
 			</div>
 			<div class="flex gap-2">
 				<Button variant="outline" onclick={goToBuilder}>
@@ -1416,10 +1416,10 @@
 				<!-- Guideline Metadata -->
 				<div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
 					{#if selectedGuideline.industry}
-						<div class="flex items-center gap-2 rounded-lg bg-gray-50 p-3">
-							<Tag class="h-4 w-4 text-gray-600" />
+						<div class="flex items-center gap-2 rounded-lg bg-muted p-3">
+							<Tag class="h-4 w-4 text-muted-foreground" />
 							<div>
-								<p class="text-xs text-gray-500">Industry</p>
+								<p class="text-xs text-muted-foreground">Industry</p>
 								<p class="text-sm font-medium">{selectedGuideline.industry}</p>
 							</div>
 						</div>
@@ -1428,7 +1428,7 @@
 						<div class="flex items-center gap-2 rounded-lg bg-blue-50 p-3">
 							<Palette class="h-4 w-4 text-blue-600" />
 							<div>
-								<p class="text-xs text-gray-500">Mood</p>
+								<p class="text-xs text-muted-foreground">Mood</p>
 								<p class="text-sm font-medium">{selectedGuideline.mood}</p>
 							</div>
 						</div>
@@ -1437,7 +1437,7 @@
 						<div class="flex items-center gap-2 rounded-lg bg-green-50 p-3">
 							<Users class="h-4 w-4 text-green-600" />
 							<div>
-								<p class="text-xs text-gray-500">Audience</p>
+								<p class="text-xs text-muted-foreground">Audience</p>
 								<p class="text-sm font-medium">{selectedGuideline.audience}</p>
 							</div>
 						</div>
@@ -1445,7 +1445,7 @@
 					<div class="flex items-center gap-2 rounded-lg bg-purple-50 p-3">
 						<Calendar class="h-4 w-4 text-purple-600" />
 						<div>
-							<p class="text-xs text-gray-500">Created</p>
+							<p class="text-xs text-muted-foreground">Created</p>
 							<p class="text-sm font-medium">{formatTimeAgo(selectedGuideline.createdAt)}</p>
 						</div>
 					</div>
@@ -1478,7 +1478,7 @@
 						<div class="flex items-center justify-center py-12">
 							<div class="text-center">
 								<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-								<p class="text-gray-600">Loading slides...</p>
+								<p class="text-muted-foreground">Loading slides...</p>
 							</div>
 						</div>
 					{:else if slidesError}
@@ -1493,7 +1493,7 @@
 							<div class="bg-white rounded-lg shadow-sm p-4">
 								<div class="flex items-center justify-between flex-wrap gap-4">
 									<div class="flex items-center gap-4">
-										<div class="text-sm text-gray-600">
+										<div class="text-sm text-muted-foreground">
 											Slide {currentSlideIndex + 1} of {slides.length} - {slides[currentSlideIndex]?.slideTitle || slides[currentSlideIndex]?.name || 'Slide'}
 										</div>
 										<div class="flex items-center gap-2">
@@ -1561,7 +1561,7 @@
 											</Button>
 											
 											{#if showExportDropdown}
-												<div class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+												<div class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-border z-50">
 													<button
 														class="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-t-lg flex items-center gap-2 text-sm"
 														onclick={() => { downloadSlidesFromHistory(selectedGuideline); showExportDropdown = false; }}
@@ -1586,7 +1586,7 @@
 								<div class="space-y-4">
 									<div class="bg-white rounded-lg shadow-lg p-4">
 										<div class="relative mx-auto w-full">
-											<div class="mx-auto max-w-[1280px] overflow-hidden rounded-lg border-2 border-gray-200 bg-white">
+											<div class="mx-auto max-w-[1280px] overflow-hidden rounded-lg border-2 border-border bg-white">
 												{#if slides[currentSlideIndex]}
 													<iframe
 														bind:this={iframeRef}
@@ -1615,7 +1615,7 @@
 												<option value={set.value}>{set.label}</option>
 											{/each}
 										</select>
-										<p class="mt-2 text-xs text-gray-500">
+										<p class="mt-2 text-xs text-muted-foreground">
 											{templateSets.find(s => s.value === selectedTemplateSet)?.description || ''}
 										</p>
 										{#if isSwitchingTemplate}
@@ -1646,19 +1646,19 @@
 												})()}
 												<button
 													onclick={() => goToSlide(idx)}
-													class="w-full rounded border p-3 text-left text-sm transition-colors hover:bg-gray-50 {currentSlideIndex === idx ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-700'}"
+													class="w-full rounded border p-3 text-left text-sm transition-colors hover:bg-muted {currentSlideIndex === idx ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-border text-foreground'}"
 												>
 													<div class="font-medium">{slideTitle}</div>
-													<div class="text-xs text-gray-500 mt-1">Slide {idx + 1}</div>
+													<div class="text-xs text-muted-foreground mt-1">Slide {idx + 1}</div>
 												</button>
 											{/each}
 										</div>
 									</div>
 									
 									<!-- Edit Status -->
-									<div class="bg-gray-50 rounded-lg p-4">
+									<div class="bg-muted rounded-lg p-4">
 										<h4 class="font-semibold text-gray-800 mb-2">📋 Status</h4>
-										<div class="text-sm text-gray-600 space-y-1">
+										<div class="text-sm text-muted-foreground space-y-1">
 											<div><strong>Brand:</strong> {selectedGuideline.brandName}</div>
 											<div><strong>Slides:</strong> {slides.length}</div>
 											<div><strong>Edit Status:</strong> {isEditable ? '✏️ Editing' : '👁️ Viewing'}</div>
@@ -1693,8 +1693,8 @@
 					{:else}
 						<!-- No slides found, show fallback content -->
 						<div class="text-center py-12">
-							<div class="text-gray-600 mb-4">No slides found for this brand guideline.</div>
-							<p class="text-sm text-gray-500 mb-4">
+							<div class="text-muted-foreground mb-4">No slides found for this brand guideline.</div>
+							<p class="text-sm text-muted-foreground mb-4">
 								Slides are generated when you preview or download your brand guidelines.
 							</p>
 							<Button onclick={() => goto('/dashboard/preview-html')}>
@@ -1711,8 +1711,8 @@
 			<Card>
 				<CardContent class="p-12 text-center">
 					<History class="mx-auto mb-4 h-16 w-16 text-gray-400" />
-					<h3 class="mb-2 text-lg font-medium text-gray-900">No Brand Guidelines Yet</h3>
-					<p class="mb-6 text-gray-600">
+					<h3 class="mb-2 text-lg font-medium text-foreground">No Brand Guidelines Yet</h3>
+					<p class="mb-6 text-muted-foreground">
 						You haven't generated any brand guidelines yet. Create your first one to see it here.
 					</p>
 					<Button onclick={goToBuilder}>Create Brand Guidelines</Button>
@@ -1721,7 +1721,7 @@
 		{:else}
 			<div class="space-y-4">
 				<div class="flex items-center justify-between">
-					<h2 class="text-lg font-semibold text-gray-900">
+					<h2 class="text-lg font-semibold text-foreground">
 						{userGuidelines.length} Brand Guidelines
 					</h2>
 				</div>
@@ -1735,31 +1735,31 @@
 							<CardContent class="p-4">
 								<div class="space-y-3">
 									<div class="flex items-start justify-between">
-										<h3 class="flex-1 truncate font-semibold text-gray-900">
+										<h3 class="flex-1 truncate font-semibold text-foreground">
 											{guideline.brandName}
 										</h3>
 										<Eye class="ml-2 h-4 w-4 flex-shrink-0 text-gray-400" />
 									</div>
 
-									<div class="flex items-center gap-2 text-sm text-gray-500">
+									<div class="flex items-center gap-2 text-sm text-muted-foreground">
 										<Clock class="h-3 w-3" />
 										{formatTimeAgo(guideline.createdAt)}
 									</div>
 
 									<div class="flex flex-wrap gap-1">
 										{#if guideline.industry}
-											<span class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
+											<span class="rounded-full bg-gray-100 px-2 py-1 text-xs text-muted-foreground">
 												{guideline.industry}
 											</span>
 										{/if}
 										{#if guideline.mood}
-											<span class="rounded-full bg-blue-100 px-2 py-1 text-xs text-gray-600">
+											<span class="rounded-full bg-blue-100 px-2 py-1 text-xs text-muted-foreground">
 												{guideline.mood}
 											</span>
 										{/if}
 									</div>
 
-									<p class="line-clamp-3 text-xs text-gray-500">
+									<p class="line-clamp-3 text-xs text-muted-foreground">
 										{guideline.content.substring(0, 150)}...
 									</p>
 

@@ -10,6 +10,7 @@
 	import { CheckCircle, XCircle, Loader } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
 	let status = $state('loading');
 	let message = $state('Verifying your email...');
@@ -40,19 +41,19 @@
 	<CardHeader class="text-center">
 		<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
 			{#if status === 'loading'}
-				<Loader class="h-6 w-6 animate-spin text-blue-600" />
+				<Loader class="h-6 w-6 animate-spin text-primary" />
 			{:else if status === 'success'}
-				<CheckCircle class="h-6 w-6 text-green-600" />
+				<CheckCircle class="h-6 w-6 text-primary" />
 			{:else}
-				<XCircle class="h-6 w-6 text-red-600" />
+				<XCircle class="h-6 w-6 text-destructive" />
 			{/if}
 		</div>
 		<CardTitle
 			class="text-2xl font-bold {status === 'success'
-				? 'text-green-600'
+				? 'text-primary'
 				: status === 'error'
-					? 'text-red-600'
-					: 'text-blue-600'}"
+					? 'text-destructive'
+					: 'text-primary'}"
 		>
 			{#if status === 'loading'}
 				Verifying Email
@@ -68,15 +69,15 @@
 	</CardHeader>
 	<CardContent class="space-y-4 text-center">
 		{#if status === 'success'}
-			<div class="rounded-lg border border-green-200 bg-green-50 p-4">
-				<p class="text-sm text-green-800">
+			<div class="rounded-lg border border-primary/20 bg-primary/10 p-4">
+				<p class="text-sm text-primary">
 					Your email has been successfully verified. You can now access all features of EternaBrand.
 				</p>
 			</div>
 			<Button href="/auth/signup">Continue to Create Account</Button>
 		{:else if status === 'error'}
-			<div class="rounded-lg border border-red-200 bg-red-50 p-4">
-				<p class="text-sm text-red-800">
+			<div class="rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+				<p class="text-sm text-destructive">
 					The verification link may have expired or is invalid. Please request a new verification
 					email.
 				</p>

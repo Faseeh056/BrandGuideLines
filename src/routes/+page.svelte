@@ -8,14 +8,18 @@
 		CardTitle
 	} from '$lib/components/ui/card';
 	import { ArrowRight, Palette, Search, Sparkles } from 'lucide-svelte';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 </script>
 
 <!-- Hero Section -->
-<section class="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
+<section class="relative bg-gradient-to-br from-primary/10 to-accent/10 py-20">
 	<div class="container mx-auto px-4 text-center">
-		<h1 class="mb-4 text-5xl font-bold text-gray-900">EternaBrand</h1>
-		<p class="mb-6 text-2xl font-medium text-blue-600">AI Brand Guideline Assistant</p>
-		<p class="mx-auto mb-8 max-w-2xl text-xl text-gray-600">
+		<div class="absolute top-4 right-4 z-10">
+			<ThemeToggle />
+		</div>
+		<h1 class="mb-4 text-5xl font-bold text-foreground">EternaBrand</h1>
+		<p class="mb-6 text-2xl font-medium text-primary">AI Brand Guideline Assistant</p>
+		<p class="mx-auto mb-8 max-w-2xl text-xl text-muted-foreground">
 			Generate complete brand guidelines, audit existing assets, and create stunning branded content
 			with the power of AI
 		</p>
@@ -33,10 +37,10 @@
 <section class="py-20">
 	<div class="container mx-auto px-4">
 		<div class="mb-16 text-center">
-			<h2 class="mb-4 text-3xl font-bold text-gray-900">
+			<h2 class="mb-4 text-3xl font-bold text-foreground">
 				Everything you need to build a consistent brand
 			</h2>
-			<p class="mx-auto max-w-2xl text-lg text-gray-600">
+			<p class="mx-auto max-w-2xl text-lg text-muted-foreground">
 				From brand guidelines to creative assets, EternaBrand helps you maintain brand consistency
 				across all touchpoints
 			</p>
@@ -47,9 +51,9 @@
 			<Card class="text-center">
 				<CardHeader>
 					<div
-						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100"
+						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"
 					>
-						<Palette class="h-6 w-6 text-blue-600" />
+						<Palette class="h-6 w-6 text-primary" />
 					</div>
 					<CardTitle>Brand Builder</CardTitle>
 					<CardDescription>
@@ -58,7 +62,7 @@
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<ul class="space-y-2 text-sm text-gray-600">
+					<ul class="space-y-2 text-sm text-muted-foreground">
 						<li>• Logo generation & guidelines</li>
 						<li>• Color palette creation</li>
 						<li>• Typography recommendations</li>
@@ -71,9 +75,9 @@
 			<Card class="text-center">
 				<CardHeader>
 					<div
-						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-green-100"
+						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"
 					>
-						<Search class="h-6 w-6 text-green-600" />
+						<Search class="h-6 w-6 text-primary" />
 					</div>
 					<CardTitle>Brand Audit</CardTitle>
 					<CardDescription>
@@ -81,7 +85,7 @@
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<ul class="space-y-2 text-sm text-gray-600">
+					<ul class="space-y-2 text-sm text-muted-foreground">
 						<li>• Website compliance check</li>
 						<li>• Asset consistency analysis</li>
 						<li>• Automated fix suggestions</li>
@@ -94,9 +98,9 @@
 			<Card class="text-center">
 				<CardHeader>
 					<div
-						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100"
+						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10"
 					>
-						<Sparkles class="h-6 w-6 text-purple-600" />
+						<Sparkles class="h-6 w-6 text-accent-foreground" />
 					</div>
 					<CardTitle>Creative Generator</CardTitle>
 					<CardDescription>
@@ -104,7 +108,7 @@
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<ul class="space-y-2 text-sm text-gray-600">
+					<ul class="space-y-2 text-sm text-muted-foreground">
 						<li>• Social media templates</li>
 						<li>• Campaign creatives</li>
 						<li>• Multi-platform formats</li>
@@ -117,10 +121,10 @@
 </section>
 
 <!-- CTA Section -->
-<section class="bg-gray-50 py-20">
+<section class="bg-muted py-20">
 	<div class="container mx-auto px-4 text-center">
-		<h2 class="mb-4 text-3xl font-bold text-gray-900">Ready to build your brand?</h2>
-		<p class="mx-auto mb-8 max-w-xl text-lg text-gray-600">
+		<h2 class="mb-4 text-3xl font-bold text-foreground">Ready to build your brand?</h2>
+		<p class="mx-auto mb-8 max-w-xl text-lg text-muted-foreground">
 			Join thousands of businesses using EternaBrand to create consistent, professional brand
 			experiences
 		</p>

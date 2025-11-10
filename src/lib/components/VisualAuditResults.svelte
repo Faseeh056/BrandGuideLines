@@ -130,18 +130,18 @@
     <CardHeader>
       <div class="flex items-center justify-between">
         <div>
-          <CardTitle class="text-2xl font-bold text-gray-900">
+          <CardTitle class="text-2xl font-bold text-foreground">
             Visual Brand Compliance Audit
           </CardTitle>
-          <CardDescription class="text-gray-600 mt-2">
+          <CardDescription class="text-muted-foreground mt-2">
             Interactive analysis for <strong>{brandName}</strong> • {websiteUrl}
           </CardDescription>
         </div>
         <div class="text-right">
-          <div class="text-4xl font-bold text-blue-600">
+          <div class="text-4xl font-bold text-primary">
             {Math.round(((auditData?.overallScore ?? 0) * 100))}%
           </div>
-          <div class="text-sm text-gray-500">
+          <div class="text-sm text-muted-foreground">
             {(auditData?.overallScore ?? 0) > 0.8 ? 'Excellent' : 
              (auditData?.overallScore ?? 0) > 0.6 ? 'Good' : 
              (auditData?.overallScore ?? 0) > 0.4 ? 'Needs Improvement' : 'Poor'}
@@ -158,7 +158,7 @@
       {#if visualData?.annotatedScreenshot}
         <Card class="mb-6">
           <CardHeader>
-            <CardTitle class="text-lg font-semibold text-gray-900 flex items-center">
+            <CardTitle class="text-lg font-semibold text-foreground flex items-center">
               📸 Annotated Website Screenshot
             </CardTitle>
             <CardDescription>
@@ -170,7 +170,7 @@
               <img 
                 src={visualData.annotatedScreenshot} 
                 alt="Annotated webpage screenshot" 
-                class="max-w-full h-auto rounded-lg shadow-lg border border-gray-200"
+                class="max-w-full h-auto rounded-lg shadow-lg border border-border"
                 style="max-height: 600px;"
               />
               
@@ -199,7 +199,7 @@
     <div class="issues-sidebar">
       <Card>
         <CardHeader>
-          <CardTitle class="text-lg font-semibold text-gray-900">
+          <CardTitle class="text-lg font-semibold text-foreground">
             Detected Issues ({auditData?.issues?.length || 0})
           </CardTitle>
           <CardDescription>
@@ -211,13 +211,13 @@
             {#each Object.entries(groupedIssues) as [category, group]}
               <div class="issue-category">
                 <button
-                  class="w-full flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  class="w-full flex items-center justify-between p-3 bg-muted rounded-lg hover:bg-muted transition-colors"
                   onclick={() => toggleSection(category)}
                 >
                   <div class="flex items-center gap-2">
                     <span class="text-lg">{getCategoryIcon(category)}</span>
                     <span class="font-medium capitalize">{category}</span>
-                    <span class="text-sm text-gray-500">({group.issues.length})</span>
+                    <span class="text-sm text-muted-foreground">({group.issues.length})</span>
                   </div>
                   {#if expandedSections.has(category)}
                     <ChevronDown class="h-4 w-4" />
@@ -273,27 +273,27 @@
         </CardHeader>
         <CardContent class="space-y-4">
           <div>
-            <h4 class="font-medium text-gray-900 mb-2">Issue Description</h4>
-            <p class="text-gray-700">{selectedIssue.message}</p>
+            <h4 class="font-medium text-foreground mb-2">Issue Description</h4>
+            <p class="text-foreground">{selectedIssue.message}</p>
           </div>
           
           {#if selectedIssue.suggestion}
             <div>
-              <h4 class="font-medium text-gray-900 mb-2">Recommendation</h4>
-              <p class="text-gray-700">{selectedIssue.suggestion}</p>
+              <h4 class="font-medium text-foreground mb-2">Recommendation</h4>
+              <p class="text-foreground">{selectedIssue.suggestion}</p>
             </div>
           {/if}
           
           <div class="flex items-center gap-4">
             <div>
-              <span class="text-sm text-gray-500">Severity:</span>
+              <span class="text-sm text-muted-foreground">Severity:</span>
               <span class="ml-1 px-2 py-1 rounded text-xs font-medium text-white" 
                    style="background-color: {getSeverityColor(selectedIssue.severity || '')}">
                 {selectedIssue.severity}
               </span>
             </div>
             <div>
-              <span class="text-sm text-gray-500">Category:</span>
+              <span class="text-sm text-muted-foreground">Category:</span>
               <span class="ml-1 capitalize">{selectedIssue.category}</span>
             </div>
           </div>

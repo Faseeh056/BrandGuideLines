@@ -16,8 +16,8 @@
 
 <div in:fly={{ y: 20, duration: 300 }}>
 	<div class="mb-8 text-center">
-		<h2 class="mb-2 text-2xl font-bold text-gray-900">Create your account</h2>
-		<p class="text-gray-600">Join EternaBrand and start building your brand guidelines with AI</p>
+		<h2 class="mb-2 text-2xl font-bold text-foreground">Create your account</h2>
+		<p class="text-muted-foreground">Join EternaBrand and start building your brand guidelines with AI</p>
 	</div>
 
 	<!-- Social Login Buttons -->
@@ -61,20 +61,20 @@
 	<!-- Divider -->
 	<div class="relative mb-6">
 		<div class="absolute inset-0 flex items-center">
-			<div class="w-full border-t border-gray-300"></div>
+			<div class="w-full border-t border-border"></div>
 		</div>
 		<div class="relative flex justify-center text-sm">
-			<span class="bg-white px-2 text-gray-500">or continue with email</span>
+			<span class="bg-background px-2 text-muted-foreground">or continue with email</span>
 		</div>
 	</div>
 
 	<!-- Error Message -->
 	{#if data?.error}
 		<div class="mb-6">
-			<div class="rounded-md border border-red-200 bg-red-50 p-4">
+			<div class="rounded-md border border-destructive/20 bg-destructive/10 p-4">
 				<div class="flex items-start gap-3">
 					<div class="flex-shrink-0">
-						<svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+						<svg class="h-5 w-5 text-destructive" fill="currentColor" viewBox="0 0 20 20">
 							<path
 								fill-rule="evenodd"
 								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -83,8 +83,8 @@
 						</svg>
 					</div>
 					<div class="flex-1">
-						<h3 class="text-sm font-medium text-red-800">Registration Error</h3>
-						<div class="mt-1 text-sm text-red-700">
+						<h3 class="text-sm font-medium text-destructive">Registration Error</h3>
+						<div class="mt-1 text-sm text-destructive">
 							{data.error.message}
 						</div>
 					</div>
@@ -129,9 +129,9 @@
 					onclick={() => (showPassword = !showPassword)}
 				>
 					{#if showPassword}
-						<EyeOff class="h-4 w-4 text-gray-400" />
+						<EyeOff class="h-4 w-4 text-muted-foreground" />
 					{:else}
-						<Eye class="h-4 w-4 text-gray-400" />
+						<Eye class="h-4 w-4 text-muted-foreground" />
 					{/if}
 				</button>
 			</div>
@@ -142,9 +142,9 @@
 
 	<!-- Sign In Link -->
 	<div class="mt-6 text-center">
-		<p class="text-sm text-gray-600">
+		<p class="text-sm text-muted-foreground">
 			Already have an account?
-			<a href="/auth/login" class="font-medium text-blue-600 hover:text-blue-500"> Sign in </a>
+			<a href="/auth/login" class="font-medium text-primary hover:text-primary/80"> Sign in </a>
 		</p>
 	</div>
 </div>

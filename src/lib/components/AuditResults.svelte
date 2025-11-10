@@ -82,19 +82,19 @@
 
   function getCategoryColor(category: string) {
     switch (category?.toLowerCase()) {
-      case 'colors': return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: 'text-red-600', badge: 'bg-red-100 text-red-800' };
-      case 'typography': return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: 'text-blue-600', badge: 'bg-blue-100 text-blue-800' };
+      case 'colors': return { bg: 'bg-destructive/10', border: 'border-destructive/20', text: 'text-destructive', icon: 'text-destructive', badge: 'bg-destructive/20 text-destructive' };
+      case 'typography': return { bg: 'bg-primary/10', border: 'border-primary/20', text: 'text-primary', icon: 'text-primary', badge: 'bg-primary/20 text-primary' };
       case 'logo': return { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', icon: 'text-yellow-600', badge: 'bg-yellow-100 text-yellow-800' };
-      case 'layout': return { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', icon: 'text-green-600', badge: 'bg-green-100 text-green-800' };
+      case 'layout': return { bg: 'bg-primary/10', border: 'border-primary/20', text: 'text-primary', icon: 'text-primary', badge: 'bg-primary/20 text-primary' };
       case 'spacing': return { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', icon: 'text-purple-600', badge: 'bg-purple-100 text-purple-800' };
-      default: return { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', icon: 'text-gray-600', badge: 'bg-gray-100 text-gray-800' };
+      default: return { bg: 'bg-muted', border: 'border-border', text: 'text-foreground', icon: 'text-muted-foreground', badge: 'bg-muted text-foreground' };
     }
   }
 
   function getScoreColor(score: number) {
-    if (score >= 0.8) return { color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', progress: 'bg-green-500' };
+    if (score >= 0.8) return { color: 'text-primary', bg: 'bg-primary/10', border: 'border-primary/20', progress: 'bg-primary/100' };
     if (score >= 0.6) return { color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', progress: 'bg-yellow-500' };
-    return { color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', progress: 'bg-red-500' };
+    return { color: 'text-destructive', bg: 'bg-destructive/10', border: 'border-destructive/20', progress: 'bg-destructive/100' };
   }
 
   function getCategoryDisplayName(category: string) {
@@ -152,19 +152,19 @@
   // Get severity color
   function getSeverityColor(severity: string): string {
     switch (severity?.toLowerCase()) {
-      case 'high': return 'bg-red-600 text-white';
+      case 'high': return 'bg-destructive text-white';
       case 'medium': return 'bg-orange-500 text-white';
       case 'low': return 'bg-yellow-500 text-black';
-      default: return 'bg-gray-500 text-white';
+      default: return 'bg-muted0 text-white';
     }
   }
 
   function getSeverityBadgeStyle(severity: string) {
     switch (severity?.toLowerCase()) {
-      case 'high': return { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' };
+      case 'high': return { bg: 'bg-destructive/20', text: 'text-destructive', border: 'border-destructive/30' };
       case 'medium': return { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' };
       case 'low': return { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' };
-      default: return { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
+      default: return { bg: 'bg-muted', text: 'text-foreground', border: 'border-border' };
     }
   }
 
@@ -265,22 +265,22 @@
 
 <div class="space-y-6">
   <!-- Header with Overall Score -->
-  <Card class="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+  <Card class="bg-gradient-to-r from-blue-50 to-purple-50 border-primary/20">
     <CardHeader>
       <div class="flex items-center justify-between">
         <div>
-          <CardTitle class="text-2xl font-bold text-gray-900">
+          <CardTitle class="text-2xl font-bold text-foreground">
             Brand Compliance Analysis
           </CardTitle>
-          <CardDescription class="text-gray-600 mt-2">
+          <CardDescription class="text-muted-foreground mt-2">
             Analysis for <strong>{brandName}</strong> • {websiteUrl}
           </CardDescription>
         </div>
         <div class="text-right">
-          <div class="text-4xl font-bold text-blue-600">
+          <div class="text-4xl font-bold text-primary">
             {Math.round((auditData?.overallScore || 0) * 100)}%
           </div>
-          <div class="text-sm text-gray-500">
+          <div class="text-sm text-muted-foreground">
             {auditData?.overallScore > 0.8 ? 'Excellent' : 
              auditData?.overallScore > 0.6 ? 'Good' : 
              auditData?.overallScore > 0.4 ? 'Needs Improvement' : 'Poor'}
@@ -292,14 +292,14 @@
 
   <!-- Website Screenshot with Visual Audit -->
   {#if screenshot || visualData?.annotatedScreenshot}
-    <Card class="bg-gray-50 border-gray-200">
+    <Card class="bg-muted border-border">
       <CardHeader>
         <div class="flex items-center justify-between">
           <div>
-            <CardTitle class="text-lg font-semibold text-gray-900 flex items-center">
+            <CardTitle class="text-lg font-semibold text-foreground flex items-center">
               📸 Website Screenshot
               {#if visualData?.annotatedScreenshot}
-                <span class="ml-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                <span class="ml-2 text-sm bg-primary/20 text-primary px-2 py-1 rounded-full">
                   Visual Audit Mode
                 </span>
               {/if}
@@ -333,7 +333,7 @@
           <img 
             src={visualData?.annotatedScreenshot || screenshot} 
             alt="Website Screenshot" 
-            class="max-w-full h-auto rounded-lg shadow-lg border border-gray-200"
+            class="max-w-full h-auto rounded-lg shadow-lg border border-border"
             style="max-height: 600px;"
           />
           
@@ -348,23 +348,23 @@
   <!-- Priority Summary Cards -->
   <Card class="mb-6">
     <CardHeader>
-      <CardTitle class="text-lg font-semibold text-gray-900 flex items-center">
-        <AlertTriangle class="h-5 w-5 text-gray-600 mr-2" />
+      <CardTitle class="text-lg font-semibold text-foreground flex items-center">
+        <AlertTriangle class="h-5 w-5 text-muted-foreground mr-2" />
         Priority Summary
       </CardTitle>
     </CardHeader>
     <CardContent>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <!-- High Priority -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-300 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div class="relative overflow-hidden bg-gradient-to-br from-red-50 to-red-100 border-2 border-destructive/30 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
           <div class="flex items-center justify-between">
             <div>
-              <div class="text-4xl font-bold text-red-700 mb-1">{summaryStats.bySeverity.high}</div>
-              <div class="text-sm font-semibold text-red-800 uppercase tracking-wide">High Priority</div>
-              <div class="text-xs text-red-600 mt-1">Requires immediate attention</div>
+              <div class="text-4xl font-bold text-destructive mb-1">{summaryStats.bySeverity.high}</div>
+              <div class="text-sm font-semibold text-destructive uppercase tracking-wide">High Priority</div>
+              <div class="text-xs text-destructive mt-1">Requires immediate attention</div>
             </div>
             <div class="bg-red-200 rounded-full p-3">
-              <AlertTriangle class="h-8 w-8 text-red-700" />
+              <AlertTriangle class="h-8 w-8 text-destructive" />
             </div>
           </div>
         </div>
@@ -403,8 +403,8 @@
   <!-- Category Scores -->
   <Card class="mb-6">
     <CardHeader>
-      <CardTitle class="text-lg font-semibold text-gray-900 flex items-center">
-        <CheckCircle class="h-5 w-5 text-gray-600 mr-2" />
+      <CardTitle class="text-lg font-semibold text-foreground flex items-center">
+        <CheckCircle class="h-5 w-5 text-muted-foreground mr-2" />
         Category Scores
       </CardTitle>
       <CardDescription>
@@ -522,7 +522,7 @@
                 <div class="space-y-4 mb-4">
                   {#each group.issues as issue}
                     {@const issueSeverity = getSeverityBadgeStyle(issue.severity || 'medium')}
-                    <div class="border-l-4 {categoryColors.border} bg-gray-50 rounded-r-lg p-4 hover:bg-gray-100 transition-colors">
+                    <div class="border-l-4 {categoryColors.border} bg-muted rounded-r-lg p-4 hover:bg-muted transition-colors">
                       <div class="flex items-start justify-between mb-2">
                         <div class="flex-1">
                           <div class="flex items-center space-x-2 mb-2">
@@ -530,11 +530,11 @@
                               {issue.severity?.toUpperCase() || 'MEDIUM'}
                             </span>
                           </div>
-                          <div class="font-semibold text-gray-900 text-base leading-relaxed">
+                          <div class="font-semibold text-foreground text-base leading-relaxed">
                             {issue.message || issue.description || issue.title || `${issue.cssProperty}: ${issue.found} → ${issue.expected}`}
                           </div>
                           {#if issue.recommendation || issue.suggestion}
-                            <div class="mt-2 text-sm text-gray-600 italic">
+                            <div class="mt-2 text-sm text-muted-foreground italic">
                               💡 {issue.recommendation || issue.suggestion}
                             </div>
                           {/if}
@@ -547,18 +547,18 @@
                           <div class="mt-3 space-y-3">
                             <!-- Expected Colors -->
                             <div class="flex flex-col space-y-2">
-                              <span class="text-xs font-medium text-gray-700 uppercase tracking-wide">Expected</span>
+                              <span class="text-xs font-medium text-foreground uppercase tracking-wide">Expected</span>
                               <div class="flex flex-wrap items-center gap-3">
                                 {#if expectedColors.length > 0}
                                   {#each expectedColors as c}
-                                    <div class="flex items-center space-x-2 bg-white px-2 py-1.5 rounded border border-gray-200 shadow-sm">
-                                      <div class="w-6 h-6 rounded border border-gray-300 flex-shrink-0" style="background-color: {c}"></div>
-                                      <span class="text-xs font-mono font-semibold text-gray-700">{getColorDisplay(c)}</span>
+                                    <div class="flex items-center space-x-2 bg-white px-2 py-1.5 rounded border border-border shadow-sm">
+                                      <div class="w-6 h-6 rounded border border-border flex-shrink-0" style="background-color: {c}"></div>
+                                      <span class="text-xs font-mono font-semibold text-foreground">{getColorDisplay(c)}</span>
                                     </div>
                                   {/each}
                                 {:else}
-                                  <div class="flex items-center space-x-2 bg-gray-50 px-2 py-1.5 rounded border border-gray-200">
-                                    <div class="w-6 h-6 rounded border border-gray-300 bg-gray-100"></div>
+                                  <div class="flex items-center space-x-2 bg-muted px-2 py-1.5 rounded border border-border">
+                                    <div class="w-6 h-6 rounded border border-border bg-muted"></div>
                                     <span class="text-xs text-gray-400 italic">No colors specified</span>
                                   </div>
                                 {/if}
@@ -567,18 +567,18 @@
                             <!-- Found Colors - Only show if not a suggestion issue -->
                             {#if !isSuggestion}
                               <div class="flex flex-col space-y-2">
-                                <span class="text-xs font-medium text-gray-700 uppercase tracking-wide">Found</span>
+                                <span class="text-xs font-medium text-foreground uppercase tracking-wide">Found</span>
                                 <div class="flex flex-wrap items-center gap-3">
                                   {#if foundColors.length > 0}
                                     {#each foundColors as c}
-                                      <div class="flex items-center space-x-2 bg-white px-2 py-1.5 rounded border border-gray-200 shadow-sm">
-                                        <div class="w-6 h-6 rounded border border-gray-300 flex-shrink-0" style="background-color: {c}"></div>
-                                        <span class="text-xs font-mono font-semibold text-gray-700">{getColorDisplay(c)}</span>
+                                      <div class="flex items-center space-x-2 bg-white px-2 py-1.5 rounded border border-border shadow-sm">
+                                        <div class="w-6 h-6 rounded border border-border flex-shrink-0" style="background-color: {c}"></div>
+                                        <span class="text-xs font-mono font-semibold text-foreground">{getColorDisplay(c)}</span>
                                       </div>
                                     {/each}
                                   {:else}
-                                    <div class="flex items-center space-x-2 bg-gray-50 px-2 py-1.5 rounded border border-gray-200">
-                                      <div class="w-6 h-6 rounded border border-gray-300 bg-gray-100"></div>
+                                    <div class="flex items-center space-x-2 bg-muted px-2 py-1.5 rounded border border-border">
+                                      <div class="w-6 h-6 rounded border border-border bg-muted"></div>
                                       <span class="text-xs text-gray-400 italic">No colors detected</span>
                                     </div>
                                   {/if}
@@ -597,11 +597,11 @@
       </CardContent>
     </Card>
   {:else}
-    <Card class="bg-green-50 border-green-200">
+    <Card class="bg-primary/10 border-primary/20">
       <CardContent class="p-8 text-center">
         <CheckCircle class="h-16 w-16 text-green-500 mx-auto mb-4" />
-        <h3 class="text-xl font-semibold text-green-800 mb-2">No Issues Found!</h3>
-        <p class="text-green-700">
+        <h3 class="text-xl font-semibold text-primary mb-2">No Issues Found!</h3>
+        <p class="text-primary">
           Your website is fully compliant with the brand guidelines. Great job! 🎉
         </p>
       </CardContent>
@@ -622,7 +622,7 @@
           {#each auditData.recommendations as recommendation}
             <li class="flex items-start space-x-2">
               <CheckCircle class="h-4 w-4 text-green-500 mt-1 flex-shrink-0" />
-              <span class="text-gray-700">{recommendation.message || recommendation.action || recommendation.title || recommendation}</span>
+              <span class="text-foreground">{recommendation.message || recommendation.action || recommendation.title || recommendation}</span>
             </li>
           {/each}
         </ul>
@@ -641,7 +641,7 @@
       </CardHeader>
       <CardContent>
         <div class="space-y-3">
-          <textarea readonly class="w-full h-72 p-3 bg-gray-50 rounded border font-mono text-sm">{fixPrompt}</textarea>
+          <textarea readonly class="w-full h-72 p-3 bg-muted rounded border font-mono text-sm">{fixPrompt}</textarea>
           <div class="flex justify-end">
             <Button variant="outline" size="sm" onclick={() => copyToClipboard(fixPrompt || '', 'aiPrompt')}>Copy Prompt</Button>
           </div>
@@ -665,27 +665,27 @@
         </CardHeader>
         <CardContent class="space-y-4">
           <div>
-            <h4 class="font-medium text-gray-900 mb-2">Issue Description</h4>
-            <p class="text-gray-700">{selectedIssue.message}</p>
+            <h4 class="font-medium text-foreground mb-2">Issue Description</h4>
+            <p class="text-foreground">{selectedIssue.message}</p>
           </div>
           
           {#if selectedIssue.suggestion}
             <div>
-              <h4 class="font-medium text-gray-900 mb-2">Recommendation</h4>
-              <p class="text-gray-700">{selectedIssue.suggestion}</p>
+              <h4 class="font-medium text-foreground mb-2">Recommendation</h4>
+              <p class="text-foreground">{selectedIssue.suggestion}</p>
             </div>
           {/if}
           
           <div class="flex items-center gap-4">
             <div>
-              <span class="text-sm text-gray-500">Severity:</span>
+              <span class="text-sm text-muted-foreground">Severity:</span>
               <span class="ml-1 px-2 py-1 rounded text-xs font-medium text-white" 
                     style="background-color: {getSeverityColor(selectedIssue.severity)}">
                 {selectedIssue.severity}
               </span>
             </div>
             <div>
-              <span class="text-sm text-gray-500">Category:</span>
+              <span class="text-sm text-muted-foreground">Category:</span>
               <span class="ml-1 capitalize">{selectedIssue.category}</span>
             </div>
           </div>

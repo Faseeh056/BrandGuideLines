@@ -1,7 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createEditableSlides } from '$lib/services/editable-slide-factory';
-  import EnhancedColorPaletteSlide from '$lib/components/editable-slides/EnhancedColorPaletteSlide.svelte';
   import interact from 'interactjs';
 
   let slides: Array<{ name: string; html: string }> = [];
@@ -217,7 +215,7 @@
       
       // Show saving message
       const savingMsg = document.createElement('div');
-      savingMsg.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+      savingMsg.className = 'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50 shadow-lg';
       savingMsg.textContent = '💾 Saving changes...';
       document.body.appendChild(savingMsg);
       
@@ -248,7 +246,7 @@
         // Remove saving message and show success
         savingMsg.remove();
         const successMsg = document.createElement('div');
-        successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+        successMsg.className = 'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50 shadow-lg';
         successMsg.textContent = '✅ Changes saved and synced!';
         document.body.appendChild(successMsg);
         setTimeout(() => successMsg.remove(), 3000);
@@ -256,7 +254,7 @@
         // Remove saving message and show error
         savingMsg.remove();
         const errorMsg = document.createElement('div');
-        errorMsg.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+        errorMsg.className = 'fixed top-4 right-4 bg-destructive text-white px-4 py-2 rounded-lg z-50 shadow-lg';
         errorMsg.textContent = '⚠️ Changes saved locally, sync failed';
         document.body.appendChild(errorMsg);
         setTimeout(() => errorMsg.remove(), 3000);
@@ -346,7 +344,7 @@
       
       // Show success message
       const successMsg = document.createElement('div');
-      successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+      successMsg.className = 'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50 shadow-lg';
       successMsg.textContent = '✅ Changes reverted to original state';
       document.body.appendChild(successMsg);
       setTimeout(() => successMsg.remove(), 3000);
@@ -355,7 +353,7 @@
     } catch (error) {
       console.error('Error reverting changes:', error);
       const errorMsg = document.createElement('div');
-      errorMsg.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+      errorMsg.className = 'fixed top-4 right-4 bg-destructive text-white px-4 py-2 rounded-lg z-50 shadow-lg';
       errorMsg.textContent = '⚠️ Failed to revert changes';
       document.body.appendChild(errorMsg);
       setTimeout(() => errorMsg.remove(), 3000);
@@ -767,18 +765,20 @@
     
     // Show success message
     const successMsg = document.createElement('div');
-    successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-50';
+    successMsg.className = 'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50';
     successMsg.textContent = 'Changes saved successfully!';
     document.body.appendChild(successMsg);
     setTimeout(() => successMsg.remove(), 3000);
   }
 
 
+
   async function downloadPPTX() {
     try {
       isDownloading = true;
+      error = null;
       
-      // Use original HTML-based PPTX generation with updated slides
+      // Use original HTML-based PPTX generation with updated slides (image-based)
       const res = await fetch('/api/generate-slides-html', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -812,6 +812,7 @@
       URL.revokeObjectURL(url);
     } catch (err: any) {
       error = err.message || 'Download failed';
+      console.error('PPTX download error:', err);
     } finally {
       isDownloading = false;
     }
@@ -913,39 +914,39 @@
 </script>
 
 {#if loading}
-  <div class="p-6 flex items-center justify-center min-h-screen bg-gray-50">
+  <div class="p-6 flex items-center justify-center min-h-screen bg-background">
     <div class="text-center">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-      <div class="text-gray-600">Loading preview...</div>
+      <div class="text-muted-foreground">Loading preview...</div>
     </div>
   </div>
 {:else if error}
-  <div class="p-6 text-red-600 text-center min-h-screen flex items-center justify-center bg-gray-50">
+  <div class="p-6 text-destructive text-center min-h-screen flex items-center justify-center bg-background">
     <div>
       <div class="text-2xl mb-4">⚠️</div>
       <div class="text-lg">{error}</div>
     </div>
   </div>
 {:else}
-  <div class="p-4 min-h-screen bg-gray-50">
+  <div class="p-4 min-h-screen bg-background">
     <div class="mx-auto max-w-7xl">
       <!-- Header Controls -->
       <div class="mb-6 bg-white rounded-lg shadow-sm p-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-4">
-            <div class="text-sm text-gray-600">
+            <div class="text-sm text-muted-foreground">
               Slide {currentSlide + 1} of {slides.length} - {slides[currentSlide]?.name}
             </div>
             <div class="flex items-center gap-2">
               <button 
-                class="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50 transition-colors" 
+                class="px-3 py-1 border rounded disabled:opacity-50 hover:bg-background transition-colors" 
                 onclick={prevSlide} 
                 disabled={currentSlide === 0}
               >
                 ← Previous
               </button>
               <button 
-                class="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50 transition-colors" 
+                class="px-3 py-1 border rounded disabled:opacity-50 hover:bg-background transition-colors" 
                 onclick={nextSlide} 
                 disabled={currentSlide >= slides.length - 1}
               >
@@ -957,7 +958,7 @@
           <div class="flex items-center gap-2">
             {#if isEditable}
               <button 
-                class="px-3 py-2 border rounded transition-colors {editMode === 'text' ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-200 text-gray-700'}" 
+                class="px-3 py-2 border rounded transition-colors {editMode === 'text' ? 'bg-primary/20 text-primary border-primary' : 'bg-muted text-foreground'}" 
                 onclick={toggleEditMode}
                 title="Switch to {editMode === 'text' ? 'Layout' : 'Text'} editing mode"
               >
@@ -965,13 +966,13 @@
               </button>
             {/if}
             <button 
-              class="px-4 py-2 border rounded transition-colors {isEditable ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}" 
+              class="px-4 py-2 border rounded transition-colors {isEditable ? 'bg-primary text-white border-blue-500' : 'bg-muted text-foreground hover:bg-gray-300'}" 
               onclick={toggleEdit}
             >
               {isEditable ? '💾 Save & Done' : '✏️ Edit Slide'}
             </button>
             <button 
-              class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors" 
+              class="px-4 py-2 bg-primary text-white rounded hover:bg-green-600 transition-colors" 
               onclick={saveChanges}
             >
               💾 Save Changes
@@ -997,16 +998,18 @@
               </button>
               
               {#if showExportDropdown}
-                <div class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                <div class="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-border z-50">
                   <button
-                    class="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-t-lg flex items-center gap-2 text-sm"
+                    class="w-full text-left px-4 py-2 hover:bg-muted rounded-t-lg flex items-center gap-2 text-sm border-b border-border"
                     onclick={() => { downloadPPTX(); showExportDropdown = false; }}
+                    disabled={isDownloading}
                   >
-                    📄 PPTX (Non-editable)
+                    📄 PPTX (Image-based)
                   </button>
                   <button
-                    class="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-b-lg flex items-center gap-2 text-sm"
+                    class="w-full text-left px-4 py-2 hover:bg-muted rounded-b-lg flex items-center gap-2 text-sm"
                     onclick={() => { downloadPDF(); showExportDropdown = false; }}
+                    disabled={isDownloading}
                   >
                     📄 PDF
                   </button>
@@ -1022,7 +1025,7 @@
         <div class="space-y-4">
           <div class="bg-white rounded-lg shadow-lg p-4">
             <div class="relative mx-auto w-full">
-              <div class="mx-auto max-w-[1280px] overflow-hidden rounded-lg border-2 border-gray-200 bg-white">
+              <div class="mx-auto max-w-[1280px] overflow-hidden rounded-lg border-2 border-border bg-white">
                 {#if slides[currentSlide]}
                   <iframe
                     bind:this={iframeRef}
@@ -1082,7 +1085,7 @@
                 })()}
                 <button
                   onclick={() => goToSlide(idx)}
-                  class="w-full rounded border p-3 text-left text-sm transition-colors hover:bg-gray-50 {currentSlide === idx ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-700'}"
+                  class="w-full rounded border p-3 text-left text-sm transition-colors hover:bg-background {currentSlide === idx ? 'border-blue-500 bg-blue-50 text-primary' : 'border-border text-foreground'}"
                 >
                   <div class="font-medium">{slideTitle}</div>
                   <div class="text-xs text-gray-500 mt-1">Slide {idx + 1}</div>
@@ -1092,9 +1095,9 @@
           </div>
           
           <!-- Edit Status -->
-          <div class="bg-gray-50 rounded-lg p-4">
+          <div class="bg-background rounded-lg p-4">
             <h4 class="font-semibold text-gray-800 mb-2">📋 Status</h4>
-            <div class="text-sm text-gray-600 space-y-1">
+            <div class="text-sm text-muted-foreground space-y-1">
               <div><strong>Brand:</strong> {brandData.brandName || 'Unknown'}</div>
               <div><strong>Slides:</strong> {slides.length}</div>
               <div><strong>Edit Status:</strong> {isEditable ? '✏️ Editing' : '👁️ Viewing'}</div>
@@ -1106,14 +1109,14 @@
             <div class="bg-blue-50 rounded-lg p-4">
               <h4 class="font-semibold text-blue-800 mb-2">💡 Editing Tips</h4>
               {#if editMode === 'text'}
-                <ul class="text-sm text-blue-700 space-y-1">
+                <ul class="text-sm text-primary space-y-1">
                   <li>• Click on any text in the slide to edit it</li>
                   <li>• Text will be highlighted with blue borders</li>
                   <li>• Changes are saved automatically</li>
                   <li>• Switch to Layout Mode to move/resize elements</li>
                 </ul>
               {:else}
-                <ul class="text-sm text-blue-700 space-y-1">
+                <ul class="text-sm text-primary space-y-1">
                   <li>• <strong>Cursor</strong> shows what you can do (grab/resize)</li>
                   <li>• <strong>Drag</strong> elements to move them around</li>
                   <li>• <strong>Resize</strong> by dragging edges/corners</li>

@@ -407,8 +407,8 @@
 	<!-- Progress Header -->
 	<div class="progress-header">
 		<div class="progress-info">
-			<h2 class="text-2xl font-bold text-gray-900">Progressive Brand Guidelines Generation</h2>
-			<p class="text-gray-600">
+			<h2 class="text-2xl font-bold text-foreground">Progressive Brand Guidelines Generation</h2>
+			<p class="text-muted-foreground">
 				Steps will appear one by one. Review and approve each to continue, or edit any step anytime.
 			</p>
 		</div>
@@ -433,7 +433,7 @@
 		<Card>
 			<CardContent class="p-8 text-center">
 				<div class="start-generation">
-					<p class="mb-4 text-gray-600">
+					<p class="mb-4 text-muted-foreground">
 						Ready to start generating your brand guidelines step by step?
 					</p>
 					<Button onclick={startProgressiveGeneration} class="start-btn">
@@ -477,11 +477,11 @@
 				<div class="completion-section">
 					<Card>
 						<CardContent class="p-8 text-center">
-							<CheckCircle class="mx-auto mb-4 h-16 w-16 text-green-500" />
-							<h3 class="mb-2 text-xl font-semibold text-gray-900">
+							<CheckCircle class="mx-auto mb-4 h-16 w-16 text-primary" />
+							<h3 class="mb-2 text-xl font-semibold text-foreground">
 								All Steps Complete!
 							</h3>
-							<p class="mb-6 text-gray-600">
+							<p class="mb-6 text-muted-foreground">
 								Review your brand guidelines above. You can edit any step before saving.
 							</p>
 							<Button onclick={completeGeneration} class="complete-btn" size="lg">
@@ -520,14 +520,14 @@
 	.progress-track {
 		flex: 1;
 		height: 8px;
-		background: #e5e7eb;
+		background: oklch(var(--muted));
 		border-radius: 4px;
 		overflow: hidden;
 	}
 
 	.progress-fill {
 		height: 100%;
-		background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+		background: linear-gradient(90deg, oklch(var(--primary)), oklch(var(--primary) / 0.8));
 		border-radius: 4px;
 		transition: width 0.3s ease;
 	}
@@ -535,7 +535,7 @@
 	.progress-text {
 		font-size: 0.875rem;
 		font-weight: 600;
-		color: #374151;
+		color: oklch(var(--muted-foreground));
 		min-width: 10rem;
 	}
 
@@ -575,14 +575,14 @@
 	}
 
 	.complete-btn {
-		background: #10b981;
-		border-color: #10b981;
+		background: oklch(var(--primary));
+		border-color: oklch(var(--primary));
 		padding: 0.75rem 2rem;
 	}
 
 	.complete-btn:hover {
-		background: #059669;
-		border-color: #059669;
+		background: oklch(var(--primary) / 0.9);
+		border-color: oklch(var(--primary) / 0.9);
 	}
 
 	.start-generation {
@@ -591,14 +591,14 @@
 	}
 
 	.start-btn {
-		background: #3b82f6;
-		border-color: #3b82f6;
+		background: oklch(var(--primary));
+		border-color: oklch(var(--primary));
 		padding: 0.75rem 2rem;
 	}
 
 	.start-btn:hover {
-		background: #2563eb;
-		border-color: #2563eb;
+		background: oklch(var(--primary) / 0.9);
+		border-color: oklch(var(--primary) / 0.9);
 	}
 
 	@media (max-width: 768px) {

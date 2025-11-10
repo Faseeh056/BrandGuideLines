@@ -470,13 +470,13 @@
 
 <Card class="step-slide">
 	<CardHeader>
-		<CardTitle class="flex items-center gap-2">
+		<CardTitle class="flex items-center gap-2 step-title">
 			<span>{stepTitle}</span>
 			{#if isGenerating}
 				<Loader2 class="h-4 w-4 animate-spin" />
 			{/if}
 		</CardTitle>
-		<p class="text-sm text-gray-600">{stepDescription}</p>
+		<p class="step-description">{stepDescription}</p>
 	</CardHeader>
 	<CardContent>
 		{#if stepData}
@@ -1730,7 +1730,7 @@
 							{#if typeof stepData === 'string'}
 								{@html renderMarkdown(stepData)}
 							{:else}
-								<div class="text-gray-600"></div>
+								<div class="text-muted-foreground"></div>
 							{/if}
 						</div>
 					</div>
@@ -1794,7 +1794,7 @@
 			{/if}
 		{:else if !isGenerating}
 			<div class="no-content">
-				<p class="text-gray-600">Ready to generate {stepTitle.toLowerCase()} guidelines?</p>
+				<p class="text-sm text-muted-foreground">Ready to generate {stepTitle.toLowerCase()} guidelines?</p>
 			</div>
 		{/if}
 	</CardContent>
@@ -1809,6 +1809,22 @@
 		max-height: 800px;
 		overflow-y: auto;
 		overflow-x: hidden;
+	}
+
+	/* Step title in card header - ensure theme-aware color */
+	:global(.step-slide [data-slot="card-title"].step-title),
+	:global(.step-slide .step-title),
+	:global(.step-slide [data-slot="card-title"]) {
+		color: oklch(var(--foreground)) !important;
+	}
+
+	/* Step description - ensure theme-aware color, matching title */
+	.step-slide :global(.step-description),
+	.step-slide :global([data-slot="card-header"] p) {
+		font-size: 0.875rem;
+		color: oklch(var(--foreground)) !important;
+		margin-top: 0.25rem;
+		opacity: 0.9;
 	}
 
 	.step-slide::-webkit-scrollbar {
@@ -1831,6 +1847,32 @@
 
 	.slide-content {
 		margin-bottom: 2rem;
+	}
+
+	/* AI-generated content - ensure theme-aware text color */
+	.ai-generated-content {
+		color: oklch(var(--foreground));
+	}
+
+	/* Ensure all text elements inside ai-generated-content use theme color */
+	.ai-generated-content :global(p),
+	.ai-generated-content :global(span),
+	.ai-generated-content :global(div),
+	.ai-generated-content :global(li),
+	.ai-generated-content :global(ul),
+	.ai-generated-content :global(ol) {
+		color: oklch(var(--foreground));
+	}
+
+	.ai-generated-content :global(strong),
+	.ai-generated-content :global(b) {
+		color: oklch(var(--foreground));
+		font-weight: 600;
+	}
+
+	/* Slide text - ensure theme-aware text color */
+	.slide-text {
+		color: oklch(var(--foreground));
 	}
 
 	/* Positioning Slide Styles */
@@ -1887,12 +1929,12 @@
 	.section-title {
 		font-size: 1.125rem;
 		font-weight: 600;
-		color: #1f2937;
+		color: oklch(var(--foreground));
 		margin-bottom: 0.75rem;
 	}
 
 	.section-text {
-		color: #6b7280;
+		color: oklch(var(--foreground));
 		line-height: 1.5;
 	}
 
@@ -2009,18 +2051,18 @@
 	}
 
 	.logo-text {
-		color: #6b7280;
+		color:rgb(0, 0, 0);
 		font-size: 1.125rem;
 		font-weight: 500;
 	}
 
 	.logo-subtext {
-		color: #9ca3af;
+		color:rgb(255, 255, 255);
 		font-size: 0.875rem;
 	}
 
 	.logo-display {
-		background: #f3f4f6;
+		background:rgb(243, 241, 241);
 		border: 2px solid #e5e7eb;
 		border-radius: 12px;
 		padding: 2rem;
@@ -2081,7 +2123,7 @@
 
 	.logo-example.correct {
 		border-color: #10b981;
-		background: #f0fdf4;
+		background:rgb(243, 240, 253);
 	}
 
 	.logo-example.incorrect {
@@ -2183,7 +2225,7 @@
 	.no-icons-message {
 		text-align: center;
 		padding: 2rem;
-		color: #6b7280;
+		color: oklch(var(--muted-foreground));
 		font-style: italic;
 	}
 
@@ -2193,27 +2235,35 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 1rem;
-		border: 1px solid #e5e7eb;
+		border: 1px solid oklch(var(--border));
 		border-radius: 8px;
-		background: white;
+		background: oklch(var(--card));
+		color: oklch(var(--foreground));
+		box-shadow: 0 1px 3px oklch(var(--foreground) / 0.08);
 		transition: all 0.2s ease;
 	}
 
+	:global(.dark) .icon-display {
+		background: oklch(var(--muted));
+	}
+
 	.icon-display:hover {
-		border-color: #3b82f6;
-		box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+		border-color: oklch(var(--accent));
+		box-shadow: 0 2px 8px oklch(var(--accent) / 0.12);
 	}
 
 	.icon-symbol {
 		font-size: 2rem;
 		line-height: 1;
+		color: inherit;
 	}
 
 	.icon-name {
 		font-size: 0.875rem;
-		color: #374151;
+		color: oklch(var(--muted-foreground));
 		text-align: center;
 		font-weight: 500;
+		text-transform: capitalize;
 	}
 
 	.logo-guidelines-grid {
@@ -2234,6 +2284,19 @@
 		border: 2px solid #ef4444;
 		border-radius: 8px;
 		padding: 1.5rem;
+	}
+
+	/* Usage title colors - black in light mode, dark grey in dark mode */
+	.usage-title.dos-title,
+	.usage-title.donts-title {
+		/* Light mode: black */
+		color: oklch(0.2686 0 0);
+	}
+
+	/* Dark mode: dark grey */
+	:global(.dark) .usage-title.dos-title,
+	:global(.dark) .usage-title.donts-title {
+		color: oklch(0.6 0 0); /* Dark grey */
 	}
 
 	.guideline-title {
@@ -2293,11 +2356,11 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 1rem;
-		background: white;
-		border: 1px solid #e5e7eb;
+		background:rgb(247, 217, 165);
+		border: 1px solidrgb(255, 255, 255);
 		border-radius: 12px;
 		padding: 1.5rem;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 2px 4px rgba(0, 247, 185, 0.1);
 	}
 
 	.color-preview {
@@ -2320,23 +2383,23 @@
 
 	.color-hex {
 		font-size: 0.875rem;
-		color: #6b7280;
+		color:rgb(0, 0, 0);
 		font-family: monospace;
 		margin-bottom: 0.5rem;
 	}
 
 	.color-usage {
 		font-size: 0.75rem;
-		color: #9ca3af;
+		color:rgb(54, 53, 53);
 	}
 
 	/* Color Combinations */
 	.color-combinations {
 		margin-top: 2rem;
 		padding: 1.5rem;
-		background: #f8fafc;
+		background:rgb(247, 32, 32);
 		border-radius: 8px;
-		border: 1px solid #e5e7eb;
+		border: 1px solidrgb(248, 180, 7);
 	}
 
 	.combination-examples {
@@ -2363,7 +2426,7 @@
 
 	.combo-label {
 		font-size: 0.875rem;
-		color: #6b7280;
+		color:rgb(22, 94, 236);
 		font-weight: 500;
 	}
 
@@ -2444,7 +2507,7 @@
 	.section-subtitle {
 		font-size: 1rem;
 		font-weight: 600;
-		color: #1f2937;
+		color: oklch(var(--foreground));
 		margin-bottom: 0.75rem;
 	}
 
@@ -2454,7 +2517,7 @@
 	}
 
 	.icon-examples {
-		background: #f9fafb;
+		background:rgb(240, 240, 240);
 		padding: 1.5rem;
 		border-radius: 8px;
 		border: 1px solid #e5e7eb;
@@ -2481,7 +2544,7 @@
 	}
 
 	.icon-placeholder {
-		background: #e5e7eb;
+		background:rgb(169, 241, 0);
 		border-radius: 8px;
 		padding: 1rem;
 		text-align: center;
@@ -2523,8 +2586,8 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 1rem;
-		background: white;
-		border: 1px solid #e5e7eb;
+		background: pink;
+		border: 1px solidrgb(240, 142, 14);
 		border-radius: 8px;
 		transition: transform 0.2s ease;
 	}
@@ -2544,14 +2607,6 @@
 		font-size: 0.75rem;
 		color: #6b7280;
 		text-align: center;
-	}
-
-	.icon-name {
-		font-size: 0.875rem;
-		color: #374151;
-		font-weight: 500;
-		text-align: center;
-		text-transform: capitalize;
 	}
 
 	/* Photography Slide Styles */
@@ -3271,14 +3326,14 @@
 	.typography-section .section-title {
 		font-size: 1.5rem;
 		font-weight: 600;
-		color: #212529;
+		color: oklch(var(--foreground));
 		margin-bottom: 1rem;
-		border-bottom: 2px solid #e9ecef;
+		border-bottom: 2px solid oklch(var(--border));
 		padding-bottom: 0.5rem;
 	}
 
 	.font-display {
-		background: #f8f9fa;
+		background:rgb(240, 240, 240);
 		border-radius: 12px;
 		padding: 1.5rem;
 		text-align: center;
@@ -3288,7 +3343,7 @@
 	.font-name-large {
 		font-size: 2.5rem;
 		font-weight: 700;
-		color: #007bff;
+		color:rgb(29, 30, 31);
 		margin-bottom: 1rem;
 		letter-spacing: 0.05em;
 	}

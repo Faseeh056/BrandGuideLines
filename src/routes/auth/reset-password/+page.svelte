@@ -76,15 +76,15 @@
 	<CardContent>
 		{#if success}
 			<div class="space-y-4 text-center">
-				<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-					<svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+					<svg class="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"
 						></path>
 					</svg>
 				</div>
 				<div>
-					<h3 class="mb-2 text-lg font-medium text-gray-900">Password updated</h3>
-					<p class="mb-4 text-sm text-gray-600">
+					<h3 class="mb-2 text-lg font-medium text-foreground">Password updated</h3>
+					<p class="mb-4 text-sm text-muted-foreground">
 						Your password has been successfully updated. You can now sign in with your new password.
 					</p>
 				</div>
@@ -92,8 +92,8 @@
 			</div>
 		{:else}
 			{#if error}
-				<div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
-					<p class="text-sm text-red-600">{error}</p>
+				<div class="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-3">
+					<p class="text-sm text-destructive">{error}</p>
 				</div>
 			{/if}
 
@@ -116,9 +116,9 @@
 								onclick={() => (showPassword = !showPassword)}
 							>
 								{#if showPassword}
-									<EyeOff class="h-4 w-4 text-gray-400" />
+									<EyeOff class="h-4 w-4 text-muted-foreground" />
 								{:else}
-									<Eye class="h-4 w-4 text-gray-400" />
+									<Eye class="h-4 w-4 text-muted-foreground" />
 								{/if}
 							</button>
 						</div>

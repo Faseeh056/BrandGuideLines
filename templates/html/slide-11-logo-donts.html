@@ -13,13 +13,29 @@
         
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 60%, #FFFBEB 100%);
+            background: linear-gradient(135deg, {{COLOR_2_LIGHTER}} 0%, {{COLOR_3_LIGHTER}} 15%, #FFFFFF 45%, {{COLOR_4_LIGHTER}} 65%, {{COLOR_5_LIGHTER}} 85%, #FFFFFF 100%);
             width: 1280px;
             height: 720px;
             overflow: hidden;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at top left, {{COLOR_2_RGBA_12}} 0%, transparent 55%),
+                radial-gradient(ellipse at bottom right, {{COLOR_4_RGBA_12}} 0%, transparent 55%);
+            pointer-events: none;
         }
         
         .slide {
+            position: relative;
+            z-index: 1;
             width: 100%;
             height: 100%;
             padding: 40px 60px;

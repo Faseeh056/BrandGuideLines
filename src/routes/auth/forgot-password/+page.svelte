@@ -58,15 +58,15 @@
 	<CardContent>
 		{#if success}
 			<div class="space-y-4 text-center">
-				<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-					<svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+					<svg class="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"
 						></path>
 					</svg>
 				</div>
 				<div>
-					<h3 class="mb-2 text-lg font-medium text-gray-900">Check your email</h3>
-					<p class="mb-4 text-sm text-gray-600">
+					<h3 class="mb-2 text-lg font-medium text-foreground">Check your email</h3>
+					<p class="mb-4 text-sm text-muted-foreground">
 						We've sent a password reset link to your email address. Please check your inbox and
 						follow the instructions.
 					</p>
@@ -75,8 +75,8 @@
 			</div>
 		{:else}
 			{#if error}
-				<div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
-					<p class="text-sm text-red-600">{error}</p>
+				<div class="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-3">
+					<p class="text-sm text-destructive">{error}</p>
 				</div>
 			{/if}
 
@@ -101,9 +101,9 @@
 			</form>
 
 			<div class="mt-6 text-center">
-				<p class="text-sm text-gray-600">
+				<p class="text-sm text-muted-foreground">
 					Remember your password?
-					<a href="/auth/login" class="font-medium text-blue-600 hover:text-blue-500"> Sign in </a>
+					<a href="/auth/login" class="font-medium text-primary hover:text-primary/80"> Sign in </a>
 				</p>
 			</div>
 		{/if}
