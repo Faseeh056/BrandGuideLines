@@ -21,6 +21,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
+		"postinstall": "npx playwright install chromium || echo 'Playwright browser installation skipped (optional)'",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
@@ -94,6 +95,7 @@
 		"nodemailer": "^7.0.10",
 		"pdf-lib": "^1.17.1",
 		"pg": "^8.16.3",
+		"playwright": "^1.56.1",
 		"postgres": "^3.4.7",
 		"pptxgenjs": "^4.0.1",
 		"puppeteer": "^24.28.0"

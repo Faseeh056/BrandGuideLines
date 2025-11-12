@@ -10,6 +10,6 @@ export default defineConfig({
 		}
 	},
 	optimizeDeps: {
-		exclude: ['@auth/sveltekit']
+		exclude: ['@auth/sveltekit', 'playwright', 'canvas']
 	}
 });

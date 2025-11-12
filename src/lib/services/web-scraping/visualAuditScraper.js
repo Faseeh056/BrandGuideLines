@@ -1,5 +1,5 @@
 // @ts-nocheck
-import puppeteer from 'puppeteer';
+import { chromium } from 'playwright';
 import { createCanvas, loadImage } from 'canvas';
 import fs from 'fs';
 import path from 'path';
@@ -17,12 +17,12 @@ export class VisualAuditScraper {
   }
 
   async scrapeWithVisualAnnotations(url) {
-    console.log(`🎯 Starting visual audit scraping for: ${url}`);
-    
+    console.log(`:dart: Starting visual audit scraping for: ${url}`);
+   
     const scrapedData = await this.enhancedScraping(url);
     const screenshotPath = await this.captureFullPageScreenshot(url);
     const elementPositions = await this.extractElementPositions(url);
-    
+   
     // Leave annotation to API layer (+server). Only return raw screenshot and positions here.
     const annotatedPath = null;
 
@@ -42,11 +42,11 @@ export class VisualAuditScraper {
 
   async captureFullPageScreenshot(url) {
     let browser = null;
-    
+   
     try {
-      console.log(`📸 Capturing full page screenshot for: ${url}`);
-      
-      browser = await puppeteer.launch({
+      console.log(`:camera_with_flash: Capturing full page screenshot for: ${url}`);
+     
+      browser = await chromium.launch({
         headless: true,
         args: [
           '--no-sandbox',
@@ -56,18 +56,21 @@ export class VisualAuditScraper {
           '--disable-blink-features=AutomationControlled',
           '--disable-dev-shm-usage',
           '--no-first-run',
-          '--no-zygote',
-          '--single-process',
           '--disable-gpu'
         ]
       });
-      
-      const page = await browser.newPage();
-      await page.setViewport({ width: 1920, height: 1080 });
-      
+     
+      const context = await browser.newContext({
+        viewport: { width: 1920, height: 1080 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        ignoreHTTPSErrors: true
+      });
+     
+      const page = await context.newPage();
+     
       // Handle file:// URLs differently
       if (url.startsWith('file://')) {
-        console.log(`📁 Handling local file: ${url}`);
+        console.log(`:file_folder: Handling local file: ${url}`);
         let filePath = url;
         if (url.startsWith('file://') && !url.startsWith('file:///')) {
           filePath = url.replace('file://', 'file:///');
@@ -76,16 +79,16 @@ export class VisualAuditScraper {
         if (process.platform === 'win32' && filePath.includes('C:')) {
           filePath = filePath.replace('file:///C:', 'file:///C:');
         }
-        
-        console.log(`📁 Processed file path: ${filePath}`);
+       
+        console.log(`:file_folder: Processed file path: ${filePath}`);
         await page.goto(filePath, { waitUntil: 'domcontentloaded', timeout: 15000 });
       } else {
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
       }
-      
+     
       // Wait for content to load
       await this.waitForContent(page);
-      
+     
       // Ensure page has content before taking screenshot
       const pageContent = await page.evaluate(() => {
         return {
@@ -94,32 +97,32 @@ export class VisualAuditScraper {
           hasContent: document.body.innerHTML.length > 100
         };
       });
-      
-      console.log(`📏 Page dimensions: ${pageContent.bodyWidth}x${pageContent.bodyHeight}, has content: ${pageContent.hasContent}`);
-      
+     
+      console.log(`:straight_ruler: Page dimensions: ${pageContent.bodyWidth}x${pageContent.bodyHeight}, has content: ${pageContent.hasContent}`);
+     
       if (!pageContent.hasContent || pageContent.bodyHeight === 0) {
         throw new Error('Page has no content or zero height');
       }
-      
+     
       // Set a minimum viewport size if needed
       if (pageContent.bodyWidth < 800) {
-        await page.setViewport({ width: 1200, height: 800 });
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await context.setViewportSize({ width: 1200, height: 800 });
+        await page.waitForTimeout(1000);
       }
-      
+     
       // Capture full page screenshot
       const screenshotPath = path.join(this.screenshotDir, `${Date.now()}-audit.png`);
-      await page.screenshot({ 
-        path: screenshotPath, 
+      await page.screenshot({
+        path: screenshotPath,
         fullPage: true,
         type: 'png'
       });
-      
-      console.log(`✅ Screenshot saved to: ${screenshotPath}`);
+     
+      console.log(`:white_check_mark: Screenshot saved to: ${screenshotPath}`);
       return screenshotPath;
-      
+     
     } catch (error) {
-      console.error('❌ Screenshot capture failed:', error);
+      console.error(':x: Screenshot capture failed:', error);
       throw error;
     } finally {
       if (browser) {
@@ -130,11 +133,11 @@ export class VisualAuditScraper {
 
   async enhancedScraping(url) {
     let browser = null;
-    
+   
     try {
-      console.log(`🔍 Starting enhanced scraping for: ${url}`);
-      
-      browser = await puppeteer.launch({
+      console.log(`:mag: Starting enhanced scraping for: ${url}`);
+     
+      browser = await chromium.launch({
         headless: true,
         args: [
           '--no-sandbox',
@@ -144,18 +147,21 @@ export class VisualAuditScraper {
           '--disable-blink-features=AutomationControlled',
           '--disable-dev-shm-usage',
           '--no-first-run',
-          '--no-zygote',
-          '--single-process',
           '--disable-gpu'
         ]
       });
-      
-      const page = await browser.newPage();
-      await page.setViewport({ width: 1920, height: 1080 });
-      
+     
+      const context = await browser.newContext({
+        viewport: { width: 1920, height: 1080 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        ignoreHTTPSErrors: true
+      });
+     
+      const page = await context.newPage();
+     
       // Handle file:// URLs differently
       if (url.startsWith('file://')) {
-        console.log(`📁 Handling local file: ${url}`);
+        console.log(`:file_folder: Handling local file: ${url}`);
         let filePath = url;
         if (url.startsWith('file://') && !url.startsWith('file:///')) {
           filePath = url.replace('file://', 'file:///');
@@ -164,24 +170,24 @@ export class VisualAuditScraper {
         if (process.platform === 'win32' && filePath.includes('C:')) {
           filePath = filePath.replace('file:///C:', 'file:///C:');
         }
-        
-        console.log(`📁 Processed file path: ${filePath}`);
+       
+        console.log(`:file_folder: Processed file path: ${filePath}`);
         await page.goto(filePath, { waitUntil: 'domcontentloaded', timeout: 15000 });
       } else {
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
       }
-      
+     
       // Wait for content to load
       await this.waitForContent(page);
-      
+     
       // Extract comprehensive data
       const websiteData = await this.extractComprehensiveData(page, url);
-      
-      console.log(`✅ Enhanced scraping completed: ${websiteData.elements.length} elements, ${websiteData.colors.length} colors, ${websiteData.fonts.length} fonts`);
+     
+      console.log(`:white_check_mark: Enhanced scraping completed: ${websiteData.elements.length} elements, ${websiteData.colors.length} colors, ${websiteData.fonts.length} fonts`);
       return websiteData;
-      
+     
     } catch (error) {
-      console.error('❌ Enhanced scraping failed:', error);
+      console.error(':x: Enhanced scraping failed:', error);
       throw error;
     } finally {
       if (browser) {
@@ -192,11 +198,11 @@ export class VisualAuditScraper {
 
   async extractElementPositions(url) {
     let browser = null;
-    
+   
     try {
-      console.log(`📍 Extracting element positions for: ${url}`);
-      
-      browser = await puppeteer.launch({
+      console.log(`:round_pushpin: Extracting element positions for: ${url}`);
+     
+      browser = await chromium.launch({
         headless: true,
         args: [
           '--no-sandbox',
@@ -206,18 +212,21 @@ export class VisualAuditScraper {
           '--disable-blink-features=AutomationControlled',
           '--disable-dev-shm-usage',
           '--no-first-run',
-          '--no-zygote',
-          '--single-process',
           '--disable-gpu'
         ]
       });
-      
-      const page = await browser.newPage();
-      await page.setViewport({ width: 1920, height: 1080 });
-      
+     
+      const context = await browser.newContext({
+        viewport: { width: 1920, height: 1080 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        ignoreHTTPSErrors: true
+      });
+     
+      const page = await context.newPage();
+     
       // Handle file:// URLs differently
       if (url.startsWith('file://')) {
-        console.log(`📁 Handling local file: ${url}`);
+        console.log(`:file_folder: Handling local file: ${url}`);
         let filePath = url;
         if (url.startsWith('file://') && !url.startsWith('file:///')) {
           filePath = url.replace('file://', 'file:///');
@@ -226,20 +235,20 @@ export class VisualAuditScraper {
         if (process.platform === 'win32' && filePath.includes('C:')) {
           filePath = filePath.replace('file:///C:', 'file:///C:');
         }
-        
-        console.log(`📁 Processed file path: ${filePath}`);
+       
+        console.log(`:file_folder: Processed file path: ${filePath}`);
         await page.goto(filePath, { waitUntil: 'domcontentloaded', timeout: 15000 });
       } else {
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
       }
-      
+     
       // Wait for content to load
       await this.waitForContent(page);
-      
+     
       // Extract elements with their positions, prioritizing logo detection
       const elements = await page.evaluate(() => {
         const elements = [];
-        
+       
         // First, specifically look for logo elements
         const logoSelectors = [
           'header img',
@@ -251,7 +260,7 @@ export class VisualAuditScraper {
           'img[src*="logo" i]',
           '[class*="logo"]'
         ];
-        
+       
         const logoElements = new Set();
         logoSelectors.forEach(selector => {
           try {
@@ -262,7 +271,7 @@ export class VisualAuditScraper {
             // Ignore invalid selectors
           }
         });
-        
+       
         // Add logo elements first with special flag
         logoElements.forEach(el => {
           const rect = el.getBoundingClientRect();
@@ -292,7 +301,7 @@ export class VisualAuditScraper {
             });
           }
         });
-        
+       
         // Get all other relevant elements
         const selectors = [
           'h1, h2, h3, h4, h5, h6',
@@ -302,12 +311,12 @@ export class VisualAuditScraper {
           'header, footer, nav',
           'div[class*="card"], section, article'
         ];
-        
+       
         selectors.forEach(selector => {
           document.querySelectorAll(selector).forEach(el => {
             // Skip if already added as logo
             if (logoElements.has(el)) return;
-            
+           
             const rect = el.getBoundingClientRect();
             if (rect.width > 10 && rect.height > 10) {
               const isImg = el.tagName.toLowerCase() === 'img';
@@ -336,15 +345,15 @@ export class VisualAuditScraper {
             }
           });
         });
-        
+       
         return elements;
       });
-      
-      console.log(`✅ Extracted ${elements.length} element positions`);
+     
+      console.log(`:white_check_mark: Extracted ${elements.length} element positions`);
       return elements;
-      
+     
     } catch (error) {
-      console.error('❌ Element position extraction failed:', error);
+      console.error(':x: Element position extraction failed:', error);
       throw error;
     } finally {
       if (browser) {
@@ -357,10 +366,14 @@ export class VisualAuditScraper {
     try {
       // Wait for basic content
       await page.waitForSelector('body', { timeout: 5000 });
-      
-      // Wait for any dynamic content using delay instead of waitForTimeout
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+     
+      // Wait for load states (Playwright specific)
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState('networkidle');
+     
+      // Wait for any dynamic content
+      await page.waitForTimeout(2000);
+     
       // Wait for fonts to load (important for web fonts like Google Fonts)
       try {
         await page.evaluate(async () => {
@@ -371,25 +384,25 @@ export class VisualAuditScraper {
           await new Promise(resolve => setTimeout(resolve, 500));
         });
       } catch (error) {
-        console.log('⚠️ Font loading check failed, continuing...');
+        console.log(':warning: Font loading check failed, continuing...');
       }
-      
+     
       // Scroll to trigger lazy loading
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight);
       });
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+     
+      await page.waitForTimeout(1000);
+     
       // Scroll back to top
       await page.evaluate(() => {
         window.scrollTo(0, 0);
       });
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+     
+      await page.waitForTimeout(1000);
+     
     } catch (error) {
-      console.warn('⚠️ Content waiting failed:', error.message);
+      console.warn(':warning: Content waiting failed:', error.message);
     }
   }
 
@@ -399,7 +412,7 @@ export class VisualAuditScraper {
       const colors = await page.evaluate(() => {
         const colorSet = new Set();
         const elements = document.querySelectorAll('*');
-        
+       
         elements.forEach(el => {
           const styles = getComputedStyle(el);
           if (styles.color && styles.color !== 'rgba(0, 0, 0, 0)') {
@@ -409,7 +422,7 @@ export class VisualAuditScraper {
             colorSet.add(styles.backgroundColor);
           }
         });
-        
+       
         return Array.from(colorSet);
       });
 
@@ -423,7 +436,7 @@ export class VisualAuditScraper {
           weights: new Set(),
           fontSize: []
         };
-        
+       
         // Method 0: Extract fonts from Google Fonts links and CSS stylesheets (highest priority)
         try {
           // Check Google Fonts links
@@ -441,11 +454,11 @@ export class VisualAuditScraper {
                 if (!fontData.primary) {
                   fontData.primary = cleanFont;
                 }
-                console.log(`✅ Found font from Google Fonts link: ${cleanFont}`);
+                console.log(`:white_check_mark: Found font from Google Fonts link: ${cleanFont}`);
               }
             }
           });
-          
+         
           // Extract from CSS stylesheets and <style> tags
           Array.from(document.styleSheets).forEach(sheet => {
             try {
@@ -454,7 +467,7 @@ export class VisualAuditScraper {
                   const fontFamily = rule.style.fontFamily;
                   fontFamily.split(',').forEach(font => {
                     const cleanFont = font.trim().replace(/['"]/g, '');
-                    if (cleanFont && cleanFont !== 'serif' && cleanFont !== 'sans-serif' && cleanFont !== 'monospace' && 
+                    if (cleanFont && cleanFont !== 'serif' && cleanFont !== 'sans-serif' && cleanFont !== 'monospace' &&
                         !cleanFont.includes('ui-') && !cleanFont.includes('system-')) {
                       declaredFonts.add(cleanFont);
                       fontSet.add(cleanFont);
@@ -485,7 +498,7 @@ export class VisualAuditScraper {
               // Cross-origin stylesheet or other error
             }
           });
-          
+         
           // Check inline <style> tags
           Array.from(document.querySelectorAll('style')).forEach(styleTag => {
             const styleText = styleTag.textContent || styleTag.innerText || '';
@@ -511,9 +524,9 @@ export class VisualAuditScraper {
             }
           });
         } catch (e) {
-          console.warn('⚠️ Failed to extract fonts from CSS/links:', e);
+          console.warn(':warning: Failed to extract fonts from CSS/links:', e);
         }
-        
+       
         // Method 1: Get fonts from all elements (but prioritize declared fonts)
         const elements = document.querySelectorAll('*');
         elements.forEach(el => {
@@ -524,11 +537,11 @@ export class VisualAuditScraper {
               const cleanFont = font.trim().replace(/['"]/g, '');
               // Skip generic and system fonts
               if (cleanFont && cleanFont !== 'serif' && cleanFont !== 'sans-serif' && cleanFont !== 'monospace' &&
-                  !cleanFont.includes('ui-') && !cleanFont.includes('system-') && 
+                  !cleanFont.includes('ui-') && !cleanFont.includes('system-') &&
                   cleanFont !== 'cursive' && cleanFont !== 'fantasy') {
-                
+               
                 fontSet.add(cleanFont);
-                
+               
                 // Prioritize declared fonts from CSS
                 if (declaredFonts.has(cleanFont)) {
                   if (!fontData.primary || !declaredFonts.has(fontData.primary)) {
@@ -543,7 +556,7 @@ export class VisualAuditScraper {
                 }
               }
             });
-            
+           
             // Track weights
             if (styles.fontWeight) {
               fontData.weights.add(styles.fontWeight);
@@ -553,7 +566,7 @@ export class VisualAuditScraper {
             }
           }
         });
-        
+       
         // Ensure primary/secondary are from declared fonts if available
         if (declaredFonts.size > 0) {
           const declaredArray = Array.from(declaredFonts);
@@ -564,7 +577,7 @@ export class VisualAuditScraper {
             fontData.secondary = declaredArray[1];
           }
         }
-        
+       
         // Method 2: Check body computed style if no fonts found
         if (fontSet.size === 0) {
           try {
@@ -581,7 +594,7 @@ export class VisualAuditScraper {
                 }
               });
             }
-            
+           
             const htmlStyle = getComputedStyle(document.documentElement);
             if (htmlStyle.fontFamily && fontSet.size === 0) {
               htmlStyle.fontFamily.split(',').forEach(font => {
@@ -599,9 +612,9 @@ export class VisualAuditScraper {
             console.warn('Failed to get body/html styles');
           }
         }
-        
-        console.log(`🔤 Font detection found ${fontSet.size} fonts:`, Array.from(fontSet));
-        
+       
+        console.log(`:abc: Font detection found ${fontSet.size} fonts:`, Array.from(fontSet));
+       
         return {
           fonts: Array.from(fontSet),
           primary: fontData.primary,
@@ -622,7 +635,7 @@ export class VisualAuditScraper {
           'header, footer, nav',
           'section, article'
         ];
-        
+       
         selectors.forEach(selector => {
           document.querySelectorAll(selector).forEach(el => {
             elements.push({
@@ -633,7 +646,7 @@ export class VisualAuditScraper {
             });
           });
         });
-        
+       
         return elements;
       });
 
@@ -646,9 +659,9 @@ export class VisualAuditScraper {
         viewport: { width: 1920, height: 1080 },
         timestamp: new Date().toISOString()
       };
-      
+     
     } catch (error) {
-      console.error('❌ Data extraction failed:', error);
+      console.error(':x: Data extraction failed:', error);
       throw error;
     }
   }
