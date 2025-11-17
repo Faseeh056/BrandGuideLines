@@ -2,7 +2,7 @@
   import type { SlideData } from '$lib/types/slide-data';
   
   export let positioningStatement: string = 'Our brand positioning statement';
-  export let primaryColor: string = '#1E40AF';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
   export let color1Lighter: string = '#EFF6FF';
   export let color2Lighter: string = '#DBEAFE';
   export let color3Lighter: string = '#BFDBFE';
@@ -10,32 +10,86 @@
   export let color2Rgba10: string = 'rgba(59, 130, 246, 0.1)';
   export let isEditable: boolean = false;
   
-  // Dynamic styles computed from props
-  $: backgroundGradient = `linear-gradient(135deg, ${color1Lighter} 0%, ${color2Lighter} 30%, ${color3Lighter} 60%, #FFFFFF 100%)`;
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color1Lighter, color2Lighter, color3Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundGradient = (() => {
+    if (background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background.type === 'gradient' && background.gradient && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color1Lighter} 0%, ${color2Lighter} 30%, ${color3Lighter} 60%, #FFFFFF 100%)`;
+    }
+  })();
   $: radialOverlayStyle = `radial-gradient(circle at 20% 50%, ${color1Rgba10} 0%, transparent 50%), radial-gradient(circle at 80% 80%, ${color2Rgba10} 0%, transparent 50%)`;
-  $: headerBorderStyle = `4px solid ${primaryColor}`;
-  $: titleColorStyle = primaryColor;
-  $: borderLeftStyle = `6px solid ${primaryColor}`;
+  $: headerBorderStyle = `4px solid ${color1Hex}`;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
+  $: borderLeftStyle = `6px solid ${color1Hex}`;
   
   $: slideData = createSlideData();
   
   function createSlideData(): SlideData {
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color1Lighter,
+        color2Lighter,
+        color3Lighter,
+        'FFFFFF'
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'E0E0E0', 'FFFFFF'];
+    }
+    
     return {
       id: 'brand-introduction',
       type: 'content',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color1Lighter.replace('#', ''),
-              color2Lighter.replace('#', ''),
-              color3Lighter.replace('#', ''),
-              'FFFFFF'
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -49,7 +103,7 @@
           fontSize: 36,
           fontFace: 'Arial',
           bold: true,
-          color: primaryColor.replace('#', ''),
+          color: color1Hex.replace('#', ''),
           align: 'left' as const,
           valign: 'top' as const,
           zIndex: 2
@@ -60,7 +114,7 @@
           type: 'shape' as const,
           position: { x: 0.47, y: 0.78, w: 9.06, h: 0.02 },
           shapeType: 'rect',
-          fillColor: primaryColor.replace('#', ''),
+          fillColor: color1Hex.replace('#', ''),
           zIndex: 2
         },
         // Background card shape
@@ -80,7 +134,7 @@
           type: 'shape' as const,
           position: { x: 1.25, y: 2.5, w: 0.15, h: 2.0 },
           shapeType: 'rect',
-          fillColor: primaryColor.replace('#', ''),
+          fillColor: color1Hex.replace('#', ''),
           zIndex: 2
         },
         // Positioning statement
@@ -100,8 +154,9 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 

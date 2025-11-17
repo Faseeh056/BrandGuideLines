@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { SlideData } from '$lib/types/slide-data';
+  import DynamicIcon from '$lib/components/DynamicIcon.svelte';
   
   export let icons: Array<{ symbol: string; name: string }> = [];
-  export let primaryColor: string = '#1E40AF';
-  export let secondaryColor: string = '#93C5FD';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
+  export let color4Hex: string = '#93C5FD'; // SECONDARY_COLOR
   export let color5Lighter: string = '#60A5FA';
   export let color6Lighter: string = '#3B82F6';
   export let color7Lighter: string = '#1E40AF';
@@ -11,25 +12,63 @@
   export let color6Rgba12: string = 'rgba(59, 130, 246, 0.12)';
   export let isEditable: boolean = false;
   
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color5Lighter, color6Lighter, '#FFFFFF', color7Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color5Lighter} 0%, ${color6Lighter} 30%, #FFFFFF 50%, ${color7Lighter} 70%, #FFFFFF 100%)`;
+    }
+  })();
+  
+  // Editable guideline content
+  export let gridTitle: string = 'Icon Library';
+  export let guideline1Title: string = 'Icon Style';
+  export let guideline1Content: string = 'Use rounded, friendly icons that match our brand personality.';
+  export let guideline2Title: string = 'Size & Weight';
+  export let guideline2Content: string = 'Icons should be 24px–48px. Use 2px stroke weight for consistency.';
+  export let guideline3Title: string = 'Colors';
+  export let guideline3Content: string = 'Use brand primary color or gradients for emphasis.';
+  
   // Dynamic styles computed from props
   $: radialOverlayStyle = `radial-gradient(circle at 30% 40%, ${color5Rgba12} 0%, transparent 50%), radial-gradient(circle at 70% 60%, ${color6Rgba12} 0%, transparent 50%)`;
-  $: headerBorderStyle = `4px solid ${primaryColor}`;
-  $: titleColorStyle = primaryColor;
-  $: gridTitleColorStyle = primaryColor;
-  $: iconCircleGradient = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
-  $: cardTitleColorStyle = primaryColor;
-  $: demoIconBgStyle = primaryColor;
+  $: headerBorderStyle = `4px solid ${color1Hex}`;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
+  $: gridTitleColorStyle = color1Hex;
+  $: iconCircleGradient = `linear-gradient(135deg, ${color1Hex} 0%, ${color4Hex} 100%)`;
+  $: cardTitleColorStyle = color1Hex;
+  $: demoIconBgStyle = color1Hex;
   
   // Display all icons (up to 12 in a 4x3 grid, or 8 in a 4x2 grid)
+  // Extract icon names from icons array - use name for Lucide icon lookup
   $: displayIcons = icons.length > 0 ? icons.slice(0, 12) : [
-    { symbol: '◐', name: 'Brand' },
-    { symbol: '★', name: 'Featured' },
-    { symbol: '♥', name: 'Favorites' },
-    { symbol: '◆', name: 'Premium' },
-    { symbol: '✓', name: 'Success' },
-    { symbol: '→', name: 'Navigation' },
-    { symbol: '⊕', name: 'Add' },
-    { symbol: '⚙', name: 'Settings' }
+    { symbol: '', name: 'Brand' },
+    { symbol: '', name: 'Featured' },
+    { symbol: '', name: 'Success' },
+    { symbol: '', name: 'Navigation' },
+    { symbol: '', name: 'Add' },
+    { symbol: '', name: 'Settings' }
   ];
   
   $: slideData = createSlideData();
@@ -48,27 +87,27 @@
     
     // Title (in header)
     elements.push({
-      id: 'title',
-      type: 'text' as const,
+        id: 'title',
+        type: 'text' as const,
       position: { x: paddingX, y: paddingY, w: 10 - (paddingX * 2), h: pyToIn(42) },
-      text: 'Iconography',
-      fontSize: 36,
-      fontFace: 'Arial',
-      bold: true,
-      color: primaryColor.replace('#', ''),
-      align: 'left' as const,
-      valign: 'top' as const,
+        text: 'Iconography',
+        fontSize: 36,
+        fontFace: 'Arial',
+        bold: true,
+      color: color1Hex.replace('#', ''),
+        align: 'left' as const,
+        valign: 'top' as const,
       zIndex: 3
     });
     
     // Divider line
     elements.push({
-      id: 'divider',
-      type: 'shape' as const,
+        id: 'divider',
+        type: 'shape' as const,
       position: { x: paddingX, y: paddingY + pyToIn(60), w: 10 - (paddingX * 2), h: pyToIn(4) },
       shapeType: 'rect',
-      fillColor: primaryColor.replace('#', ''),
-      lineColor: primaryColor.replace('#', ''),
+      fillColor: color1Hex.replace('#', ''),
+      lineColor: color1Hex.replace('#', ''),
       lineWidth: 0,
       zIndex: 3
     });
@@ -95,7 +134,7 @@
       id: 'icon-grid-bg',
       type: 'shape' as const,
       position: { x: iconGridX, y: iconGridY, w: iconGridWidth, h: iconGridHeight },
-      shapeType: 'rect',
+        shapeType: 'rect',
       fillColor: 'FFFFFF',
       lineColor: 'E0E0E0',
       lineWidth: 1,
@@ -107,25 +146,26 @@
       id: 'grid-title',
       type: 'text' as const,
       position: { x: iconGridX + iconGridPadding, y: iconGridY + iconGridPadding, w: iconGridWidth - (iconGridPadding * 2), h: pyToIn(20) },
-      text: 'Icon Library',
+      text: gridTitle,
       fontSize: 18,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
-      zIndex: 2
+        zIndex: 2
     });
     
-    // Icons grid (4 columns)
-    const iconsStartY = iconGridY + iconGridPadding + pyToIn(45); // After title + margin
+    // Icons grid (4 columns) with proper spacing to prevent overlap
+    const iconsStartY = iconGridY + iconGridPadding + pyToIn(50); // After title + margin
     const iconsAreaWidth = iconGridWidth - (iconGridPadding * 2);
+    const iconsAreaHeight = iconGridHeight - iconGridPadding - pyToIn(50) - iconGridPadding; // Available height for icons
     
-    // Calculate icon size and spacing (matching CSS exactly)
-    const iconCircleSizePx = 80; // 80px circle
-    const iconGapPx = 25; // 25px gap between icons (CSS gap: 25px)
-    const iconLabelMarginPx = 10; // 10px margin between circle and label
-    const iconLabelHeightPx = 30; // Height for label text (allows for 2 lines)
+    // Calculate icon size and spacing to fit within available space
+    const iconCircleSizePx = 70; // Reduced to prevent overlap
+    const iconGapPx = 28; // Gap between icons
+    const iconLabelMarginPx = 10; // Margin between circle and label
+    const iconLabelHeightPx = 25; // Height for label text
     
     const iconCircleSize = pxToIn(iconCircleSizePx);
     const iconGap = pxToIn(iconGapPx);
@@ -135,21 +175,30 @@
     // Total item height: circle + margin + label
     const iconItemHeight = iconCircleSize + iconLabelMargin + iconLabelHeight;
     
+    // Gap between rows
+    const iconRowGap = pyToIn(15);
+    
+    // Calculate how many rows can fit within available height
+    const maxRows = Math.floor((iconsAreaHeight + iconRowGap) / (iconItemHeight + iconRowGap));
+    const actualRows = Math.min(maxRows, Math.ceil(displayIcons.length / 4));
+    
     // Calculate column width for 4 columns with proper spacing
-    // Total width = 4 columns + 3 gaps
     const iconColWidth = (iconsAreaWidth - (iconGap * 3)) / 4;
     
-    // Add icons in 4-column grid
+    // Add icons in 4-column grid with proper row spacing
     displayIcons.forEach((icon, index) => {
       const col = index % 4;
       const row = Math.floor(index / 4);
+      
+      // Only add icons that fit within available space
+      if (row >= actualRows) return;
       
       // Calculate column X position (each column starts at its own position)
       const colStartX = iconGridX + iconGridPadding + col * (iconColWidth + iconGap);
       
       // Center icon circle within its column
       const iconX = colStartX + (iconColWidth - iconCircleSize) / 2;
-      const iconY = iconsStartY + row * iconItemHeight;
+      const iconY = iconsStartY + row * (iconItemHeight + iconRowGap);
       
       // Icon circle background (ensure it's a perfect circle)
       elements.push({
@@ -157,17 +206,20 @@
         type: 'shape' as const,
         position: { x: iconX, y: iconY, w: iconCircleSize, h: iconCircleSize },
         shapeType: 'circle',
-        fillColor: primaryColor.replace('#', ''),
+        fillColor: color1Hex.replace('#', ''),
         zIndex: 2
       });
       
-      // Icon symbol text (centered in circle)
+      // Icon symbol text - for PDF generation, we'll use a text representation
+      // In the actual Svelte component, we'll use DynamicIcon
+      // For PDF, we'll use a simple representation based on the name
+      const iconText = icon.name.substring(0, 2).toUpperCase();
       elements.push({
         id: `icon-symbol-${index}`,
         type: 'text' as const,
         position: { x: iconX, y: iconY, w: iconCircleSize, h: iconCircleSize },
-        text: icon.symbol,
-        fontSize: 24,
+        text: iconText,
+        fontSize: 20,
         fontFace: 'Arial',
         bold: true,
         color: 'FFFFFF',
@@ -213,11 +265,11 @@
       id: 'guideline-card-1-title',
       type: 'text' as const,
       position: { x: rightColX + pxToIn(25), y: card1Y + pxToIn(25), w: rightColWidth - pxToIn(50), h: pyToIn(18) },
-      text: 'Icon Style',
+      text: guideline1Title,
       fontSize: 16,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
@@ -226,7 +278,7 @@
       id: 'guideline-card-1-content',
       type: 'text' as const,
       position: { x: rightColX + pxToIn(25), y: card1Y + pxToIn(50), w: rightColWidth - pxToIn(50), h: pyToIn(40) },
-      text: 'Use rounded, friendly icons that match our brand personality.',
+      text: guideline1Content,
       fontSize: 12,
       fontFace: 'Arial',
       color: '666666',
@@ -243,15 +295,17 @@
       type: 'shape' as const,
       position: { x: demoIconX, y: demoIconY, w: demoIconSize, h: demoIconSize },
       shapeType: 'rect',
-      fillColor: primaryColor.replace('#', ''),
+      fillColor: color1Hex.replace('#', ''),
       zIndex: 2
     });
+    // Demo icon - use first icon name or default
+    const demoIconText = displayIcons.length > 0 ? displayIcons[0].name.substring(0, 2).toUpperCase() : 'IC';
     elements.push({
       id: 'demo-icon-symbol',
       type: 'text' as const,
       position: { x: demoIconX, y: demoIconY, w: demoIconSize, h: demoIconSize },
-      text: '◐',
-      fontSize: 18,
+      text: demoIconText,
+      fontSize: 16,
       fontFace: 'Arial',
       color: 'FFFFFF',
       align: 'center' as const,
@@ -275,11 +329,11 @@
       id: 'guideline-card-2-title',
       type: 'text' as const,
       position: { x: rightColX + pxToIn(25), y: card2Y + pxToIn(25), w: rightColWidth - pxToIn(50), h: pyToIn(18) },
-      text: 'Size & Weight',
+      text: guideline2Title,
       fontSize: 16,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
@@ -288,7 +342,7 @@
       id: 'guideline-card-2-content',
       type: 'text' as const,
       position: { x: rightColX + pxToIn(25), y: card2Y + pxToIn(50), w: rightColWidth - pxToIn(50), h: pyToIn(60) },
-      text: 'Icons should be 24px–48px. Use 2px stroke weight for consistency.',
+      text: guideline2Content,
       fontSize: 12,
       fontFace: 'Arial',
       color: '666666',
@@ -313,11 +367,11 @@
       id: 'guideline-card-3-title',
       type: 'text' as const,
       position: { x: rightColX + pxToIn(25), y: card3Y + pxToIn(25), w: rightColWidth - pxToIn(50), h: pyToIn(18) },
-      text: 'Colors',
+      text: guideline3Title,
       fontSize: 16,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
@@ -326,7 +380,7 @@
       id: 'guideline-card-3-content',
       type: 'text' as const,
       position: { x: rightColX + pxToIn(25), y: card3Y + pxToIn(50), w: rightColWidth - pxToIn(50), h: pyToIn(60) },
-      text: 'Use brand primary color or gradients for emphasis.',
+      text: guideline3Content,
       fontSize: 12,
       fontFace: 'Arial',
       color: '666666',
@@ -335,23 +389,50 @@
       zIndex: 2
     });
     
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color5Lighter,
+        color6Lighter,
+        'FFFFFF',
+        color7Lighter,
+        'FFFFFF'
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'E0E0E0', 'FFFFFF'];
+    }
+    
     return {
       id: 'iconography',
       type: 'iconography',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color5Lighter.replace('#', ''),
-              color6Lighter.replace('#', ''),
-              'FFFFFF',
-              color7Lighter.replace('#', ''),
-              'FFFFFF'
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -359,12 +440,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="iconography-slide" style="background: linear-gradient(135deg, {color5Lighter} 0%, {color6Lighter} 30%, #FFFFFF 50%, {color7Lighter} 70%, #FFFFFF 100%);">
+<div class="iconography-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">
@@ -374,11 +456,17 @@
     
     <div class="content">
       <div class="icon-grid">
-        <div class="grid-title" style="color: {gridTitleColorStyle};">Icon Library</div>
+        {#if isEditable}
+          <input type="text" bind:value={gridTitle} class="grid-title-input" style="color: {gridTitleColorStyle};" />
+        {:else}
+          <div class="grid-title" style="color: {gridTitleColorStyle};">{gridTitle}</div>
+        {/if}
         <div class="icons">
           {#each displayIcons as icon, index}
             <div class="icon-item">
-              <div class="icon-circle" style="background: {iconCircleGradient};">{icon.symbol}</div>
+              <div class="icon-circle" style="background: {iconCircleGradient};">
+                <DynamicIcon name={icon.name} size={32} color="#FFFFFF" strokeWidth={2} />
+              </div>
               {#if isEditable}
                 <input type="text" bind:value={icon.name} class="icon-label-input" />
               {:else}
@@ -391,27 +479,43 @@
       
       <div class="guidelines">
         <div class="guideline-card">
-          <div class="card-title" style="color: {cardTitleColorStyle};">Icon Style</div>
-          <div class="card-content">
-            Use rounded, friendly icons that match our brand personality.
-          </div>
+          {#if isEditable}
+            <input type="text" bind:value={guideline1Title} class="card-title-input" style="color: {cardTitleColorStyle};" />
+            <textarea bind:value={guideline1Content} class="card-content-input"></textarea>
+          {:else}
+            <div class="card-title" style="color: {cardTitleColorStyle};">{guideline1Title}</div>
+            <div class="card-content">{guideline1Content}</div>
+          {/if}
           <div class="style-demo">
-            <div class="demo-icon" style="background: {demoIconBgStyle};">◐</div>
+            <div class="demo-icon" style="background: {demoIconBgStyle};">
+              <DynamicIcon 
+                name={displayIcons.length > 0 ? displayIcons[0].name : 'Brand'} 
+                size={24} 
+                color="#FFFFFF" 
+                strokeWidth={2} 
+              />
+            </div>
           </div>
         </div>
         
         <div class="guideline-card">
-          <div class="card-title" style="color: {cardTitleColorStyle};">Size & Weight</div>
-          <div class="card-content">
-            Icons should be 24px–48px. Use 2px stroke weight for consistency.
-          </div>
+          {#if isEditable}
+            <input type="text" bind:value={guideline2Title} class="card-title-input" style="color: {cardTitleColorStyle};" />
+            <textarea bind:value={guideline2Content} class="card-content-input"></textarea>
+          {:else}
+            <div class="card-title" style="color: {cardTitleColorStyle};">{guideline2Title}</div>
+            <div class="card-content">{guideline2Content}</div>
+          {/if}
         </div>
         
         <div class="guideline-card">
-          <div class="card-title" style="color: {cardTitleColorStyle};">Colors</div>
-          <div class="card-content">
-            Use brand primary color or gradients for emphasis.
-          </div>
+          {#if isEditable}
+            <input type="text" bind:value={guideline3Title} class="card-title-input" style="color: {cardTitleColorStyle};" />
+            <textarea bind:value={guideline3Content} class="card-content-input"></textarea>
+          {:else}
+            <div class="card-title" style="color: {cardTitleColorStyle};">{guideline3Title}</div>
+            <div class="card-content">{guideline3Content}</div>
+          {/if}
         </div>
       </div>
     </div>
@@ -496,8 +600,11 @@
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 32px;
-    font-weight: bold;
+  }
+  
+  .icon-circle :global(svg) {
+    width: 32px;
+    height: 32px;
   }
   
   .icon-label,
@@ -559,7 +666,45 @@
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 24px;
+  }
+  
+  .demo-icon :global(svg) {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .grid-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 25px;
+  }
+  
+  .card-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 12px;
+  }
+  
+  .card-content-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 14px;
+    color: #666;
+    resize: vertical;
+    min-height: 50px;
   }
 </style>
 

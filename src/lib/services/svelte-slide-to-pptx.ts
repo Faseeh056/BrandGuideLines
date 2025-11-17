@@ -144,6 +144,7 @@ async function addElementToSlide(element: SlideElement, slide: any): Promise<voi
           // Add image to slide with proper sizing
           // Use 'contain' to maintain aspect ratio, center the image, and fit within bounds
           // This matches UI behavior: object-fit: contain with flex centering
+          // Ensure images don't stretch by using proper sizing constraints
           slide.addImage({
             data: imageData,
             x: position.x,
@@ -154,9 +155,10 @@ async function addElementToSlide(element: SlideElement, slide: any): Promise<voi
               type: 'contain',
               w: position.w,
               h: position.h
-            },
+            }
             // Images are centered automatically with 'contain' sizing
             // This matches the UI's flexbox centering behavior
+            // 'contain' type ensures aspect ratio is maintained and image doesn't stretch
           });
           
           console.log(`✅ Added image: ${element.id} at (${position.x.toFixed(2)}, ${position.y.toFixed(2)}) size ${position.w.toFixed(2)}x${position.h.toFixed(2)}`);

@@ -6,8 +6,7 @@
     hex: string;
     usage?: string;
   }> = [];
-  export let primaryColor: string = '#1E40AF';
-  export let color1Hex: string = '#1E40AF';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
   export let color1Lighter: string = '#EFF6FF';
   export let color2Lighter: string = '#DBEAFE';
   export let color3Lighter: string = '#BFDBFE';
@@ -17,8 +16,38 @@
   export let color3Rgba10: string = 'rgba(96, 165, 250, 0.1)';
   export let isEditable: boolean = false;
   
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color1Lighter, color2Lighter, '#FFFFFF', color3Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color1Lighter} 0%, ${color2Lighter} 30%, #FFFFFF 50%, ${color3Lighter} 70%, #FFFFFF 100%)`;
+    }
+  })();
+  
   // Dynamic styles computed from props
-  $: titleColorStyle = primaryColor;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
   $: dividerBackgroundStyle = color1Hex;
   $: radialOverlayStyle = `radial-gradient(circle at 15% 30%, ${color1Rgba15 || 'rgba(30, 64, 175, 0.15)'} 0%, transparent 45%), radial-gradient(circle at 85% 70%, ${color2Rgba15 || 'rgba(59, 130, 246, 0.15)'} 0%, transparent 45%), radial-gradient(circle at 50% 50%, ${color3Rgba10 || 'rgba(96, 165, 250, 0.1)'} 0%, transparent 55%)`;
   
@@ -45,7 +74,7 @@
         fontSize: 36,
         fontFace: 'Arial',
         bold: true,
-        color: primaryColor.replace('#', ''),
+          color: color1Hex.replace('#', ''),
         align: 'left' as const,
         valign: 'top' as const,
         zIndex: 2
@@ -61,24 +90,38 @@
       }
     ];
     
-    // Add color swatches in 4x2 grid
-    const startX = 0.47;
-    const startY = 1.11;
-    const swatchWidth = 2.1;
-    const swatchHeight = 1.04;
-    const gap = 0.16;
+    // Add color swatches in 4x2 grid with proper spacing to avoid overlaps
+    // Calculate dimensions to fit within available space and prevent stretching
+    const startX = 0.6;
+    const startY = 1.2;
+    const availableWidth = 10 - (startX * 2); // Total available width
+    const availableHeight = 5.625 - startY - 0.4; // Total available height (leave bottom margin)
+    const gapX = 0.22; // Horizontal gap between swatches
+    const gapY = 0.24; // Vertical gap between rows
+    
+    // Calculate swatch dimensions to fit 4 columns and 2 rows
+    const swatchWidth = (availableWidth - (gapX * 3)) / 4; // 4 columns with 3 gaps
+    const swatchHeight = (availableHeight - gapY) / 2; // 2 rows with 1 gap
+    
+    // Prevent excessive stretching - maintain reasonable aspect ratio (max 2.0:1)
+    const maxSwatchWidth = swatchHeight * 2.0;
+    const finalSwatchWidth = Math.min(swatchWidth, maxSwatchWidth);
+    
+    // Recalculate startX to center if swatches are narrower
+    const actualTotalWidth = (finalSwatchWidth * 4) + (gapX * 3);
+    const adjustedStartX = (10 - actualTotalWidth) / 2;
     
     displayColors.forEach((color, index) => {
       const col = index % 4;
       const row = Math.floor(index / 4);
-      const x = startX + col * (swatchWidth + gap);
-      const y = startY + row * (swatchHeight + gap);
+      const x = adjustedStartX + col * (finalSwatchWidth + gapX);
+      const y = startY + row * (swatchHeight + gapY);
       
       // Color swatch rectangle
       elements.push({
         id: `color-swatch-${index}`,
         type: 'color-swatch' as const,
-        position: { x, y, w: swatchWidth, h: swatchHeight },
+        position: { x, y, w: finalSwatchWidth, h: swatchHeight },
         colorSwatch: {
           hex: color.hex,
           name: color.name,
@@ -88,24 +131,51 @@
       });
     });
     
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color1Lighter,
+        color2Lighter,
+        'FFFFFF',
+        color3Lighter,
+        color4Lighter,
+        'FFFFFF'
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'E0E0E0', 'D0D0D0', 'FFFFFF'];
+    }
+    
     return {
       id: 'color-palette',
       type: 'color',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color1Lighter.replace('#', ''),
-              color2Lighter.replace('#', ''),
-              'FFFFFF',
-              color3Lighter.replace('#', ''),
-              color4Lighter.replace('#', ''),
-              'FFFFFF'
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -113,12 +183,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="color-palette-slide" style="background: linear-gradient(135deg, {color1Lighter} 0%, {color2Lighter} 20%, #FFFFFF 40%, {color3Lighter} 60%, {color4Lighter} 80%, #FFFFFF 100%);">
+<div class="color-palette-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">
@@ -130,9 +201,19 @@
         <div class="color-item">
           <div class="color-swatch" style="background-color: {color.hex};"></div>
           {#if isEditable}
-            <input type="text" bind:value={color.name} class="color-name-input" />
-            <input type="text" bind:value={color.hex} class="color-hex-input" />
-            <input type="text" bind:value={color.usage} class="color-usage-input" />
+            <div class="editable-color-controls">
+              <input type="text" bind:value={color.name} class="color-name-input" placeholder="Color name" />
+              <div class="color-hex-group">
+                <input type="text" bind:value={color.hex} class="color-hex-input" placeholder="#000000" />
+                <input 
+                  type="color" 
+                  value={color.hex || '#000000'}
+                  oninput={(e) => color.hex = e.currentTarget.value}
+                  class="color-picker-input"
+                />
+              </div>
+              <input type="text" bind:value={color.usage} class="color-usage-input" placeholder="Usage description" />
+            </div>
           {:else}
             <div class="color-name">{color.name}</div>
             <div class="color-hex">{color.hex}</div>
@@ -257,6 +338,41 @@
     border: 2px dashed rgba(0,0,0,0.2);
     border-radius: 4px;
     padding: 4px;
+  }
+  
+  .editable-color-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .color-hex-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  .color-hex-group .color-hex-input {
+    flex: 1;
+  }
+  
+  .color-picker-input {
+    width: 50px;
+    height: 40px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0;
+    background: none;
+  }
+  
+  .color-picker-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  
+  .color-picker-input::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
   }
 </style>
 

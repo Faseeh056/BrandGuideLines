@@ -4,33 +4,94 @@
   export let website: string = 'your-website.com';
   export let email: string = 'contact@example.com';
   export let phone: string = '';
-  export let primaryColor: string = '#1E40AF';
-  export let secondaryColor: string = '#93C5FD';
-  export let color2Hex: string = '#3B82F6';
-  export let color3Hex: string = '#60A5FA';
-  export let color4Hex: string = '#93C5FD';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR
+  export let color2Hex: string = '#3B82F6'; // COLOR_2_HEX
+  export let color3Hex: string = '#60A5FA'; // COLOR_3_HEX
+  export let color4Hex: string = '#93C5FD'; // SECONDARY_COLOR / COLOR_4_HEX
   export let isEditable: boolean = false;
+  
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color4Hex, color3Hex, color4Hex, color1Hex, color2Hex],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  // HTML template: linear-gradient(135deg, {{SECONDARY_COLOR}} 0%, {{COLOR_3_HEX}} 25%, {{COLOR_4_HEX}} 50%, {{PRIMARY_COLOR}} 75%, {{COLOR_2_HEX}} 100%)
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient matching HTML template
+      return `linear-gradient(135deg, ${color4Hex} 0%, ${color3Hex} 25%, ${color4Hex} 50%, ${color1Hex} 75%, ${color2Hex} 100%)`;
+    }
+  })();
+  
+  // Editable content
+  export let thankYouText: string = 'Thank You';
+  export let subtitleText: string = 'Let\'s Create Something Amazing Together';
   
   $: slideData = createSlideData();
   
   function createSlideData(): SlideData {
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color4Hex,
+        color3Hex,
+        color4Hex,
+        color1Hex,
+        color2Hex
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['000000', '333333', '000000', '666666', '999999'];
+    }
+    
     return {
       id: 'thank-you',
       type: 'closing',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              secondaryColor.replace('#', ''),
-              color3Hex.replace('#', ''),
-              color4Hex.replace('#', ''),
-              primaryColor.replace('#', ''),
-              color2Hex.replace('#', '')
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -40,7 +101,7 @@
           id: 'thank-you',
           type: 'text' as const,
           position: { x: 0.5, y: 2.5, w: 9, h: 1.0 },
-          text: 'Thank You',
+          text: thankYouText,
           fontSize: 64,
           fontFace: 'Arial',
           bold: true,
@@ -54,7 +115,7 @@
           id: 'subtitle',
           type: 'text' as const,
           position: { x: 0.5, y: 3.6, w: 9, h: 0.5 },
-          text: 'Let\'s Create Something Amazing Together',
+          text: subtitleText,
           fontSize: 20,
           fontFace: 'Arial',
           italic: true,
@@ -80,17 +141,26 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="thank-you-slide" style="background: linear-gradient(135deg, {secondaryColor} 0%, {color3Hex} 25%, {color4Hex} 50%, {primaryColor} 75%, {color2Hex} 100%);">
+<div class="thank-you-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay"></div>
   
   <div class="slide">
-    <div class="thank-you">Thank You</div>
-    <div class="subtitle">Let's Create Something Amazing Together</div>
+    {#if isEditable}
+      <input type="text" bind:value={thankYouText} class="thank-you-input" />
+    {:else}
+      <div class="thank-you">{thankYouText}</div>
+    {/if}
+    {#if isEditable}
+      <input type="text" bind:value={subtitleText} class="subtitle-input" />
+    {:else}
+      <div class="subtitle">{subtitleText}</div>
+    {/if}
     <div class="contact">
       {#if isEditable}
         <input type="text" bind:value={website} class="contact-input" />
@@ -176,6 +246,35 @@
     border-radius: 4px;
     padding: 8px;
     text-align: center;
+  }
+  
+  .thank-you-input,
+  .subtitle-input {
+    background: rgba(0,0,0,0.2);
+    border: 2px dashed rgba(255,255,255,0.5);
+    border-radius: 4px;
+    padding: 10px 20px;
+    text-align: center;
+    color: #FFFFFF;
+    font-family: 'Arial', sans-serif;
+  }
+  
+  .thank-you-input {
+    font-size: 64px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    width: 100%;
+    max-width: 600px;
+  }
+  
+  .subtitle-input {
+    font-size: 24px;
+    font-style: italic;
+    margin-bottom: 40px;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 800px;
   }
 </style>
 

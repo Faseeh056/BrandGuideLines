@@ -319,6 +319,7 @@ export const generatedSlides = pgTable('generated_slides', {
 	slideTitle: text('slideTitle').notNull(),
 	slideNumber: integer('slideNumber').notNull(),
 	htmlContent: text('htmlContent').notNull(), // The complete HTML code for the slide
+	svelteContent: text('svelteContent'), // JSON string of Svelte slide data (SlideData object)
 	slideType: text('slideType').notNull(), // e.g., 'title', 'content', 'thank-you', etc.
 	slideData: text('slideData'), // JSON string of slide-specific data (content, styling, etc.)
 	thumbnailPath: text('thumbnailPath'), // Path to slide thumbnail image

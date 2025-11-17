@@ -2491,8 +2491,8 @@
           // Call the SlideManager's download method
           // Since SlideManager has its own download button, we'll trigger it programmatically
           // Or we can collect the data ourselves
-          const brandName = brandData?.brandName || brandData?.brand_name || 'Brand';
-          
+        const brandName = brandData?.brandName || brandData?.brand_name || 'Brand';
+        
           // We'll need to access the slide refs from SlideManager
           // For now, let's use a simpler approach - trigger the SlideManager's download
           console.log('📊 Collecting slide data from Svelte components...');
@@ -2501,7 +2501,7 @@
           // by calling the convertSvelteSlidesToPptx directly if we can access the refs
           // For now, let's show a message to use the SlideManager's download button
           alert('Please use the "Download All Slides as PPTX" button in the Svelte component view to get editable PPTX files.');
-          return;
+        return;
         } catch (err: any) {
           console.error('Svelte PPTX conversion error:', err);
           throw new Error('Failed to generate editable PPTX. Please try the download button in the component view.');
@@ -2687,13 +2687,13 @@
           
           <div class="flex items-center gap-2">
             <!-- Toggle between HTML iframe and Svelte components -->
-            <button 
+              <button
               class="px-3 py-2 border rounded transition-colors {useSvelteComponents ? 'bg-green-500 text-white border-green-600' : 'bg-muted text-foreground hover:bg-gray-300'}" 
               onclick={() => useSvelteComponents = !useSvelteComponents}
               title={useSvelteComponents ? 'Switch to HTML iframe view' : 'Switch to Svelte component view (editable PPTX)'}
-            >
+              >
               {useSvelteComponents ? '🔄 HTML View' : '⚡ Svelte View'}
-            </button>
+              </button>
             {#if !useSvelteComponents}
               {#if isEditable}
                 <button 
@@ -2711,58 +2711,58 @@
                 {isEditable ? '💾 Save & Done' : '✏️ Edit Slide'}
               </button>
             {/if}
-            <button 
-              class="px-4 py-2 bg-primary text-white rounded hover:bg-green-600 transition-colors" 
-              onclick={saveChanges}
-            >
-              💾 Save Changes
-            </button>
-            {#if originalSlidesSnapshot && originalSlidesSnapshot.length > 0}
               <button 
-                class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors" 
-                onclick={revertChanges}
-                title="Discard all edits and revert to original state"
+                class="px-4 py-2 bg-primary text-white rounded hover:bg-green-600 transition-colors" 
+                onclick={saveChanges}
               >
-                🔄 Revert Changes
+                💾 Save Changes
               </button>
-            {/if}
-            <!-- Export As Dropdown -->
-            <div class="relative inline-block" bind:this={exportDropdownRef}>
-              <button 
-                class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center gap-2" 
-                disabled={isDownloading}
-                onclick={() => showExportDropdown = !showExportDropdown}
-              >
-                {isDownloading ? '⏳ Generating...' : '📥 Export As'}
-                <span class="text-sm">▼</span>
-              </button>
-              
-              {#if showExportDropdown}
-                <div class="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-border z-50">
-                  <button
-                    class="w-full text-left px-4 py-2 hover:bg-muted rounded-t-lg flex items-center gap-2 text-sm border-b border-border"
-                    onclick={() => { downloadPPTX(); showExportDropdown = false; }}
-                    disabled={isDownloading}
-                  >
-                    {useSvelteComponents ? '📄 PPTX (Editable)' : '📄 PPTX (Image-based)'}
-                  </button>
-                  <button
-                    class="w-full text-left px-4 py-2 hover:bg-muted rounded-b-lg flex items-center gap-2 text-sm"
-                    onclick={() => { downloadPDF(); showExportDropdown = false; }}
-                    disabled={isDownloading}
-                  >
-                    📄 PDF
-                  </button>
-                </div>
+              {#if originalSlidesSnapshot && originalSlidesSnapshot.length > 0}
+                <button 
+                  class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors" 
+                  onclick={revertChanges}
+                  title="Discard all edits and revert to original state"
+                >
+                  🔄 Revert Changes
+                </button>
               {/if}
-            </div>
+              <!-- Export As Dropdown -->
+              <div class="relative inline-block" bind:this={exportDropdownRef}>
+                <button 
+                  class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center gap-2" 
+                  disabled={isDownloading}
+                  onclick={() => showExportDropdown = !showExportDropdown}
+                >
+                  {isDownloading ? '⏳ Generating...' : '📥 Export As'}
+                  <span class="text-sm">▼</span>
+                </button>
+                
+                {#if showExportDropdown}
+                  <div class="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-border z-50">
+                    <button
+                      class="w-full text-left px-4 py-2 hover:bg-muted rounded-t-lg flex items-center gap-2 text-sm border-b border-border"
+                      onclick={() => { downloadPPTX(); showExportDropdown = false; }}
+                      disabled={isDownloading}
+                    >
+                    {useSvelteComponents ? '📄 PPTX (Editable)' : '📄 PPTX (Image-based)'}
+                    </button>
+                    <button
+                      class="w-full text-left px-4 py-2 hover:bg-muted rounded-b-lg flex items-center gap-2 text-sm"
+                      onclick={() => { downloadPDF(); showExportDropdown = false; }}
+                      disabled={isDownloading}
+                    >
+                      📄 PDF
+                    </button>
+                  </div>
+                {/if}
+              </div>
           </div>
         </div>
       </div>
 
-      <div class="grid gap-6 lg:grid-cols-[1fr_300px]">
-        <!-- Main Slide Viewer -->
-        <div class="space-y-4">
+        <div class="grid gap-6 lg:grid-cols-[1fr_300px]">
+          <!-- Main Slide Viewer -->
+          <div class="space-y-4">
           {#if useSvelteComponents}
             <!-- Svelte Component View -->
             <div class="bg-white rounded-lg shadow-lg p-4">
@@ -2798,10 +2798,10 @@
               </div>
             </div>
           {/if}
-        </div>
+          </div>
 
-        <!-- Sidebar -->
-        <div class="space-y-4">
+          <!-- Sidebar -->
+          <div class="space-y-4">
           {#if !useSvelteComponents}
             <!-- Template Selector (only for HTML mode) -->
             <div class="bg-white rounded-lg shadow-sm p-4">
@@ -2869,52 +2869,52 @@
               </div>
             </div>
           {/if}
-          
-          <!-- Edit Status -->
-          <div class="bg-background rounded-lg p-4">
-            <h4 class="font-semibold text-gray-800 mb-2">📋 Status</h4>
-            <div class="text-sm text-muted-foreground space-y-1">
-              <div><strong>Brand:</strong> {brandData.brandName || 'Unknown'}</div>
-              <div><strong>Slides:</strong> {slides.length}</div>
-              <div><strong>Edit Status:</strong> {isEditable ? '✏️ Editing' : '👁️ Viewing'}</div>
+            
+            <!-- Edit Status -->
+            <div class="bg-background rounded-lg p-4">
+              <h4 class="font-semibold text-gray-800 mb-2">📋 Status</h4>
+              <div class="text-sm text-muted-foreground space-y-1">
+                <div><strong>Brand:</strong> {brandData.brandName || 'Unknown'}</div>
+                <div><strong>Slides:</strong> {slides.length}</div>
+                <div><strong>Edit Status:</strong> {isEditable ? '✏️ Editing' : '👁️ Viewing'}</div>
+              </div>
             </div>
-          </div>
-          
-          <!-- Editing Tips -->
+            
+            <!-- Editing Tips -->
           {#if isEditable}
-            <div class="bg-blue-50 rounded-lg p-4">
-              <h4 class="font-semibold text-blue-800 mb-2">💡 Editing Tips</h4>
-              {#if editMode === 'text'}
-                <ul class="text-sm text-primary space-y-1">
-                  <li>• Click on any text in the slide to edit it</li>
-                  <li>• Text will be highlighted with blue borders</li>
-                  <li>• Changes are saved automatically</li>
-                  <li>• Switch to Layout Mode to move/resize elements</li>
-                </ul>
-              {:else}
-                <ul class="text-sm text-primary space-y-1">
-                  <li>• <strong>Cursor</strong> shows what you can do (grab/resize)</li>
-                  <li>• <strong>Drag</strong> elements to move them around</li>
-                  <li>• <strong>Resize</strong> by dragging edges/corners</li>
-                  <li>• Click to select an element (blue outline)</li>
-                  <li>• Switch to Text Mode to edit content</li>
-                </ul>
-              {/if}
-            </div>
-          {/if}
-          
-          <!-- How It Works -->
-          <div class="bg-yellow-50 rounded-lg p-4">
-            <h4 class="font-semibold text-yellow-800 mb-2">🔧 How It Works</h4>
-            <div class="text-sm text-yellow-700 space-y-1">
-              <div><strong>Preview Mode:</strong> View slides as generated</div>
-              <div><strong>Edit Mode:</strong> Click text to edit directly</div>
-              <div><strong>Revert:</strong> Discard all changes and go back</div>
-              <div><strong>Download:</strong> Get updated PPTX with changes</div>
+              <div class="bg-blue-50 rounded-lg p-4">
+                <h4 class="font-semibold text-blue-800 mb-2">💡 Editing Tips</h4>
+                {#if editMode === 'text'}
+                  <ul class="text-sm text-primary space-y-1">
+                    <li>• Click on any text in the slide to edit it</li>
+                    <li>• Text will be highlighted with blue borders</li>
+                    <li>• Changes are saved automatically</li>
+                    <li>• Switch to Layout Mode to move/resize elements</li>
+                  </ul>
+                {:else}
+                  <ul class="text-sm text-primary space-y-1">
+                    <li>• <strong>Cursor</strong> shows what you can do (grab/resize)</li>
+                    <li>• <strong>Drag</strong> elements to move them around</li>
+                    <li>• <strong>Resize</strong> by dragging edges/corners</li>
+                    <li>• Click to select an element (blue outline)</li>
+                    <li>• Switch to Text Mode to edit content</li>
+                  </ul>
+                {/if}
+              </div>
+            {/if}
+            
+            <!-- How It Works -->
+            <div class="bg-yellow-50 rounded-lg p-4">
+              <h4 class="font-semibold text-yellow-800 mb-2">🔧 How It Works</h4>
+              <div class="text-sm text-yellow-700 space-y-1">
+                <div><strong>Preview Mode:</strong> View slides as generated</div>
+                <div><strong>Edit Mode:</strong> Click text to edit directly</div>
+                <div><strong>Revert:</strong> Discard all changes and go back</div>
+                <div><strong>Download:</strong> Get updated PPTX with changes</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
     </div>
   </div>
  {/if}

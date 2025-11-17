@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { SlideData } from '$lib/types/slide-data';
   
-  export let primaryColor: string = '#1E40AF';
-  export let secondaryColor: string = '#93C5FD';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
+  export let color4Hex: string = '#93C5FD'; // SECONDARY_COLOR
   export let color6Lighter: string = '#3B82F6';
   export let color7Lighter: string = '#1E40AF';
   export let color8Lighter: string = '#2563EB';
@@ -10,13 +10,70 @@
   export let color7Rgba10: string = 'rgba(30, 64, 175, 0.1)';
   export let isEditable: boolean = false;
   
+  // Editable photo labels
+  export let photoLabel1: string = 'Authentic Moments';
+  export let photoLabel2: string = 'Natural Lighting';
+  export let photoLabel3: string = 'Vibrant Colors';
+  export let photoLabel4: string = 'People-Focused';
+  
+  // Editable photo emojis
+  export let photoEmoji1: string = '📷';
+  export let photoEmoji2: string = '🌟';
+  export let photoEmoji3: string = '🎨';
+  export let photoEmoji4: string = '👥';
+  
+  // Editable guidelines
+  export let guidelineTitle1: string = 'Style Guidelines';
+  export let guidelineItems: string[] = [
+    'Natural, authentic moments',
+    'Bright, well-lit environments',
+    'Warm, inviting tones',
+    'Diverse, inclusive representation',
+    'Professional yet approachable'
+  ];
+  
+  // Editable do's and don'ts
+  export let guidelineTitle2: string = 'Do\'s & Don\'ts';
+  export let doText: string = 'Use natural lighting & authentic scenes';
+  export let dontText: string = 'Avoid staged poses & heavy filters';
+  
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color6Lighter, color7Lighter, '#FFFFFF', color8Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color6Lighter} 0%, ${color7Lighter} 25%, #FFFFFF 50%, ${color8Lighter} 75%, ${color6Lighter} 100%)`;
+    }
+  })();
+  
   // Dynamic styles computed from props
   $: radialOverlayStyle = `radial-gradient(ellipse at top right, ${color6Rgba10} 0%, transparent 60%), radial-gradient(ellipse at bottom left, ${color7Rgba10} 0%, transparent 60%)`;
-  $: headerBorderStyle = `4px solid ${primaryColor}`;
-  $: titleColorStyle = primaryColor;
-  $: photoPlaceholderGradient = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
-  $: boxTitleColorStyle = primaryColor;
-  $: guidelineListColorStyle = primaryColor;
+  $: headerBorderStyle = `4px solid ${color1Hex}`;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
+  $: photoPlaceholderGradient = `linear-gradient(135deg, ${color1Hex} 0%, ${color4Hex} 100%)`;
+  $: boxTitleColorStyle = color1Hex;
+  $: guidelineListColorStyle = color1Hex;
   
   $: slideData = createSlideData();
   
@@ -41,7 +98,7 @@
       fontSize: 36,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 3
@@ -53,8 +110,8 @@
       type: 'shape' as const,
       position: { x: paddingX, y: paddingY + pyToIn(60), w: 10 - (paddingX * 2), h: pyToIn(4) },
       shapeType: 'rect',
-      fillColor: primaryColor.replace('#', ''),
-      lineColor: primaryColor.replace('#', ''),
+      fillColor: color1Hex.replace('#', ''),
+      lineColor: color1Hex.replace('#', ''),
       lineWidth: 0,
       zIndex: 3
     });
@@ -71,10 +128,10 @@
     
     // Left column: Photo examples in 2x2 grid
     const photoExamples = [
-      { emoji: '📷', label: 'Authentic Moments' },
-      { emoji: '🌟', label: 'Natural Lighting' },
-      { emoji: '🎨', label: 'Vibrant Colors' },
-      { emoji: '👥', label: 'People-Focused' }
+      { emoji: photoEmoji1, label: photoLabel1 },
+      { emoji: photoEmoji2, label: photoLabel2 },
+      { emoji: photoEmoji3, label: photoLabel3 },
+      { emoji: photoEmoji4, label: photoLabel4 }
     ];
     
     const photoGridGap = pxToIn(20); // 20px gap between photos
@@ -100,17 +157,23 @@
         zIndex: 1
       });
       
-      // Photo placeholder area (200px height, full width)
+      // Photo placeholder area (200px height, full width with padding)
       const placeholderHeight = pyToIn(200);
       const placeholderY = photoBoxY;
+      const placeholderPadding = pxToIn(2); // Small padding to prevent edge touching
       
       // Photo placeholder background (gradient area)
       elements.push({
         id: `photo-placeholder-bg-${index}`,
         type: 'shape' as const,
-        position: { x: photoBoxX, y: placeholderY, w: photoBoxWidth, h: placeholderHeight },
+        position: { 
+          x: photoBoxX + placeholderPadding, 
+          y: placeholderY + placeholderPadding, 
+          w: photoBoxWidth - (placeholderPadding * 2), 
+          h: placeholderHeight - (placeholderPadding * 2)
+        },
         shapeType: 'rect',
-        fillColor: primaryColor.replace('#', ''),
+        fillColor: color1Hex.replace('#', ''),
         zIndex: 2
       });
       
@@ -118,7 +181,12 @@
       elements.push({
         id: `photo-icon-${index}`,
         type: 'text' as const,
-        position: { x: photoBoxX, y: placeholderY, w: photoBoxWidth, h: placeholderHeight },
+        position: { 
+          x: photoBoxX + placeholderPadding, 
+          y: placeholderY + placeholderPadding, 
+          w: photoBoxWidth - (placeholderPadding * 2), 
+          h: placeholderHeight - (placeholderPadding * 2)
+        },
         text: photo.emoji,
         fontSize: 32,
         fontFace: 'Arial',
@@ -128,9 +196,9 @@
         zIndex: 3
       });
       
-      // Photo label (below placeholder)
-      const labelY = placeholderY + placeholderHeight;
-      const labelHeight = photoBoxHeight - placeholderHeight;
+      // Photo label (below placeholder with proper spacing)
+      const labelY = placeholderY + placeholderHeight + pyToIn(5);
+      const labelHeight = photoBoxHeight - placeholderHeight - pyToIn(5);
       elements.push({
         id: `photo-label-${index}`,
         type: 'text' as const,
@@ -167,24 +235,17 @@
       id: 'guideline-card-1-title',
       type: 'text' as const,
       position: { x: rightColX + pxToIn(25), y: card1Y + pxToIn(25), w: rightColWidth - pxToIn(50), h: pyToIn(18) },
-      text: 'Style Guidelines',
+      text: guidelineTitle1,
       fontSize: 16,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
     });
     
-    // Guideline list items
-    const guidelineItems = [
-      'Natural, authentic moments',
-      'Bright, well-lit environments',
-      'Warm, inviting tones',
-      'Diverse, inclusive representation',
-      'Professional yet approachable'
-    ];
+    // Guideline list items (use exported array)
     
     const guidelineStartY = card1Y + pxToIn(50);
     guidelineItems.forEach((item, index) => {
@@ -223,11 +284,11 @@
       id: 'guideline-card-2-title',
       type: 'text' as const,
       position: { x: rightColX + pxToIn(25), y: card2Y + pxToIn(25), w: rightColWidth - pxToIn(50), h: pyToIn(18) },
-      text: 'Do\'s & Don\'ts',
+      text: guidelineTitle2,
       fontSize: 16,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
@@ -267,7 +328,7 @@
       id: 'do-text',
       type: 'text' as const,
       position: { x: doBoxX, y: doBoxY + pyToIn(22), w: doDontWidth, h: pyToIn(58) },
-      text: 'Use natural lighting & authentic scenes',
+      text: doText,
       fontSize: 11,
       fontFace: 'Arial',
       color: '666666',
@@ -305,7 +366,7 @@
       id: 'dont-text',
       type: 'text' as const,
       position: { x: dontBoxX, y: doBoxY + pyToIn(22), w: doDontWidth, h: pyToIn(58) },
-      text: 'Avoid staged poses & heavy filters',
+      text: dontText,
       fontSize: 11,
       fontFace: 'Arial',
       color: '666666',
@@ -314,23 +375,50 @@
       zIndex: 3
     });
     
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color6Lighter,
+        color7Lighter,
+        'FFFFFF',
+        color8Lighter,
+        color6Lighter
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'E0E0E0', 'F0F0F0'];
+    }
+    
     return {
       id: 'photography',
       type: 'photography',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color6Lighter.replace('#', ''),
-              color7Lighter.replace('#', ''),
-              'FFFFFF',
-              color8Lighter.replace('#', ''),
-              color6Lighter.replace('#', '')
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -338,12 +426,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="photography-slide" style="background: linear-gradient(135deg, {color6Lighter} 0%, {color7Lighter} 25%, #FFFFFF 50%, {color8Lighter} 75%, {color6Lighter} 100%);">
+<div class="photography-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">
@@ -354,45 +443,105 @@
     <div class="content">
       <div class="photo-examples">
         <div class="photo-box">
-          <div class="photo-placeholder" style="background: {photoPlaceholderGradient};">📷</div>
-          <div class="photo-label">Authentic Moments</div>
+          <div class="photo-placeholder" style="background: {photoPlaceholderGradient};">
+            {#if isEditable}
+              <input type="text" bind:value={photoEmoji1} class="photo-emoji-input" />
+            {:else}
+              {photoEmoji1}
+            {/if}
+          </div>
+          {#if isEditable}
+            <input type="text" bind:value={photoLabel1} class="photo-label-input" />
+          {:else}
+            <div class="photo-label">{photoLabel1}</div>
+          {/if}
         </div>
         <div class="photo-box">
-          <div class="photo-placeholder" style="background: {photoPlaceholderGradient};">🌟</div>
-          <div class="photo-label">Natural Lighting</div>
+          <div class="photo-placeholder" style="background: {photoPlaceholderGradient};">
+            {#if isEditable}
+              <input type="text" bind:value={photoEmoji2} class="photo-emoji-input" />
+            {:else}
+              {photoEmoji2}
+            {/if}
+          </div>
+          {#if isEditable}
+            <input type="text" bind:value={photoLabel2} class="photo-label-input" />
+          {:else}
+            <div class="photo-label">{photoLabel2}</div>
+          {/if}
         </div>
         <div class="photo-box">
-          <div class="photo-placeholder" style="background: {photoPlaceholderGradient};">🎨</div>
-          <div class="photo-label">Vibrant Colors</div>
+          <div class="photo-placeholder" style="background: {photoPlaceholderGradient};">
+            {#if isEditable}
+              <input type="text" bind:value={photoEmoji3} class="photo-emoji-input" />
+            {:else}
+              {photoEmoji3}
+            {/if}
+          </div>
+          {#if isEditable}
+            <input type="text" bind:value={photoLabel3} class="photo-label-input" />
+          {:else}
+            <div class="photo-label">{photoLabel3}</div>
+          {/if}
         </div>
         <div class="photo-box">
-          <div class="photo-placeholder" style="background: {photoPlaceholderGradient};">👥</div>
-          <div class="photo-label">People-Focused</div>
+          <div class="photo-placeholder" style="background: {photoPlaceholderGradient};">
+            {#if isEditable}
+              <input type="text" bind:value={photoEmoji4} class="photo-emoji-input" />
+            {:else}
+              {photoEmoji4}
+            {/if}
+          </div>
+          {#if isEditable}
+            <input type="text" bind:value={photoLabel4} class="photo-label-input" />
+          {:else}
+            <div class="photo-label">{photoLabel4}</div>
+          {/if}
         </div>
       </div>
       
       <div class="guidelines">
         <div class="guideline-box">
-          <div class="box-title" style="color: {boxTitleColorStyle};">Style Guidelines</div>
+          {#if isEditable}
+            <input type="text" bind:value={guidelineTitle1} class="box-title-input" style="color: {boxTitleColorStyle};" />
+          {:else}
+            <div class="box-title" style="color: {boxTitleColorStyle};">{guidelineTitle1}</div>
+          {/if}
           <ul class="guideline-list" style="--guideline-color: {guidelineListColorStyle};">
-            <li>Natural, authentic moments</li>
-            <li>Bright, well-lit environments</li>
-            <li>Warm, inviting tones</li>
-            <li>Diverse, inclusive representation</li>
-            <li>Professional yet approachable</li>
+            {#each guidelineItems as item, index}
+              {#if isEditable}
+                <li>
+                  <input type="text" bind:value={guidelineItems[index]} class="guideline-item-input" />
+                </li>
+              {:else}
+                <li>{item}</li>
+              {/if}
+            {/each}
           </ul>
         </div>
         
         <div class="guideline-box">
-          <div class="box-title" style="color: {boxTitleColorStyle};">Do's & Don'ts</div>
+          {#if isEditable}
+            <input type="text" bind:value={guidelineTitle2} class="box-title-input" style="color: {boxTitleColorStyle};" />
+          {:else}
+            <div class="box-title" style="color: {boxTitleColorStyle};">{guidelineTitle2}</div>
+          {/if}
           <div class="do-dont">
             <div class="do-box">
               <div class="do-title">✓ DO</div>
-              <div class="rule-text">Use natural lighting & authentic scenes</div>
+              {#if isEditable}
+                <input type="text" bind:value={doText} class="rule-text-input" />
+              {:else}
+                <div class="rule-text">{doText}</div>
+              {/if}
             </div>
             <div class="dont-box">
               <div class="dont-title">✗ DON'T</div>
-              <div class="rule-text">Avoid staged poses & heavy filters</div>
+              {#if isEditable}
+                <input type="text" bind:value={dontText} class="rule-text-input" />
+              {:else}
+                <div class="rule-text">{dontText}</div>
+              {/if}
             </div>
           </div>
         </div>
@@ -555,6 +704,63 @@
   .rule-text {
     font-size: 12px;
     color: #666;
+  }
+  
+  .photo-emoji-input {
+    background: transparent;
+    border: 2px dashed rgba(255,255,255,0.5);
+    border-radius: 4px;
+    padding: 8px;
+    text-align: center;
+    font-size: 32px;
+    color: white;
+    width: 100%;
+    max-width: 100px;
+    margin: 0 auto;
+  }
+  
+  .photo-label-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+  }
+  
+  .box-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 15px;
+  }
+  
+  .guideline-item-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 4px;
+    background: white;
+    font-size: 14px;
+    color: #666;
+  }
+  
+  .rule-text-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 6px;
+    background: white;
+    font-size: 12px;
+    color: #666;
+    text-align: center;
   }
 </style>
 

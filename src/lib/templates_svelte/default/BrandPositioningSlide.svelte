@@ -18,9 +18,39 @@
   export let color1Rgba5: string = 'rgba(30, 64, 175, 0.05)';
   export let isEditable: boolean = false;
   
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color2Lighter, color3Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color2Lighter} 0%, ${color3Lighter} 25%, #FFFFFF 50%, ${color1Lighter} 75%, #FFFFFF 100%)`;
+    }
+  })();
+  
   // Dynamic styles computed from props
   $: radialOverlayStyle = `radial-gradient(circle at 10% 20%, ${color2Rgba15} 0%, transparent 40%), radial-gradient(circle at 90% 80%, ${color3Rgba15} 0%, transparent 40%), linear-gradient(45deg, transparent 30%, ${color1Rgba5} 50%, transparent 70%)`;
-  $: titleColorStyle = primaryColor;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
   $: dividerBgStyle = color1Hex;
   $: missionCardBgStyle = color1Lighter;
   $: missionCardBorderStyle = color1Hex;
@@ -35,22 +65,49 @@
   $: slideData = createSlideData();
   
   function createSlideData(): SlideData {
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color2Lighter,
+        color3Lighter,
+        'FFFFFF',
+        color1Lighter
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'E0E0E0'];
+    }
+    
     return {
       id: 'brand-positioning',
       type: 'content',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color2Lighter.replace('#', ''),
-              color3Lighter.replace('#', ''),
-              'FFFFFF',
-              color1Lighter.replace('#', '')
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -64,7 +121,7 @@
           fontSize: 36,
           fontFace: 'Arial',
           bold: true,
-          color: primaryColor.replace('#', ''),
+          color: color1Hex.replace('#', ''),
           align: 'left' as const,
           valign: 'top' as const,
           zIndex: 2
@@ -226,12 +283,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="brand-positioning-slide" style="background: linear-gradient(135deg, {color2Lighter} 0%, {color3Lighter} 25%, #FFFFFF 50%, {color1Lighter} 75%, #FFFFFF 100%);">
+<div class="brand-positioning-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">

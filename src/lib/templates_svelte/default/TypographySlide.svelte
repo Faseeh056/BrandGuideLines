@@ -5,7 +5,7 @@
   export let secondaryFont: string = 'Arial';
   export let primaryWeights: string = 'Regular, Bold';
   export let secondaryWeights: string = 'Regular, Medium';
-  export let primaryColor: string = '#1E40AF';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
   export let color4Lighter: string = '#93C5FD';
   export let color5Lighter: string = '#60A5FA';
   export let color6Lighter: string = '#3B82F6';
@@ -14,35 +14,65 @@
   export let color6Rgba8: string = 'rgba(59, 130, 246, 0.08)';
   export let isEditable: boolean = false;
   
+  // Editable hierarchy content
+  export let hierarchyH1: string = 'H1: 32pt - Main titles';
+  export let hierarchyH2: string = 'H2: 24pt - Section headers';
+  export let hierarchyH3: string = 'H3: 20pt - Subsection headers';
+  export let hierarchyBody: string = 'Body: 16pt - Main content';
+  
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color4Lighter, color5Lighter, '#FFFFFF', color6Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color4Lighter} 0%, ${color5Lighter} 30%, #FFFFFF 50%, ${color6Lighter} 70%, #FFFFFF 100%)`;
+    }
+  })();
+  
   // Dynamic styles computed from props
   $: radialOverlayStyle = `linear-gradient(90deg, transparent 0%, ${color4Rgba8} 20%, transparent 40%, ${color5Rgba8} 60%, transparent 80%, ${color6Rgba8} 100%)`;
-  $: titleColorStyle = primaryColor;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
   
-  // Google Fonts mapping for common fonts
-  const googleFonts = [
-    'Roboto', 'Open Sans', 'Montserrat', 'Lato', 'Inter', 'Poppins', 'Nunito',
-    'Merriweather', 'Source Sans Pro', 'Playfair Display', 'Raleway', 'Ubuntu',
-    'Oswald', 'PT Sans', 'PT Serif', 'Crimson Text', 'Work Sans', 'DM Sans',
-    'Space Grotesk', 'IBM Plex Sans', 'Fira Sans', 'Noto Sans', 'Rubik',
-    'Libre Baskerville', 'Bebas Neue', 'Futura', 'Gotham', 'Proxima Nova'
-  ];
-  
-  // Function to load Google Font if needed
+  // Function to load Google Font dynamically (works for any font name)
   function loadGoogleFont(fontName: string) {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || !fontName) return;
     
     // Check if font is already loaded
     const fontId = `font-${fontName.replace(/\s+/g, '-').toLowerCase()}`;
     if (document.getElementById(fontId)) return;
     
-    // Check if it's a Google Font
-    if (googleFonts.includes(fontName)) {
-      const link = document.createElement('link');
-      link.id = fontId;
-      link.rel = 'stylesheet';
-      link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/\s+/g, '+')}:wght@300;400;500;600;700&display=swap`;
-      document.head.appendChild(link);
-    }
+    // Try to load as Google Font (most common fonts are available)
+    // If it's not a Google Font, the browser will fall back to system fonts
+    const link = document.createElement('link');
+    link.id = fontId;
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/\s+/g, '+')}:wght@300;400;500;600;700&display=swap`;
+    link.onerror = () => {
+      // If Google Font doesn't exist, silently fail - browser will use fallback
+      console.log(`Font "${fontName}" not found in Google Fonts, using system fallback`);
+    };
+    document.head.appendChild(link);
   }
   
   // Load fonts when component mounts or fonts change
@@ -69,23 +99,50 @@
   $: slideData = createSlideData();
   
   function createSlideData(): SlideData {
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color4Lighter,
+        color5Lighter,
+        'FFFFFF',
+        color6Lighter,
+        'FFFFFF'
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'E0E0E0', 'FFFFFF'];
+    }
+    
     return {
       id: 'typography',
       type: 'typography',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color4Lighter.replace('#', ''),
-              color5Lighter.replace('#', ''),
-              'FFFFFF',
-              color6Lighter.replace('#', ''),
-              'FFFFFF'
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -99,7 +156,7 @@
           fontSize: 36,
           fontFace: 'Arial',
           bold: true,
-          color: primaryColor.replace('#', ''),
+          color: color1Hex.replace('#', ''),
           align: 'left' as const,
           valign: 'top' as const,
           zIndex: 2
@@ -246,7 +303,7 @@
           id: 'hierarchy-h1',
           type: 'text' as const,
           position: { x: 0.57, y: 3.04, w: 8.86, h: 0.25 },
-          text: 'H1: 32pt - Main titles',
+          text: hierarchyH1,
           fontSize: 13,
           fontFace: 'Arial',
           color: '2C2C2C',
@@ -258,7 +315,7 @@
           id: 'hierarchy-h2',
           type: 'text' as const,
           position: { x: 0.57, y: 3.29, w: 8.86, h: 0.25 },
-          text: 'H2: 24pt - Section headers',
+          text: hierarchyH2,
           fontSize: 13,
           fontFace: 'Arial',
           color: '2C2C2C',
@@ -270,7 +327,7 @@
           id: 'hierarchy-h3',
           type: 'text' as const,
           position: { x: 0.57, y: 3.54, w: 8.86, h: 0.25 },
-          text: 'H3: 20pt - Subsection headers',
+          text: hierarchyH3,
           fontSize: 13,
           fontFace: 'Arial',
           color: '2C2C2C',
@@ -282,7 +339,7 @@
           id: 'hierarchy-body',
           type: 'text' as const,
           position: { x: 0.57, y: 3.79, w: 8.86, h: 0.25 },
-          text: 'Body: 16pt - Main content',
+          text: hierarchyBody,
           fontSize: 13,
           fontFace: 'Arial',
           color: '2C2C2C',
@@ -294,12 +351,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="typography-slide" style="background: linear-gradient(135deg, {color4Lighter} 0%, {color5Lighter} 25%, #FFFFFF 50%, {color6Lighter} 75%, #FFFFFF 100%);">
+<div class="typography-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">
@@ -310,7 +368,15 @@
       <div class="font-card">
         <div class="font-label">PRIMARY FONT</div>
         {#if isEditable}
-          <input type="text" bind:value={primaryFont} class="font-name-input" />
+          <div class="font-editing-group">
+            <input 
+              type="text" 
+              bind:value={primaryFont} 
+              class="font-name-input" 
+              placeholder="Enter font name (e.g., Roboto, Inter, Arial)"
+            />
+            <input type="text" bind:value={primaryWeights} class="font-weights-input" placeholder="Regular, Bold" />
+          </div>
         {:else}
           <div class="font-name" style="font-family: {primaryFontFamily};">{primaryFont}</div>
         {/if}
@@ -331,7 +397,15 @@
       <div class="font-card">
         <div class="font-label">SECONDARY FONT</div>
         {#if isEditable}
-          <input type="text" bind:value={secondaryFont} class="font-name-input" />
+          <div class="font-editing-group">
+            <input 
+              type="text" 
+              bind:value={secondaryFont} 
+              class="font-name-input" 
+              placeholder="Enter font name (e.g., Roboto, Inter, Arial)"
+            />
+            <input type="text" bind:value={secondaryWeights} class="font-weights-input" placeholder="Regular, Medium" />
+          </div>
         {:else}
           <div class="font-name" style="font-family: {secondaryFontFamily};">{secondaryFont}</div>
         {/if}
@@ -352,10 +426,17 @@
     
     <div class="hierarchy-card">
       <div class="hierarchy-title">TYPOGRAPHY HIERARCHY</div>
-      <div class="hierarchy-item">H1: 32pt - Main titles</div>
-      <div class="hierarchy-item">H2: 24pt - Section headers</div>
-      <div class="hierarchy-item">H3: 20pt - Subsection headers</div>
-      <div class="hierarchy-item">Body: 16pt - Main content</div>
+      {#if isEditable}
+        <input type="text" bind:value={hierarchyH1} class="hierarchy-input" />
+        <input type="text" bind:value={hierarchyH2} class="hierarchy-input" />
+        <input type="text" bind:value={hierarchyH3} class="hierarchy-input" />
+        <input type="text" bind:value={hierarchyBody} class="hierarchy-input" />
+      {:else}
+        <div class="hierarchy-item">{hierarchyH1}</div>
+        <div class="hierarchy-item">{hierarchyH2}</div>
+        <div class="hierarchy-item">{hierarchyH3}</div>
+        <div class="hierarchy-item">{hierarchyBody}</div>
+      {/if}
     </div>
   </div>
 </div>
@@ -429,12 +510,29 @@
     margin-bottom: 5px;
   }
   
+  .font-editing-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
   .font-name-input {
     width: 100%;
     border: 2px dashed rgba(0,0,0,0.2);
     border-radius: 4px;
     padding: 8px;
     background: white;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  .font-weights-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 6px;
+    background: white;
+    font-size: 14px;
   }
   
   .font-sample {
@@ -483,6 +581,17 @@
   .hierarchy-item {
     margin-bottom: 10px;
     font-size: 13px;
+    color: #2C2C2C;
+  }
+  
+  .hierarchy-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 6px;
+    background: white;
+    font-size: 13px;
+    margin-bottom: 10px;
     color: #2C2C2C;
   }
 </style>

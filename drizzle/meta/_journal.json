@@ -78,6 +78,27 @@
       "when": 1761890700471,
       "tag": "0010_wooden_sentry",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1763102576621,
+      "tag": "0011_silky_cardiac",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1763102904711,
+      "tag": "0012_dry_sasquatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1763105524589,
+      "tag": "0013_sad_hairball",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "generated_slides" ADD COLUMN "svelteContent" text;

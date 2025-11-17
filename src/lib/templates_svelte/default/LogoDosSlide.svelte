@@ -4,8 +4,8 @@
   export let brandName: string = 'Brand Name';
   export let logoUrl: string = '';
   export let logoData: string = '';
-  export let primaryColor: string = '#1E40AF';
-  export let secondaryColor: string = '#93C5FD';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
+  export let color4Hex: string = '#93C5FD'; // SECONDARY_COLOR
   export let color1Lighter: string = '#EFF6FF';
   export let color2Lighter: string = '#DBEAFE';
   export let color3Lighter: string = '#BFDBFE';
@@ -14,12 +14,59 @@
   export let color3Rgba10: string = 'rgba(96, 165, 250, 0.1)';
   export let isEditable: boolean = false;
   
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color1Lighter, color2Lighter, '#FFFFFF', color3Lighter, color4Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color1Lighter} 0%, ${color2Lighter} 20%, #FFFFFF 50%, ${color3Lighter} 70%, ${color4Lighter} 90%, #FFFFFF 100%)`;
+    }
+  })();
+  
+  // Editable DO card content
+  export let doCard1Title: string = 'Use Approved Colors';
+  export let doCard1Hint: string = 'Apply only {color1Hex} and {color4Hex} per brand palette.';
+  export let doCard2Title: string = 'Maintain Clear Space';
+  export let doCard2Hint: string = 'Keep minimum clear space around logo (≥ 10% of logo width).';
+  export let doCard3Title: string = 'Respect Minimum Size';
+  export let doCard3Hint: string = 'Never display the logo smaller than the specified minimum height.';
+  export let doCard4Title: string = 'Ensure Contrast';
+  export let doCard4Hint: string = 'Use sufficient contrast with backgrounds to maintain readability.';
+  
+  // Editable guidelines
+  export let guidelinesTitle: string = 'Usage Guidelines';
+  export let guideline1: string = 'Use only approved color combinations and backgrounds.';
+  export let guideline2: string = 'Maintain clear space around the logo on all sides.';
+  export let guideline3: string = 'Scale proportionally; adhere to minimum size constraints.';
+  export let guideline4: string = 'Place on clean, uncluttered backgrounds with strong contrast.';
+  
   // Dynamic styles computed from props
   $: radialOverlayStyle = `radial-gradient(circle at 25% 25%, ${color1Rgba10} 0%, transparent 50%), radial-gradient(circle at 75% 75%, ${color3Rgba10} 0%, transparent 50%)`;
-  $: headerBorderStyle = `4px solid ${primaryColor}`;
-  $: titleColorStyle = primaryColor;
-  $: guidelinesTitleColorStyle = primaryColor;
-  $: logoDemoGradient = `linear-gradient(135deg, #111 0%, ${primaryColor} 100%)`;
+  $: headerBorderStyle = `4px solid ${color1Hex}`;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
+  $: guidelinesTitleColorStyle = color1Hex;
+  $: logoDemoGradient = `linear-gradient(135deg, #111 0%, ${color1Hex} 100%)`;
   
   $: slideData = createSlideData();
   
@@ -67,7 +114,7 @@
       fontSize: 36,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 3
@@ -79,8 +126,8 @@
       type: 'shape' as const,
       position: { x: paddingX, y: paddingY + pyToIn(60), w: 10 - (paddingX * 2), h: pyToIn(4) },
       shapeType: 'rect',
-      fillColor: primaryColor.replace('#', ''),
-      lineColor: primaryColor.replace('#', ''),
+      fillColor: color1Hex.replace('#', ''),
+      lineColor: color1Hex.replace('#', ''),
       lineWidth: 0,
       zIndex: 3
     });
@@ -96,20 +143,22 @@
     const guidelinesColWidth = contentWidth * (1.0 / 2.6);
     const columnGap = pxToIn(32); // gap: 32px from UI
     
-    // Examples grid: 2x2 cards
-    const cardGap = pxToIn(20); // gap: 20px from UI
+    // Examples grid: 2x2 cards with proper spacing to prevent overlap
+    // Calculate card dimensions to fit within available space
+    const cardGap = pxToIn(28); // Gap between cards
+    const rowGap = pyToIn(28); // Gap between rows
     const cardWidth = (examplesColWidth - cardGap) / 2;
-    const cardHeight = pyToIn(200); // Adjusted card height
+    // Calculate card height to fit 2 rows within available content height
+    const cardHeight = (contentHeight - rowGap) / 2;
     const cardsStartX = paddingX; // Left column starts at padding
     const cardsStartY = contentStartY;
-    const rowGap = pyToIn(20); // gap: 20px from UI
     
-    // DO example cards in 2x2 grid
+    // DO example cards in 2x2 grid (use exported props)
     const doExamples = [
-      { title: 'Use Approved Colors', desc: 'Always use the official brand colors', hint: `Apply only ${primaryColor} and ${secondaryColor} per brand palette.` },
-      { title: 'Maintain Clear Space', desc: 'Keep 10% padding around the logo', hint: 'Keep minimum clear space around logo (≥ 10% of logo width).' },
-      { title: 'Respect Minimum Size', desc: 'Never display the logo smaller than the specified minimum height', hint: 'Never display the logo smaller than the specified minimum height.' },
-      { title: 'Ensure Contrast', desc: 'Use sufficient contrast with backgrounds to maintain readability', hint: 'Use sufficient contrast with backgrounds to maintain readability.' }
+      { title: doCard1Title, desc: 'Always use the official brand colors', hint: doCard1Hint.replace('{color1Hex}', color1Hex).replace('{color4Hex}', color4Hex) },
+      { title: doCard2Title, desc: 'Keep 10% padding around the logo', hint: doCard2Hint },
+      { title: doCard3Title, desc: 'Never display the logo smaller than the specified minimum height', hint: doCard3Hint },
+      { title: doCard4Title, desc: 'Use sufficient contrast with backgrounds to maintain readability', hint: doCard4Hint }
     ];
     
     doExamples.forEach((example, index) => {
@@ -176,17 +225,25 @@
       });
       
       // Logo demo area (centered in card, below header)
-      // Match UI: .logo-demo has height: 140px (or 100px for card 3)
-      // The demo area is full width of card, but logo image is centered within it
-      let logoAreaHeight = pyToIn(140); // Default height (140px)
+      // Calculate available space: card height - padding - badge - gap - hint space
+      const availableHeight = cardHeight - (cardPadding * 2) - badgeHeight - pyToIn(12) - pyToIn(35); // Reserve 35px for hint
+      // Match UI: .logo-demo has height: 140px (or 100px for card 3), but respect available space
+      let logoAreaHeight = Math.min(pyToIn(140), availableHeight); // Default height (140px) but not more than available
       if (index === 2) {
         // Third card: smaller height (100px as per UI style="height: 100px;")
-        logoAreaHeight = pyToIn(100);
+        logoAreaHeight = Math.min(pyToIn(100), availableHeight);
       }
       // Logo demo area spans full card width (card padding already accounted for in cardX)
       const logoAreaWidth = cardWidth - (cardPadding * 2); // Full card width minus padding
       const logoAreaY = cardY + cardPadding + badgeHeight + pyToIn(12); // 12px gap from badge
       const logoAreaX = cardX + cardPadding; // Start from card's inner edge
+      
+      // Add padding inside logo area to prevent image from stretching to edges
+      const logoInnerPadding = pxToIn(8);
+      const logoImageWidth = logoAreaWidth - (logoInnerPadding * 2);
+      const logoImageHeight = logoAreaHeight - (logoInnerPadding * 2);
+      const logoImageX = logoAreaX + logoInnerPadding;
+      const logoImageY = logoAreaY + logoInnerPadding;
       
       // Logo demo background (different for each example)
       if (index === 0) {
@@ -260,7 +317,7 @@
             h: logoAreaHeight * 0.7 
           },
           shapeType: 'rect',
-          fillColor: primaryColor.replace('#', ''),
+          fillColor: color1Hex.replace('#', ''),
           lineColor: '00000000',
           lineWidth: 0,
           zIndex: 1
@@ -279,18 +336,23 @@
         });
       }
       
-      // Logo image or text (on top of background, centered in area)
-      // Images should fill the demo area and be centered (like UI with object-fit: contain)
+      // Logo image or text (on top of background, centered in area with padding)
+      // Images should maintain aspect ratio and not stretch
       if (logoData || logoUrl) {
-        // Image fills the entire demo area - PPTX will center it with 'contain' sizing
+        // Image with inner padding to prevent stretching to edges
+        // Use square aspect ratio constraint to prevent distortion
+        const logoSize = Math.min(logoImageWidth, logoImageHeight);
+        const logoCenteredX = logoImageX + (logoImageWidth - logoSize) / 2;
+        const logoCenteredY = logoImageY + (logoImageHeight - logoSize) / 2;
+        
         elements.push({
           id: `do-logo-${index}`,
           type: 'image' as const,
           position: { 
-            x: logoAreaX, 
-            y: logoAreaY, 
-            w: logoAreaWidth, 
-            h: logoAreaHeight
+            x: logoCenteredX, 
+            y: logoCenteredY, 
+            w: logoSize, 
+            h: logoSize
           },
           imageData: logoData || undefined,
           imageSrc: logoUrl || undefined,
@@ -306,28 +368,40 @@
           fontSize: 16,
           fontFace: 'Arial',
           bold: true,
-          color: index === 3 ? 'FFFFFF' : primaryColor.replace('#', ''), // White text on gradient background
+          color: index === 3 ? 'FFFFFF' : color1Hex.replace('#', ''), // White text on gradient background
           align: 'center' as const,
           valign: 'middle' as const,
           zIndex: 3
         });
       }
       
-      // Hint text (below logo)
+      // Hint text (below logo with proper spacing to avoid overlap)
+      // Calculate hint position to ensure it fits within card bounds and doesn't overlap
       const hintY = logoAreaY + logoAreaHeight + pyToIn(10);
-      elements.push({
-        id: `do-hint-${index}`,
-        type: 'text' as const,
-        position: { x: cardX + cardPadding, y: hintY, w: cardWidth - cardPadding * 2, h: cardHeight - hintY + cardY - pyToIn(10) },
-        text: example.hint,
-        fontSize: 10,
-        fontFace: 'Arial',
-        italic: true,
-        color: '999999',
-        align: 'left' as const,
-        valign: 'top' as const,
-        zIndex: 2
-      });
+      const hintMaxHeight = cardY + cardHeight - hintY - pyToIn(10); // Leave 10px margin at bottom
+      const hintHeight = Math.min(pyToIn(25), hintMaxHeight); // Fixed height but respect card bounds
+      
+      // Only add hint if there's enough space (at least 15px)
+      if (hintHeight > pyToIn(15)) {
+        elements.push({
+          id: `do-hint-${index}`,
+          type: 'text' as const,
+          position: { 
+            x: cardX + cardPadding, 
+            y: hintY, 
+            w: cardWidth - cardPadding * 2, 
+            h: hintHeight
+          },
+          text: example.hint,
+          fontSize: 9,
+          fontFace: 'Arial',
+          italic: true,
+          color: '999999',
+          align: 'left' as const,
+          valign: 'top' as const,
+          zIndex: 2
+        });
+      }
     });
     
     // Right column: Guidelines section
@@ -357,7 +431,7 @@
       fontSize: 16,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
@@ -410,24 +484,51 @@
       });
     });
     
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color1Lighter,
+        color2Lighter,
+        'FFFFFF',
+        color3Lighter,
+        color4Lighter,
+        'FFFFFF'
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'E0E0E0', 'D0D0D0', 'FFFFFF'];
+    }
+    
     return {
       id: 'logo-dos',
       type: 'logo',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color1Lighter.replace('#', ''),
-              color2Lighter.replace('#', ''),
-              'FFFFFF',
-              color3Lighter.replace('#', ''),
-              color4Lighter.replace('#', ''),
-              'FFFFFF'
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -435,12 +536,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="logo-dos-slide" style="background: linear-gradient(135deg, {color1Lighter} 0%, {color2Lighter} 20%, #FFFFFF 50%, {color3Lighter} 70%, {color4Lighter} 90%, #FFFFFF 100%);">
+<div class="logo-dos-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">
@@ -453,24 +555,66 @@
         <div class="example-card">
           <div class="card-header">
             <div class="badge-do">DO</div>
-            <div class="card-title">Use Approved Colors</div>
-          </div>
-          <div class="logo-demo">
-            {#if logoData}
-              <img src={logoData} alt="{brandName} Logo" />
-            {:else if logoUrl}
-              <img src={logoUrl} alt="{brandName} Logo" />
+            {#if isEditable}
+              <input type="text" bind:value={doCard1Title} class="card-title-input" />
             {:else}
-              <div class="logo-placeholder">{brandName}</div>
+              <div class="card-title">{doCard1Title}</div>
             {/if}
           </div>
-          <div class="hint">Apply only {primaryColor} and {secondaryColor} per brand palette.</div>
+          <div class="logo-demo" class:editable={isEditable}>
+            {#if isEditable}
+              <label class="logo-upload-label">
+                {#if logoData}
+                  <img src={logoData} alt="{brandName} Logo" />
+                {:else if logoUrl}
+                  <img src={logoUrl} alt="{brandName} Logo" />
+                {:else}
+                  <div class="logo-upload-placeholder">
+                    <span class="upload-icon">📷</span>
+                    <span class="upload-text">Upload</span>
+                  </div>
+                {/if}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onchange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        logoData = event.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  class="logo-upload-input"
+                />
+              </label>
+            {:else}
+              {#if logoData}
+                <img src={logoData} alt="{brandName} Logo" />
+              {:else if logoUrl}
+                <img src={logoUrl} alt="{brandName} Logo" />
+              {:else}
+                <div class="logo-placeholder">{brandName}</div>
+              {/if}
+            {/if}
+          </div>
+          {#if isEditable}
+            <textarea bind:value={doCard1Hint} class="hint-input"></textarea>
+          {:else}
+            <div class="hint">{doCard1Hint.replace('{color1Hex}', color1Hex).replace('{color4Hex}', color4Hex)}</div>
+          {/if}
         </div>
         
         <div class="example-card">
           <div class="card-header">
             <div class="badge-do">DO</div>
-            <div class="card-title">Maintain Clear Space</div>
+            {#if isEditable}
+              <input type="text" bind:value={doCard2Title} class="card-title-input" />
+            {:else}
+              <div class="card-title">{doCard2Title}</div>
+            {/if}
           </div>
           <div class="logo-demo" style="position: relative;">
             <div class="clear-space-indicator"></div>
@@ -482,13 +626,21 @@
               <div class="logo-placeholder">{brandName}</div>
             {/if}
           </div>
-          <div class="hint">Keep minimum clear space around logo (≥ 10% of logo width).</div>
+          {#if isEditable}
+            <textarea bind:value={doCard2Hint} class="hint-input"></textarea>
+          {:else}
+            <div class="hint">{doCard2Hint}</div>
+          {/if}
         </div>
         
         <div class="example-card">
           <div class="card-header">
             <div class="badge-do">DO</div>
-            <div class="card-title">Respect Minimum Size</div>
+            {#if isEditable}
+              <input type="text" bind:value={doCard3Title} class="card-title-input" />
+            {:else}
+              <div class="card-title">{doCard3Title}</div>
+            {/if}
           </div>
           <div class="logo-demo" style="height: 100px;">
             {#if logoData}
@@ -499,13 +651,21 @@
               <div class="logo-placeholder">{brandName}</div>
             {/if}
           </div>
-          <div class="hint">Never display the logo smaller than the specified minimum height.</div>
+          {#if isEditable}
+            <textarea bind:value={doCard3Hint} class="hint-input"></textarea>
+          {:else}
+            <div class="hint">{doCard3Hint}</div>
+          {/if}
         </div>
         
         <div class="example-card">
           <div class="card-header">
             <div class="badge-do">DO</div>
-            <div class="card-title">Ensure Contrast</div>
+            {#if isEditable}
+              <input type="text" bind:value={doCard4Title} class="card-title-input" />
+            {:else}
+              <div class="card-title">{doCard4Title}</div>
+            {/if}
           </div>
           <div class="logo-demo" style="background: {logoDemoGradient};">
             {#if logoData}
@@ -516,16 +676,31 @@
               <div class="logo-placeholder">{brandName}</div>
             {/if}
           </div>
-          <div class="hint">Use sufficient contrast with backgrounds to maintain readability.</div>
+          {#if isEditable}
+            <textarea bind:value={doCard4Hint} class="hint-input"></textarea>
+          {:else}
+            <div class="hint">{doCard4Hint}</div>
+          {/if}
         </div>
       </div>
       
       <div class="guidelines">
-        <div class="guidelines-title" style="color: {guidelinesTitleColorStyle};">Usage Guidelines</div>
-        <div class="guideline-item">Use only approved color combinations and backgrounds.</div>
-        <div class="guideline-item">Maintain clear space around the logo on all sides.</div>
-        <div class="guideline-item">Scale proportionally; adhere to minimum size constraints.</div>
-        <div class="guideline-item">Place on clean, uncluttered backgrounds with strong contrast.</div>
+        {#if isEditable}
+          <input type="text" bind:value={guidelinesTitle} class="guidelines-title-input" style="color: {guidelinesTitleColorStyle};" />
+        {:else}
+          <div class="guidelines-title" style="color: {guidelinesTitleColorStyle};">{guidelinesTitle}</div>
+        {/if}
+        {#if isEditable}
+          <input type="text" bind:value={guideline1} class="guideline-item-input" />
+          <input type="text" bind:value={guideline2} class="guideline-item-input" />
+          <input type="text" bind:value={guideline3} class="guideline-item-input" />
+          <input type="text" bind:value={guideline4} class="guideline-item-input" />
+        {:else}
+          <div class="guideline-item">{guideline1}</div>
+          <div class="guideline-item">{guideline2}</div>
+          <div class="guideline-item">{guideline3}</div>
+          <div class="guideline-item">{guideline4}</div>
+        {/if}
       </div>
     </div>
   </div>
@@ -629,6 +804,50 @@
     object-fit: contain;
   }
   
+  .logo-demo.editable {
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .logo-demo.editable:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+  }
+  
+  .logo-upload-label {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+  }
+  
+  .logo-upload-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .logo-upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: #666;
+  }
+  
+  .upload-icon {
+    font-size: 32px;
+  }
+  
+  .upload-text {
+    font-size: 12px;
+    font-weight: 500;
+  }
+  
   .logo-placeholder {
     font-size: 24px;
     font-weight: bold;
@@ -677,6 +896,52 @@
     left: 0;
     color: #10B981;
     font-weight: bold;
+  }
+  
+  .card-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 4px;
+    background: white;
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+  }
+  
+  .hint-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 4px;
+    background: white;
+    font-size: 12px;
+    color: #666;
+    resize: vertical;
+    min-height: 40px;
+  }
+  
+  .guidelines-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 12px;
+  }
+  
+  .guideline-item-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 6px;
+    background: white;
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 10px;
+    padding-left: 26px;
   }
 </style>
 

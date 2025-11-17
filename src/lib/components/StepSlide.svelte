@@ -2,6 +2,9 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { CheckCircle, XCircle, Loader2, ThumbsUp, ThumbsDown, RefreshCw, Edit } from 'lucide-svelte';
+	import DynamicIcon from '$lib/components/DynamicIcon.svelte';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	export let stepData: any;
 	export let stepTitle: string;
@@ -23,98 +26,112 @@
 	let showFeedback = false;
 	let userFeedback = '';
 	let isRegenerating = false;
-
-	// Helper function to render markdown text
-	function renderMarkdown(text: string): string {
-		if (!text) return '';
-		return text
-			.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-			.replace(/\*(.*?)\*/g, '<em>$1</em>')
-			.replace(/\n/g, '<br>');
-	}
-
-	function extractColorsFromText(text: string): Array<{ name: string; hex: string }> {
-		if (!text) return [];
-
-		const colors: Array<{ name: string; hex: string }> = [];
-		const lines = text.split('\n');
-
-		for (const line of lines) {
-			// Try different patterns to match various AI-generated formats
-			
-			// New markdown format: [Color name] - #hexcode
-			let colorMatch = line.match(/^\s*\[([^\]]+)\]\s*-\s*(#[0-9A-Fa-f]{6})\s*$/);
-			
-			// Original format: [Color Name] - #HEXCODE - [description]
-			if (!colorMatch) {
-				colorMatch = line.match(/([^-]+)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)/);
-			}
-			if (!colorMatch) {
-				colorMatch = line.match(/^\s*([^-]+)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)$/); // With line start/end
-			}
-			if (!colorMatch) {
-				colorMatch = line.match(/^\s*(.+?)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)$/); // More flexible name matching
-			}
-
-			if (colorMatch) {
-				const name = colorMatch[1].trim();
-				const hex = colorMatch[2].trim();
-				// Avoid duplicates
-				if (!colors.find((c) => c.hex === hex)) {
-					colors.push({ name, hex });
-				}
+	
+	// Validate if a string looks like a valid font name
+	function isValidFontName(fontName: string): boolean {
+		if (!fontName || fontName.length < 2 || fontName.length > 30) return false;
+		
+		const lowerName = fontName.toLowerCase().trim();
+		
+		// Reject common description words
+		const invalidWords = [
+			'font', 'typeface', 'text', 'style', 'usage', 'description', 'guidelines',
+			'information', 'ensure', 'readability', 'professional', 'modern', 'clean',
+			'appropriate', 'suitable', 'works', 'well', 'for', 'headings', 'body',
+			'complements', 'primary', 'secondary', 'supporting', 'should', 'must',
+			'based', 'brand', 'mood', 'audience', 'description', 'explaining', 'why',
+			'this', 'specific', 'fits', 'matches', 'personality', 'that', 'with'
+		];
+		
+		// Check if it contains invalid words
+		for (const word of invalidWords) {
+			if (lowerName.includes(word) && lowerName.length > word.length + 2) {
+				return false;
 			}
 		}
-
-		return colors;
+		
+		// Font names are usually 1-3 words, max 30 chars
+		const words = fontName.trim().split(/\s+/);
+		if (words.length > 3) return false;
+		
+		// Must start with a letter
+		if (!/^[A-Za-z]/.test(fontName.trim())) return false;
+		
+		// Should only contain letters, numbers, spaces, and hyphens
+		if (!/^[A-Za-z0-9\s\-]+$/.test(fontName.trim())) return false;
+		
+		// Common valid font names (whitelist approach for safety)
+		const commonFonts = [
+			'inter', 'roboto', 'montserrat', 'poppins', 'open sans', 'lato', 'source sans pro',
+			'raleway', 'nunito', 'work sans', 'dm sans', 'space grotesk', 'ibm plex sans',
+			'fira sans', 'noto sans', 'rubik', 'ubuntu', 'oswald', 'bebas neue', 'helvetica',
+			'arial', 'georgia', 'times new roman', 'merriweather', 'libre baskerville',
+			'crimson text', 'playfair display', 'futura', 'gotham', 'proxima nova'
+		];
+		
+		// If it matches a common font name (case-insensitive), it's valid
+		if (commonFonts.some(f => lowerName === f || lowerName.includes(f))) {
+			return true;
+		}
+		
+		// For unknown fonts, be more strict - must be short and look like a font name
+		// Font names typically have capital letters or are all lowercase
+		const hasProperCasing = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/.test(fontName.trim()) || 
+		                         /^[a-z]+(\s+[a-z]+)*$/.test(fontName.trim());
+		
+		return hasProperCasing && words.length <= 2;
 	}
 
-	function extractIconsFromText(text: string): Array<{ name: string; icon: string }> {
-		if (!text) return [];
-
-		const icons: Array<{ name: string; icon: string }> = [];
-		const lines = text.split('\n');
-
-		for (const line of lines) {
-			// Try different patterns to match various AI-generated formats
-			let iconMatch = line.match(/^\s*[\*\-\•]\s*(\S+)\s*(.+)$/); // Original format: • ⚫ Button
-			if (!iconMatch) {
-				iconMatch = line.match(/^\s*[\*\-\•]\s*(.+)$/); // Just bullet with name: • Button
-			}
-			if (!iconMatch) {
-				iconMatch = line.match(/^\s*(.+)$/); // Any line with content
-			}
-
-			if (iconMatch) {
-				const iconName = iconMatch[2] || iconMatch[1];
-				let iconSymbol = '';
-
-				if (iconMatch[1] && iconMatch[2]) {
-					// Format: • ⚫ Button - extract the symbol
-					iconSymbol = iconMatch[1].trim();
-				} else if (iconMatch[1]) {
-					// Format: • Button - try to extract symbol from the name
-					const parts = iconMatch[1].split(' ');
-					if (parts.length > 1 && /[⚫⚪⚡⚙⚠⚰⚱★☆♦♠♣♥♪♫♬♭♮♯]/.test(parts[0])) {
-						// First part is a symbol
-						iconSymbol = parts[0];
-					} else {
-						// No symbol found, skip this line
-						continue;
-					}
-				}
-
-				// Only add if we have both symbol and name
-				if (iconSymbol && iconName) {
-					icons.push({
-						name: iconName.trim(),
-						icon: iconSymbol.trim()
-					});
-				}
-			}
+	// Load Google Font dynamically
+	function loadGoogleFont(fontName: string): void {
+		if (!browser || !fontName || typeof document === 'undefined') return;
+		
+		// Validate font name before attempting to load
+		if (!isValidFontName(fontName)) {
+			console.warn(`Invalid font name detected: "${fontName}" - skipping Google Fonts load`);
+			return;
 		}
+		
+		// Clean font name (remove spaces, special chars for ID)
+		const fontId = `font-${fontName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '').toLowerCase()}`;
+		
+		// Check if font is already loaded
+		if (document.getElementById(fontId)) return;
+		
+		// Create link element to load Google Font
+		const link = document.createElement('link');
+		link.id = fontId;
+		link.rel = 'stylesheet';
+		link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@300;400;500;600;700;800;900&display=swap`;
+		
+		// Handle load errors gracefully
+		link.onerror = () => {
+			console.log(`Font "${fontName}" not found in Google Fonts, using system fallback`);
+		};
+		
+		document.head.appendChild(link);
+	}
 
-		return icons;
+	// Get appropriate fallback font family based on font name
+	function getFontFamily(fontName: string): string {
+		if (!fontName) return 'sans-serif';
+		
+		const lowerName = fontName.toLowerCase();
+		
+		// Serif fonts
+		if (lowerName.includes('serif') || 
+			lowerName.includes('display') || 
+			lowerName.includes('baskerville') || 
+			lowerName.includes('crimson') || 
+			lowerName.includes('merriweather') ||
+			lowerName.includes('georgia') ||
+			lowerName.includes('times') ||
+			lowerName.includes('playfair')) {
+			return `"${fontName}", Georgia, "Times New Roman", serif`;
+		}
+		
+		// Sans-serif fonts (default)
+		return `"${fontName}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
 	}
 
 	// Extract font information for visual typography display
@@ -148,86 +165,86 @@
 		const weights = [];
 
 		for (const line of lines) {
-			// Look for primary font - try multiple patterns including AI format
+			// Look for primary font - STRICT pattern matching
 			if (line.toLowerCase().includes('primary')) {
-				// Pattern 1: "**Primary Font**: FontName - description" (New AI format)
-				// Use greedy matching for font name to capture "Font-Name" patterns
-				let fontMatch = line.match(/\*\*primary\s+font\*\*[:\s]*([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)*?)\s*-\s*(.+)/i);
-				if (!fontMatch) {
-					// Pattern 2: "**Primary Font**: FontName description" (Old AI format)
-					fontMatch = line.match(
-						/\*\*primary\s+font\*\*[:\s]*([A-Za-z0-9\s\-]+?)(?:\s+[:\-]|\s|$)/i
-					);
-				}
-				if (!fontMatch) {
-					// Pattern 3: "Primary Font: FontName"
-					fontMatch = line.match(/primary\s+font[:\s]+([A-Za-z0-9\s\-]+)/i);
-				}
-				if (!fontMatch) {
-					// Pattern 4: "Primary: FontName"
-					fontMatch = line.match(/primary[:\s]+([A-Za-z0-9\s\-]+)/i);
-				}
-				if (!fontMatch) {
-					// Pattern 5: Look for font name after "primary"
-					fontMatch = line.match(/primary[:\s]+([A-Za-z0-9\s\-]+?)(?:\s*-\s*(.+))?/i);
-				}
-				if (!fontMatch) {
-					// Pattern 6: More flexible - just look for primary and extract next word(s)
-					fontMatch = line.match(/primary[:\s]*font[:\s]*([A-Za-z0-9\s\-]+?)(?:\s|$)/i);
-				}
-				if (fontMatch && fontMatch[1].trim().length > 1) {
+				// Pattern 1: "**Primary Font**: FontName - description" (STRICT - font name before dash)
+				let fontMatch = line.match(/\*\*primary\s+font\*\*[:\s]*([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)?)\s*-\s*(.+)/i);
+				if (fontMatch) {
 					const fontName = fontMatch[1].trim();
-					// Filter out common words that aren't font names
-					if (!['font', 'typeface', 'text', 'style'].includes(fontName.toLowerCase())) {
+					if (isValidFontName(fontName)) {
 						primary = {
 							name: fontName,
 							description: fontMatch[2]?.trim() || ''
 						};
+						continue;
+					}
+				}
+				
+				// Pattern 2: "**Primary Font**: FontName" (STRICT - stop at first space or end)
+				fontMatch = line.match(/\*\*primary\s+font\*\*[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)(?:\s|$|,|\.)/i);
+				if (fontMatch) {
+					const fontName = fontMatch[1].trim();
+					if (isValidFontName(fontName)) {
+						primary = {
+							name: fontName,
+							description: ''
+						};
+						continue;
+					}
+				}
+				
+				// Pattern 3: "Primary Font: FontName" (STRICT)
+				fontMatch = line.match(/primary\s+font[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)(?:\s|$|,|\.)/i);
+				if (fontMatch) {
+					const fontName = fontMatch[1].trim();
+					if (isValidFontName(fontName)) {
+						primary = {
+							name: fontName,
+							description: ''
+						};
+						continue;
 					}
 				}
 			}
 
-			// Look for supporting/secondary font - try multiple patterns including AI format
+			// Look for supporting/secondary font - STRICT pattern matching
 			if (line.toLowerCase().includes('supporting') || line.toLowerCase().includes('secondary')) {
-				// Pattern 1: "**Supporting Font**: FontName - description" (New AI format)
-				// Use greedy matching for font name to capture "Font-Name" patterns
-				let fontMatch = line.match(
-					/\*\*(?:supporting|secondary)\s+font\*\*[:\s]*([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)*?)\s*-\s*(.+)/i
-				);
-				if (!fontMatch) {
-					// Pattern 2: "**Supporting Font**: FontName description" (Old AI format)
-					fontMatch = line.match(
-						/\*\*(?:supporting|secondary)\s+font\*\*[:\s]*([A-Za-z0-9\s\-]+?)(?:\s+[:\-]|\s|$)/i
-					);
-				}
-				if (!fontMatch) {
-					// Pattern 3: "Supporting Font: FontName"
-					fontMatch = line.match(/(?:supporting|secondary)\s+font[:\s]+([A-Za-z0-9\s\-]+)/i);
-				}
-				if (!fontMatch) {
-					// Pattern 4: "Supporting: FontName"
-					fontMatch = line.match(/(?:supporting|secondary)[:\s]+([A-Za-z0-9\s\-]+)/i);
-				}
-				if (!fontMatch) {
-					// Pattern 5: Look for font name after "supporting" or "secondary"
-					fontMatch = line.match(
-						/(?:supporting|secondary)[:\s]+([A-Za-z0-9\s\-]+?)(?:\s*-\s*(.+))?/i
-					);
-				}
-				if (!fontMatch) {
-					// Pattern 6: More flexible - just look for supporting/secondary and extract next word(s)
-					fontMatch = line.match(
-						/(?:supporting|secondary)[:\s]*font[:\s]*([A-Za-z0-9\s\-]+?)(?:\s|$)/i
-					);
-				}
-				if (fontMatch && fontMatch[1].trim().length > 1) {
+				// Pattern 1: "**Supporting Font**: FontName - description" (STRICT)
+				let fontMatch = line.match(/\*\*(?:supporting|secondary)\s+font\*\*[:\s]*([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)?)\s*-\s*(.+)/i);
+				if (fontMatch) {
 					const fontName = fontMatch[1].trim();
-					// Filter out common words that aren't font names
-					if (!['font', 'typeface', 'text', 'style'].includes(fontName.toLowerCase())) {
+					if (isValidFontName(fontName)) {
 						supporting = {
 							name: fontName,
 							description: fontMatch[2]?.trim() || ''
 						};
+						continue;
+					}
+				}
+				
+				// Pattern 2: "**Supporting Font**: FontName" (STRICT)
+				fontMatch = line.match(/\*\*(?:supporting|secondary)\s+font\*\*[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)(?:\s|$|,|\.)/i);
+				if (fontMatch) {
+					const fontName = fontMatch[1].trim();
+					if (isValidFontName(fontName)) {
+						supporting = {
+							name: fontName,
+							description: ''
+						};
+						continue;
+					}
+				}
+				
+				// Pattern 3: "Supporting Font: FontName" (STRICT)
+				fontMatch = line.match(/(?:supporting|secondary)\s+font[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)(?:\s|$|,|\.)/i);
+				if (fontMatch) {
+					const fontName = fontMatch[1].trim();
+					if (isValidFontName(fontName)) {
+						supporting = {
+							name: fontName,
+							description: ''
+						};
+						continue;
 					}
 				}
 			}
@@ -284,53 +301,175 @@
 			'Raleway',
 			'Ubuntu',
 			'Oswald',
-			'Droid Sans'
+			'Bebas Neue',
+			'Space Grotesk',
+			'DM Sans',
+			'Work Sans',
+			'IBM Plex Sans',
+			'Fira Sans',
+			'Noto Sans',
+			'Rubik'
 		];
 
+		const textLower = text.toLowerCase();
 		let primary = null;
 		let supporting = null;
 
-		// Try to find font names in the text
+		// Look for common fonts in the text
 		for (const font of commonFonts) {
-			const regex = new RegExp(`\\b${font.replace(/\s+/g, '\\s+')}\\b`, 'gi');
-			const matches = text.match(regex);
-
-			if (matches) {
-				// Check if it's mentioned as primary or supporting
-				const context = text.toLowerCase();
-				const fontLower = font.toLowerCase();
-				const fontIndex = context.indexOf(fontLower);
-
-				// Look for context around the font name
-				const beforeContext = context.substring(Math.max(0, fontIndex - 50), fontIndex);
-				const afterContext = context.substring(fontIndex, fontIndex + 50);
-
-				console.log(`Found font ${font} in context:`, { beforeContext, afterContext });
-
-				if (!primary && (beforeContext.includes('primary') || afterContext.includes('primary'))) {
-					primary = font;
-					console.log('Set as primary:', font);
-				} else if (
-					!supporting &&
-					(beforeContext.includes('supporting') ||
-						beforeContext.includes('secondary') ||
-						afterContext.includes('supporting') ||
-						afterContext.includes('secondary'))
-				) {
-					supporting = font;
-					console.log('Set as supporting:', font);
-				} else if (!primary) {
-					primary = font;
-					console.log('Set as primary (default):', font);
-				} else if (!supporting) {
-					supporting = font;
-					console.log('Set as supporting (default):', font);
+			const fontLower = font.toLowerCase();
+			if (textLower.includes(fontLower)) {
+				// Check if it's mentioned in a primary context
+				if (textLower.includes('primary') && textLower.indexOf(fontLower) > textLower.indexOf('primary') - 50) {
+					if (!primary) {
+						primary = font;
+					}
+				}
+				// Check if it's mentioned in a supporting/secondary context
+				if ((textLower.includes('supporting') || textLower.includes('secondary')) && 
+				    textLower.indexOf(fontLower) > (textLower.indexOf('supporting') || textLower.indexOf('secondary')) - 50) {
+					if (!supporting) {
+						supporting = font;
+					}
 				}
 			}
 		}
 
-		console.log('Fallback extraction result:', { primary, supporting });
 		return { primary, supporting };
+	}
+	
+	// Function to handle font loading (called from reactive statement)
+	function handleFontLoading() {
+		if (!browser || stepId !== 'typography' || typeof stepData !== 'string') return;
+		
+		try {
+			const fontInfo = extractFontInfo(stepData);
+			if (fontInfo.primary?.name) {
+				loadGoogleFont(fontInfo.primary.name);
+			}
+			if (fontInfo.supporting?.name) {
+				loadGoogleFont(fontInfo.supporting.name);
+			}
+			
+			// Also handle fallback fonts if main extraction failed
+			if (!fontInfo.primary && !fontInfo.supporting) {
+				const fallbackFonts = extractFallbackFonts(stepData);
+				if (fallbackFonts.primary) {
+					loadGoogleFont(fallbackFonts.primary);
+				}
+				if (fallbackFonts.supporting) {
+					loadGoogleFont(fallbackFonts.supporting);
+				}
+			}
+		} catch (error) {
+			console.error('Error loading fonts:', error);
+		}
+	}
+	
+	// Reactive statements to load Google Fonts when typography data changes
+	$: if (stepId === 'typography' && typeof stepData === 'string' && browser) {
+		handleFontLoading();
+	}
+
+	// Helper function to render markdown text
+	function renderMarkdown(text: string): string {
+		if (!text) return '';
+		return text
+			.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+			.replace(/\*(.*?)\*/g, '<em>$1</em>')
+			.replace(/\n/g, '<br>');
+	}
+
+	function extractColorsFromText(text: string): Array<{ name: string; hex: string }> {
+		if (!text) return [];
+
+		const colors: Array<{ name: string; hex: string }> = [];
+		const lines = text.split('\n');
+
+		for (const line of lines) {
+			// Try different patterns to match various AI-generated formats
+			
+			// New markdown format: [Color name] - #hexcode
+			let colorMatch = line.match(/^\s*\[([^\]]+)\]\s*-\s*(#[0-9A-Fa-f]{6})\s*$/);
+			
+			// Original format: [Color Name] - #HEXCODE - [description]
+			if (!colorMatch) {
+				colorMatch = line.match(/([^-]+)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)/);
+			}
+			if (!colorMatch) {
+				colorMatch = line.match(/^\s*([^-]+)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)$/); // With line start/end
+			}
+			if (!colorMatch) {
+				colorMatch = line.match(/^\s*(.+?)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)$/); // More flexible name matching
+			}
+
+			if (colorMatch) {
+				const name = colorMatch[1].trim();
+				const hex = colorMatch[2].trim();
+				// Avoid duplicates
+				if (!colors.find((c) => c.hex === hex)) {
+					colors.push({ name, hex });
+				}
+			}
+		}
+
+		return colors;
+	}
+
+	function extractIconsFromText(text: string): Array<{ name: string; icon?: string }> {
+		if (!text) return [];
+
+		const icons: Array<{ name: string; icon?: string }> = [];
+		const lines = text.split('\n');
+
+		for (const line of lines) {
+			// Skip empty lines
+			if (!line.trim()) continue;
+			
+			// Try different patterns to match various AI-generated formats
+			// Pattern 1: • Icon Name or - Icon Name or * Icon Name
+			let iconMatch = line.match(/^\s*[\*\-\•]\s*(.+)$/);
+			if (iconMatch) {
+				const iconName = iconMatch[1].trim();
+				// Skip if it's just a symbol/emoji (very short or only special chars)
+				if (iconName.length > 2 && !/^[⚫⚪⚡⚙⚠⚰⚱★☆♦♠♣♥♪♫♬♭♮♯◐◑◒◓◔◕◖◗◘◙◚◛◜◝◞◟◠◡☀☁☂☎☐☑☒☓☕☘☝☞☟☠☢☣☮☯☸☹☺☻☼☽☾♀♁♂♃♄♅♆♇♈♉♊♋♌♍♎♏♐♑♒♓♔♕♖♗♘♙♚♛♜♝♞♟]+$/.test(iconName)) {
+					// Remove any leading emoji/symbol if present
+					const cleanName = iconName.replace(/^[⚫⚪⚡⚙⚠⚰⚱★☆♦♠♣♥♪♫♬♭♮♯◐◑◒◓◔◕◖◗◘◙◚◛◜◝◞◟◠◡☀☁☂☎☐☑☒☓☕☘☝☞☟☠☢☣☮☯☸☹☺☻☼☽☾♀♁♂♃♄♅♆♇♈♉♊♋♌♍♎♏♐♑♒♓♔♕♖♗♘♙♚♛♜♝♞♟\s]+/, '').trim();
+					if (cleanName) {
+						icons.push({ name: cleanName });
+					}
+				}
+				continue;
+			}
+			
+			// Pattern 2: Icon Name (colon separated)
+			iconMatch = line.match(/^\s*([^:]+):\s*(.+)$/);
+			if (iconMatch) {
+				const iconName = iconMatch[2].trim() || iconMatch[1].trim();
+				if (iconName.length > 2) {
+					icons.push({ name: iconName });
+				}
+				continue;
+			}
+			
+			// Pattern 3: Icon Name (dash separated)
+			iconMatch = line.match(/^\s*([^\-]+)\s*-\s*(.+)$/);
+			if (iconMatch && iconMatch[2].trim().length > 2) {
+				icons.push({ name: iconMatch[2].trim() });
+				continue;
+			}
+			
+			// Pattern 4: Just a name (if line is short and looks like an icon name)
+			const trimmed = line.trim();
+			if (trimmed.length > 2 && trimmed.length < 50 && !trimmed.includes('.') && !trimmed.includes('http')) {
+				// Check if it looks like an icon name (starts with capital, no special formatting)
+				if (/^[A-Z][a-zA-Z\s]+$/.test(trimmed) || /^[a-z\s]+$/.test(trimmed)) {
+					icons.push({ name: trimmed });
+				}
+			}
+		}
+
+		return icons;
 	}
 
 	// Load logo data
@@ -789,6 +928,12 @@
 							{console.log('Typography stepData:', stepData)}
 							{console.log('Extracted fontInfo:', fontInfo)}
 							{#if fontInfo.primary || fontInfo.supporting}
+								<!-- Compute font families for display -->
+								{@const primaryFontName = fontInfo.primary?.name}
+								{@const supportingFontName = fontInfo.supporting?.name}
+								{@const primaryFontFamily = primaryFontName ? getFontFamily(primaryFontName) : 'sans-serif'}
+								{@const supportingFontFamily = supportingFontName ? getFontFamily(supportingFontName) : 'sans-serif'}
+								
 								<!-- Visual typography display like professional examples -->
 								{#if fontInfo.primary}
 									<div class="typography-section">
@@ -796,28 +941,30 @@
 										<div class="font-display">
 											<div
 												class="font-name-large"
-												style="font-family: '{fontInfo.primary.name}', serif;"
+												style="font-family: {primaryFontFamily};"
 											>
 												{fontInfo.primary.name}
 											</div>
 											<div
 												class="character-set"
-												style="font-family: '{fontInfo.primary.name}', serif;"
+												style="font-family: {primaryFontFamily};"
 											>
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy
-												Zz<br />
+												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz<br />
 												0123456789
 											</div>
 											<div class="font-weights-grid">
 												{#each fontInfo.weights as weight}
 													<div
 														class="weight-sample"
-														style="font-family: '{fontInfo.primary
-															.name}', serif; font-weight: {weight === 'bold'
+														style="font-family: {primaryFontFamily}; font-weight: {weight === 'bold'
 															? 'bold'
 															: weight === 'light'
 																? '300'
-																: 'normal'};"
+																: weight === 'medium'
+																	? '500'
+																	: weight === 'semibold'
+																		? '600'
+																		: 'normal'};"
 													>
 														{weight.charAt(0).toUpperCase() + weight.slice(1)}
 													</div>
@@ -833,16 +980,15 @@
 										<div class="font-display">
 											<div
 												class="font-name-large"
-												style="font-family: '{fontInfo.supporting.name}', sans-serif;"
+												style="font-family: {supportingFontFamily};"
 											>
 												{fontInfo.supporting.name}
 											</div>
 											<div
 												class="character-set"
-												style="font-family: '{fontInfo.supporting.name}', sans-serif;"
+												style="font-family: {supportingFontFamily};"
 											>
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy
-												Zz<br />
+												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz<br />
 												0123456789
 											</div>
 										</div>
@@ -861,39 +1007,39 @@
 
 								<!-- Try to show extracted fonts even if main extraction failed -->
 								{#if fallbackFonts.primary}
+									{@const fallbackPrimaryFamily = getFontFamily(fallbackFonts.primary)}
 									<div class="typography-section">
 										<h3 class="section-title">Primary Typeface</h3>
 										<div class="font-display">
 											<div
 												class="font-name-large"
-												style="font-family: '{fallbackFonts.primary}', serif;"
+												style="font-family: {fallbackPrimaryFamily};"
 											>
 												{fallbackFonts.primary}
 											</div>
 											<div
 												class="character-set"
-												style="font-family: '{fallbackFonts.primary}', serif;"
+												style="font-family: {fallbackPrimaryFamily};"
 											>
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy
-												Zz<br />
+												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz<br />
 												0123456789
 											</div>
 											<div class="font-weights-grid">
 												<div
 													class="weight-sample"
-													style="font-family: '{fallbackFonts.primary}', serif; font-weight: normal;"
+													style="font-family: {fallbackPrimaryFamily}; font-weight: normal;"
 												>
 													Regular
 												</div>
 												<div
 													class="weight-sample"
-													style="font-family: '{fallbackFonts.primary}', serif; font-weight: bold;"
+													style="font-family: {fallbackPrimaryFamily}; font-weight: bold;"
 												>
 													Bold
 												</div>
 												<div
 													class="weight-sample"
-													style="font-family: '{fallbackFonts.primary}', serif; font-style: italic;"
+													style="font-family: {fallbackPrimaryFamily}; font-style: italic;"
 												>
 													Italic
 												</div>
@@ -903,21 +1049,21 @@
 								{/if}
 
 								{#if fallbackFonts.supporting}
+									{@const fallbackSupportingFamily = getFontFamily(fallbackFonts.supporting)}
 									<div class="typography-section">
 										<h3 class="section-title">Secondary Typeface</h3>
 										<div class="font-display">
 											<div
 												class="font-name-large"
-												style="font-family: '{fallbackFonts.supporting}', sans-serif;"
+												style="font-family: {fallbackSupportingFamily};"
 											>
 												{fallbackFonts.supporting}
 											</div>
 											<div
 												class="character-set"
-												style="font-family: '{fallbackFonts.supporting}', sans-serif;"
+												style="font-family: {fallbackSupportingFamily};"
 											>
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy
-												Zz<br />
+												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz<br />
 												0123456789
 											</div>
 										</div>
@@ -1022,7 +1168,9 @@
 											{#each extractedIcons as iconData}
 												<div class="icon-item">
 													<div class="icon-display">
-														<div class="icon-symbol">{iconData.icon}</div>
+														<div class="icon-symbol">
+															<DynamicIcon name={iconData.name} size={32} strokeWidth={2} />
+														</div>
 														<div class="icon-name">{iconData.name}</div>
 													</div>
 												</div>
@@ -1152,7 +1300,9 @@
 												{#each extractedIcons as iconData}
 													<div class="icon-item">
 														<div class="icon-display">
-															<div class="icon-symbol">{iconData.icon}</div>
+															<div class="icon-symbol">
+																<DynamicIcon name={iconData.name} size={32} strokeWidth={2} />
+															</div>
 															<div class="icon-name">{iconData.name}</div>
 														</div>
 													</div>
@@ -2257,9 +2407,15 @@
 	}
 
 	.icon-symbol {
-		font-size: 2rem;
-		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		color: inherit;
+	}
+	
+	.icon-symbol :global(svg) {
+		width: 32px;
+		height: 32px;
 	}
 
 	.icon-name {

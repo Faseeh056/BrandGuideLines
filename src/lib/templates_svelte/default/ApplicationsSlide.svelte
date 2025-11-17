@@ -2,8 +2,8 @@
   import type { SlideData } from '$lib/types/slide-data';
   
   export let applications: Array<{ icon: string; name: string; description: string }> = [];
-  export let primaryColor: string = '#1E40AF';
-  export let secondaryColor: string = '#93C5FD';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
+  export let color4Hex: string = '#93C5FD'; // SECONDARY_COLOR
   export let color7Lighter: string = '#1E40AF';
   export let color8Lighter: string = '#2563EB';
   export let color1Lighter: string = '#EFF6FF';
@@ -13,11 +13,45 @@
   export let color1Rgba5: string = 'rgba(30, 64, 175, 0.05)';
   export let isEditable: boolean = false;
   
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color7Lighter, color8Lighter, '#FFFFFF', color1Lighter, color2Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color7Lighter} 0%, ${color8Lighter} 20%, #FFFFFF 40%, ${color1Lighter} 60%, ${color2Lighter} 80%, #FFFFFF 100%)`;
+    }
+  })();
+  
+  // Editable footer content
+  export let footerTitle: string = 'Consistency is Key';
+  export let footerText: string = 'Apply these brand guidelines consistently across all touchpoints to build recognition and trust';
+  
   // Dynamic styles computed from props
-  $: headerBorderStyle = `4px solid ${primaryColor}`;
-  $: titleColorStyle = primaryColor;
-  $: appIconGradient = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
-  $: noteTitleColorStyle = primaryColor;
+  $: headerBorderStyle = `4px solid ${color1Hex}`;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
+  $: appIconGradient = `linear-gradient(135deg, ${color1Hex} 0%, ${color4Hex} 100%)`;
+  $: noteTitleColorStyle = color1Hex;
   $: radialOverlayStyle = `radial-gradient(circle at 20% 30%, ${color7Rgba12 || 'rgba(30, 64, 175, 0.12)'} 0%, transparent 50%), radial-gradient(circle at 80% 70%, ${color8Rgba12 || 'rgba(37, 99, 235, 0.12)'} 0%, transparent 50%), linear-gradient(45deg, transparent 0%, ${color1Rgba5 || 'rgba(30, 64, 175, 0.05)'} 50%, transparent 100%)`;
   
   // Default applications if none provided
@@ -46,27 +80,27 @@
     
     // Title (in header)
     elements.push({
-      id: 'title',
-      type: 'text' as const,
+          id: 'title',
+          type: 'text' as const,
       position: { x: paddingX, y: paddingY, w: 10 - (paddingX * 2), h: pyToIn(42) },
-      text: 'Brand Applications',
-      fontSize: 36,
-      fontFace: 'Arial',
-      bold: true,
-      color: primaryColor.replace('#', ''),
-      align: 'left' as const,
-      valign: 'top' as const,
+          text: 'Brand Applications',
+          fontSize: 36,
+          fontFace: 'Arial',
+          bold: true,
+      color: color1Hex.replace('#', ''),
+          align: 'left' as const,
+          valign: 'top' as const,
       zIndex: 3
     });
     
     // Divider line
     elements.push({
-      id: 'divider',
-      type: 'shape' as const,
+          id: 'divider',
+          type: 'shape' as const,
       position: { x: paddingX, y: paddingY + pyToIn(60), w: 10 - (paddingX * 2), h: pyToIn(4) },
       shapeType: 'rect',
-      fillColor: primaryColor.replace('#', ''),
-      lineColor: primaryColor.replace('#', ''),
+      fillColor: color1Hex.replace('#', ''),
+      lineColor: color1Hex.replace('#', ''),
       lineWidth: 0,
       zIndex: 3
     });
@@ -115,8 +149,8 @@
         id: `app-icon-bg-${index}`,
         type: 'shape' as const,
         position: { x: iconX, y: iconY, w: iconSize, h: iconSize },
-        shapeType: 'rect',
-        fillColor: primaryColor.replace('#', ''),
+          shapeType: 'rect',
+        fillColor: color1Hex.replace('#', ''),
         zIndex: 2
       });
       
@@ -163,7 +197,7 @@
         color: '666666',
         align: 'center' as const,
         valign: 'top' as const,
-        zIndex: 2
+          zIndex: 2
       });
     });
     
@@ -186,32 +220,63 @@
       
       // Footer title
       elements.push({
-        id: 'footer-title',
-        type: 'text' as const,
+          id: 'footer-title',
+          type: 'text' as const,
         position: { x: paddingX, y: footerY + pyToIn(20), w: contentWidth, h: pyToIn(16) },
-        text: 'Consistency is Key',
-        fontSize: 16,
-        fontFace: 'Arial',
-        bold: true,
-        color: primaryColor.replace('#', ''),
-        align: 'center' as const,
-        valign: 'top' as const,
-        zIndex: 2
+        text: footerTitle,
+          fontSize: 16,
+          fontFace: 'Arial',
+          bold: true,
+        color: color1Hex.replace('#', ''),
+          align: 'center' as const,
+          valign: 'top' as const,
+          zIndex: 2
       });
       
       // Footer text
       elements.push({
-        id: 'footer-text',
-        type: 'text' as const,
+          id: 'footer-text',
+          type: 'text' as const,
         position: { x: paddingX, y: footerY + pyToIn(40), w: contentWidth, h: pyToIn(40) },
-        text: 'Apply these brand guidelines consistently across all touchpoints to build recognition and trust',
-        fontSize: 12,
-        fontFace: 'Arial',
-        color: '666666',
-        align: 'center' as const,
-        valign: 'top' as const,
-        zIndex: 2
+        text: footerText,
+          fontSize: 12,
+          fontFace: 'Arial',
+          color: '666666',
+          align: 'center' as const,
+          valign: 'top' as const,
+          zIndex: 2
       });
+    }
+    
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+  }
+  
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color7Lighter,
+        color8Lighter,
+        'FFFFFF',
+        color1Lighter,
+        color2Lighter,
+        'FFFFFF'
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'E0E0E0', 'D0D0D0', 'FFFFFF'];
     }
     
     return {
@@ -220,18 +285,14 @@
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color7Lighter.replace('#', ''),
-              color8Lighter.replace('#', ''),
-              'FFFFFF',
-              color1Lighter.replace('#', ''),
-              color2Lighter.replace('#', ''),
-              'FFFFFF'
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -239,12 +300,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="applications-slide" style="background: linear-gradient(135deg, {color7Lighter} 0%, {color8Lighter} 20%, #FFFFFF 40%, {color1Lighter} 60%, {color2Lighter} 80%, #FFFFFF 100%);">
+<div class="applications-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">
@@ -269,8 +331,13 @@
       </div>
       
       <div class="footer-note">
-        <div class="note-title" style="color: {noteTitleColorStyle};">Consistency is Key</div>
-        <div class="note-text">Apply these brand guidelines consistently across all touchpoints to build recognition and trust</div>
+        {#if isEditable}
+          <input type="text" bind:value={footerTitle} class="note-title-input" style="color: {noteTitleColorStyle};" />
+          <textarea bind:value={footerText} class="note-text-input"></textarea>
+        {:else}
+          <div class="note-title" style="color: {noteTitleColorStyle};">{footerTitle}</div>
+          <div class="note-text">{footerText}</div>
+        {/if}
       </div>
     </div>
   </div>
@@ -407,6 +474,31 @@
   .note-text {
     font-size: 14px;
     color: #666;
+  }
+  
+  .note-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  
+  .note-text-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 14px;
+    color: #666;
+    resize: vertical;
+    min-height: 50px;
+    text-align: center;
   }
 </style>
 

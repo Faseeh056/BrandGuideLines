@@ -78,7 +78,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         // Save HTML content to generatedSlides table
         const brandName = body.brandName || brandInput.brandName || 'Unknown Brand';
         const brandGuidelinesId = await findBrandGuidelinesId(userId, brandName);
-        await saveSlidesToDatabase(slides, userId, brandGuidelinesId, brandName);
+        await saveSlidesToDatabase(slides, userId, brandGuidelinesId || undefined, brandName);
+        
+        // Also save Svelte slide data automatically (same way as HTML)
+        try {
+            const { buildFilledSvelteSlides } = await import('$lib/services/svelte-slide-generator');
+            const svelteSlides = buildFilledSvelteSlides(brandInput);
+            await saveSvelteSlidesToDatabase(svelteSlides, userId, brandGuidelinesId || undefined, brandName);
+            console.log('✅ Svelte slides saved successfully');
+        } catch (error) {
+            console.error('❌ Error saving Svelte slides:', error);
+            // Don't fail the request if Svelte slide save fails
+        }
         
         // Update the database with the new stepHistory that includes slides
         if (body.guidelineId) {
@@ -140,7 +151,7 @@ async function saveSlidesToDatabase(
 	brandName?: string
 ): Promise<void> {
 	try {
-		console.log(`💾 Saving ${slides.length} slides to generatedSlides table...`);
+		console.log(`💾 Saving ${slides.length} HTML slides to generatedSlides table...`);
 		
 		// Determine slide type and title from filename
 		const getSlideInfo = (filename: string) => {
@@ -156,37 +167,201 @@ async function saveSlidesToDatabase(
 			if (filename.includes('slide-08')) return { type: 'photography', title: 'Photography', order: 10 };
 			if (filename.includes('slide-09')) return { type: 'applications', title: 'Brand Applications', order: 11 };
 			if (filename.includes('slide-12')) return { type: 'thank-you', title: 'Thank You', order: 12 };
-			return { type: 'content', title: 'Content Slide', order: 999 };
+			return null; // Don't save unknown slides
 		};
 		
-		// Insert each slide into the database
+		// Save each slide (update if exists, insert if not)
 		for (let i = 0; i < slides.length; i++) {
 			const slide = slides[i];
 			const slideInfo = getSlideInfo(slide.name);
 			
-			await db.insert(generatedSlides).values({
-				userId,
-				brandGuidelinesId: brandGuidelinesId || null,
-				brandName: brandName || 'Unknown Brand',
-				slideTitle: slideInfo.title,
-				slideNumber: slideInfo.order,
-				htmlContent: slide.html,
-				slideType: slideInfo.type,
-				slideData: JSON.stringify({
-					filename: slide.name,
-					contentLength: slide.html.length,
-					generatedAt: new Date().toISOString()
-				}),
-				status: 'completed'
-			});
+			// Skip unknown slides
+			if (!slideInfo) {
+				console.warn(`⚠️ Skipping unknown slide: ${slide.name}`);
+				continue;
+			}
 			
-			console.log(`✓ Saved slide ${i + 1}: ${slideInfo.title}`);
+			// Check if slide already exists
+			const whereConditions: any[] = [
+				eq(generatedSlides.slideType, slideInfo.type),
+				eq(generatedSlides.slideNumber, slideInfo.order)
+			];
+			
+			if (brandGuidelinesId) {
+				whereConditions.push(eq(generatedSlides.brandGuidelinesId, brandGuidelinesId));
+			} else {
+				whereConditions.push(eq(generatedSlides.userId, userId));
+				whereConditions.push(eq(generatedSlides.brandName, brandName || 'Unknown Brand'));
+			}
+			
+			const existingSlide = await db
+				.select({ id: generatedSlides.id })
+				.from(generatedSlides)
+				.where(and(...whereConditions))
+				.limit(1);
+			
+			if (existingSlide && existingSlide.length > 0) {
+				// Update existing slide with HTML content
+				await db
+					.update(generatedSlides)
+					.set({
+						htmlContent: slide.html,
+						updatedAt: new Date()
+					})
+					.where(eq(generatedSlides.id, existingSlide[0].id));
+				
+				console.log(`✓ Updated HTML slide: ${slideInfo.title}`);
+			} else {
+				// Insert new slide
+				await db.insert(generatedSlides).values({
+					userId,
+					brandGuidelinesId: brandGuidelinesId || null,
+					brandName: brandName || 'Unknown Brand',
+					slideTitle: slideInfo.title,
+					slideNumber: slideInfo.order,
+					htmlContent: slide.html,
+					svelteContent: '', // Will be filled when Svelte slides are generated
+					slideType: slideInfo.type,
+					slideData: JSON.stringify({
+						filename: slide.name,
+						contentLength: slide.html.length,
+						generatedAt: new Date().toISOString()
+					}),
+					status: 'completed'
+				});
+				
+				console.log(`✓ Inserted HTML slide: ${slideInfo.title}`);
+			}
 		}
 		
-		console.log(`✅ Successfully saved ${slides.length} slides to generatedSlides table`);
+		console.log(`✅ Successfully saved ${slides.length} HTML slides to generatedSlides table`);
 		
 	} catch (error) {
-		console.error('❌ Error saving slides to generatedSlides table:', error);
+		console.error('❌ Error saving HTML slides to generatedSlides table:', error);
+		// Don't throw error to avoid breaking the preview
+	}
+}
+
+/**
+ * Save Svelte slides to database (same structure as HTML slides)
+ */
+async function saveSvelteSlidesToDatabase(
+	slides: Array<{ id: string; type: string; layout: any; elements: any[] }>, 
+	userId: string, 
+	brandGuidelinesId?: string,
+	brandName?: string
+): Promise<void> {
+	try {
+		console.log(`💾 Saving ${slides.length} Svelte slides to generatedSlides table...`);
+		
+		// Map slide types to titles and orders (same as HTML slides)
+		// Handle both the 'type' field and map 'content'/'closing' to their actual types
+		const slideTypeMap: Record<string, { title: string; order: number }> = {
+			'cover': { title: 'Cover Slide', order: 1 },
+			'brand-introduction': { title: 'Brand Introduction', order: 2 },
+			'brand-positioning': { title: 'Brand Positioning', order: 3 },
+			'logo-guidelines': { title: 'Logo Guidelines', order: 4 },
+			'logo-dos': { title: 'Logo Do\'s', order: 5 },
+			'logo-donts': { title: 'Logo Don\'ts', order: 6 },
+			'color-palette': { title: 'Color Palette', order: 7 },
+			'color': { title: 'Color Palette', order: 7 }, // Alias for color-palette
+			'typography': { title: 'Typography', order: 8 },
+			'iconography': { title: 'Iconography', order: 9 },
+			'photography': { title: 'Photography', order: 10 },
+			'applications': { title: 'Brand Applications', order: 11 },
+			'thank-you': { title: 'Thank You', order: 12 },
+			'closing': { title: 'Thank You', order: 12 } // Alias for thank-you
+		};
+		
+		// Save each slide
+		for (const slideData of slides) {
+			// Determine the actual slide type from the type field or id
+			let actualType = slideData.type;
+			
+			// Map 'content' type based on slide id
+			if (actualType === 'content') {
+				if (slideData.id === 'brand-introduction') actualType = 'brand-introduction';
+				else if (slideData.id === 'brand-positioning') actualType = 'brand-positioning';
+				else {
+					console.warn(`⚠️ Unknown content slide with id: ${slideData.id}, skipping`);
+					continue;
+				}
+			}
+			
+			// Map 'closing' to 'thank-you'
+			if (actualType === 'closing') {
+				actualType = 'thank-you';
+			}
+			
+			const slideInfo = slideTypeMap[actualType];
+			
+			// Skip if slide type is not recognized
+			if (!slideInfo) {
+				console.warn(`⚠️ Skipping unknown slide type: ${slideData.type} (id: ${slideData.id})`);
+				continue;
+			}
+			
+			// Serialize the SlideData object to JSON
+			const svelteContent = JSON.stringify(slideData);
+			
+			// Check if slide already exists (update if exists, insert if not)
+			// Use the actual type for matching, not the original type
+			const whereConditions: any[] = [
+				eq(generatedSlides.slideType, actualType),
+				eq(generatedSlides.slideNumber, slideInfo.order)
+			];
+			
+			if (brandGuidelinesId) {
+				whereConditions.push(eq(generatedSlides.brandGuidelinesId, brandGuidelinesId));
+			} else {
+				whereConditions.push(eq(generatedSlides.userId, userId));
+				whereConditions.push(eq(generatedSlides.brandName, brandName || 'Unknown Brand'));
+			}
+			
+			const existingSlide = await db
+				.select({ id: generatedSlides.id })
+				.from(generatedSlides)
+				.where(and(...whereConditions))
+				.limit(1);
+			
+			if (existingSlide && existingSlide.length > 0) {
+				// Update existing slide with Svelte content
+				await db
+					.update(generatedSlides)
+					.set({
+						svelteContent,
+						updatedAt: new Date()
+					})
+					.where(eq(generatedSlides.id, existingSlide[0].id));
+				
+				console.log(`✓ Updated Svelte slide: ${slideInfo.title}`);
+			} else {
+				// Insert new slide (htmlContent will be empty initially if HTML slides haven't been generated yet)
+				await db.insert(generatedSlides).values({
+					userId,
+					brandGuidelinesId: brandGuidelinesId || null,
+					brandName: brandName || 'Unknown Brand',
+					slideTitle: slideInfo.title,
+					slideNumber: slideInfo.order,
+					htmlContent: '', // Will be filled when HTML slides are generated
+					svelteContent,
+					slideType: actualType, // Use the mapped type, not the original
+					slideData: JSON.stringify({
+						slideId: slideData.id,
+						elementCount: slideData.elements?.length || 0,
+						generatedAt: new Date().toISOString()
+					}),
+					status: 'completed'
+				});
+				
+				console.log(`✓ Inserted new Svelte slide: ${slideInfo.title}`);
+			}
+		}
+		
+		console.log(`✅ Successfully saved ${slides.length} Svelte slides to generatedSlides table`);
+		
+	} catch (error) {
+		console.error('❌ Error saving Svelte slides to generatedSlides table:', error);
 		// Don't throw error to avoid breaking the preview
 	}
 }
@@ -221,5 +396,8 @@ async function findBrandGuidelinesId(userId: string, brandName: string): Promise
 		return null;
 	}
 }
+
+
+
 
 

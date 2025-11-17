@@ -4,20 +4,64 @@
   export let brandName: string = 'Brand Name';
   export let logoUrl: string = '';
   export let logoData: string = '';
-  export let primaryColor: string = '#1E40AF';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
   export let color3Lighter: string = '#BFDBFE';
   export let color4Lighter: string = '#93C5FD';
   export let color3Rgba12: string = 'rgba(96, 165, 250, 0.12)';
   export let color4Rgba12: string = 'rgba(147, 197, 253, 0.12)';
   export let isEditable: boolean = false;
   
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color3Lighter, color4Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color3Lighter} 0%, ${color4Lighter} 20%, #FFFFFF 50%, ${color3Lighter} 70%, #FFFFFF 100%)`;
+    }
+  })();
+  
+  // Editable guideline content
+  export let guideline1Title: string = 'Minimum Size';
+  export let guideline1Desc: string = 'Never scale the logo below 32px in height to maintain legibility.';
+  export let guideline2Title: string = 'Clear Space';
+  export let guideline2Desc: string = 'Maintain clear space equal to 10% of the logo\'s width on all sides.';
+  export let guideline3Title: string = 'Background Usage';
+  export let guideline3Desc: string = 'Use on white or light backgrounds for optimal visibility and impact.';
+  export let guideline4Title: string = 'Do Not Modify';
+  export let guideline4Desc: string = 'Never rotate, distort, or change the logo colors or proportions.';
+  
+  // Editable spacing labels
+  export let minSizeLabel: string = 'Minimum Size\n32px';
+  export let clearSpaceLabel: string = 'Clear Space\n10% padding';
+  
   // Dynamic styles computed from props
   $: radialOverlayStyle = `radial-gradient(ellipse at top left, ${color3Rgba12} 0%, transparent 50%), radial-gradient(ellipse at bottom right, ${color4Rgba12} 0%, transparent 50%)`;
-  $: headerBorderStyle = `4px solid ${primaryColor}`;
-  $: titleColorStyle = primaryColor;
-  $: sectionTitleColorStyle = primaryColor;
-  $: spacingDemoBorderStyle = `3px dashed ${primaryColor}`;
-  $: guidelineItemColorStyle = primaryColor;
+  $: headerBorderStyle = `4px solid ${color1Hex}`;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
+  $: sectionTitleColorStyle = color1Hex;
+  $: spacingDemoBorderStyle = `3px dashed ${color1Hex}`;
+  $: guidelineItemColorStyle = color1Hex;
   
   $: slideData = createSlideData();
   
@@ -42,7 +86,7 @@
       fontSize: 36,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 3
@@ -54,8 +98,8 @@
       type: 'shape' as const,
       position: { x: paddingX, y: paddingY + pyToIn(60), w: 10 - (paddingX * 2), h: pyToIn(4) },
       shapeType: 'rect',
-      fillColor: primaryColor.replace('#', ''),
-      lineColor: primaryColor.replace('#', ''),
+      fillColor: color1Hex.replace('#', ''),
+      lineColor: color1Hex.replace('#', ''),
       lineWidth: 0,
       zIndex: 3
     });
@@ -94,7 +138,7 @@
       fontSize: 18,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
@@ -114,25 +158,30 @@
       fillColor: 'F8F9FA',
       lineColor: 'DDDDDD',
       lineWidth: 2,
-      zIndex: 2
+      zIndex: 1
     });
     
-    // Logo image or text (centered in placeholder area)
-    // Image should fill the placeholder area and be centered (like UI)
+    // Logo image or text (centered in placeholder area with padding to prevent stretching)
+    // Add padding inside the placeholder to ensure image doesn't touch edges
+    const logoPadding = pxToIn(10);
+    const logoImageSize = logoPlaceholderSize - (logoPadding * 2);
+    const logoImageX = logoPlaceholderX + logoPadding;
+    const logoImageY = logoPlaceholderY + logoPadding;
+    
     if (logoData || logoUrl) {
-      // Image fills entire placeholder area - PPTX will center it with 'contain' sizing
+      // Image with padding to prevent stretching and ensure proper centering
       elements.push({
         id: 'logo',
         type: 'image' as const,
         position: { 
-          x: logoPlaceholderX, 
-          y: logoPlaceholderY, 
-          w: logoPlaceholderSize, 
-          h: logoPlaceholderSize
+          x: logoImageX, 
+          y: logoImageY, 
+          w: logoImageSize, 
+          h: logoImageSize
         },
         imageData: logoData || undefined,
         imageSrc: logoUrl || undefined,
-        zIndex: 3
+        zIndex: 2
       });
     } else {
       elements.push({
@@ -146,15 +195,20 @@
         color: '666666',
         align: 'center' as const,
         valign: 'middle' as const,
-        zIndex: 3
+        zIndex: 2
       });
     }
     
-    // Spacing guides (below logo)
-    const spacingGuideY = logoPlaceholderY + logoPlaceholderSize + pyToIn(20);
-    const spacingBoxSize = pxToIn(80);
-    const spacingBoxGap = pxToIn(20);
-    const spacingBoxStartX = leftColX + (colWidth - (spacingBoxSize * 2 + spacingBoxGap)) / 2;
+    // Spacing guides (below logo with proper spacing to avoid overlap)
+    // Ensure enough space between logo and spacing boxes
+    const spacingGuideY = logoPlaceholderY + logoPlaceholderSize + pyToIn(35);
+    const spacingBoxSize = pxToIn(70); // Smaller to ensure fit and prevent overlap
+    const spacingBoxGap = pxToIn(30); // Further increased gap to prevent overlap
+    const spacingBoxStartX = leftColX + pxToIn(30) + (colWidth - pxToIn(60) - (spacingBoxSize * 2 + spacingBoxGap)) / 2;
+    
+    // Calculate text area height to ensure no overlap
+    const textAreaHeight = pyToIn(25);
+    const totalBoxHeight = spacingBoxSize + pyToIn(5) + textAreaHeight;
     
     // Minimum size box
     elements.push({
@@ -163,7 +217,7 @@
       position: { x: spacingBoxStartX, y: spacingGuideY, w: spacingBoxSize, h: spacingBoxSize },
       shapeType: 'rect',
       fillColor: 'FFFFFF',
-      lineColor: primaryColor.replace('#', ''),
+      lineColor: color1Hex.replace('#', ''),
       lineWidth: 2,
       zIndex: 2
     });
@@ -174,7 +228,7 @@
       text: 'MIN',
       fontSize: 10,
       fontFace: 'Arial',
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'center' as const,
       valign: 'middle' as const,
       zIndex: 3
@@ -182,9 +236,9 @@
     elements.push({
       id: 'min-size-text',
       type: 'text' as const,
-      position: { x: spacingBoxStartX, y: spacingGuideY + spacingBoxSize + pyToIn(5), w: spacingBoxSize, h: pyToIn(30) },
+      position: { x: spacingBoxStartX, y: spacingGuideY + spacingBoxSize + pyToIn(3), w: spacingBoxSize, h: textAreaHeight },
       text: 'Minimum Size\n32px',
-      fontSize: 10,
+      fontSize: 9,
       fontFace: 'Arial',
       color: '666666',
       align: 'center' as const,
@@ -192,7 +246,7 @@
       zIndex: 2
     });
     
-    // Clear space box
+    // Clear space box (positioned to the right with gap)
     const clearSpaceBoxX = spacingBoxStartX + spacingBoxSize + spacingBoxGap;
     elements.push({
       id: 'clear-space-box',
@@ -200,7 +254,7 @@
       position: { x: clearSpaceBoxX, y: spacingGuideY, w: spacingBoxSize, h: spacingBoxSize },
       shapeType: 'rect',
       fillColor: 'FFFFFF',
-      lineColor: primaryColor.replace('#', ''),
+      lineColor: color1Hex.replace('#', ''),
       lineWidth: 2,
       zIndex: 2
     });
@@ -211,7 +265,7 @@
       text: 'CLEAR',
       fontSize: 10,
       fontFace: 'Arial',
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'center' as const,
       valign: 'middle' as const,
       zIndex: 3
@@ -219,9 +273,9 @@
     elements.push({
       id: 'clear-space-text',
       type: 'text' as const,
-      position: { x: clearSpaceBoxX, y: spacingGuideY + spacingBoxSize + pyToIn(5), w: spacingBoxSize, h: pyToIn(30) },
+      position: { x: clearSpaceBoxX, y: spacingGuideY + spacingBoxSize + pyToIn(3), w: spacingBoxSize, h: textAreaHeight },
       text: 'Clear Space\n10% padding',
-      fontSize: 10,
+      fontSize: 9,
       fontFace: 'Arial',
       color: '666666',
       align: 'center' as const,
@@ -254,18 +308,18 @@
       fontSize: 18,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
     });
     
-    // Guidelines items
+    // Guidelines items (use exported props)
     const guidelines = [
-      { title: 'Minimum Size', desc: 'Never scale the logo below 32px in height to maintain legibility.' },
-      { title: 'Clear Space', desc: 'Maintain clear space equal to 10% of the logo\'s width on all sides.' },
-      { title: 'Background Usage', desc: 'Use on white or light backgrounds for optimal visibility and impact.' },
-      { title: 'Do Not Modify', desc: 'Never rotate, distort, or change the logo colors or proportions.' }
+      { title: guideline1Title, desc: guideline1Desc },
+      { title: guideline2Title, desc: guideline2Desc },
+      { title: guideline3Title, desc: guideline3Desc },
+      { title: guideline4Title, desc: guideline4Desc }
     ];
     
     const guidelineStartY = guidelinesSectionY + pyToIn(70);
@@ -284,7 +338,7 @@
         fontSize: 16,
         fontFace: 'Arial',
         bold: true,
-        color: primaryColor.replace('#', ''),
+        color: color1Hex.replace('#', ''),
         align: 'left' as const,
         valign: 'top' as const,
         zIndex: 2
@@ -320,22 +374,49 @@
       });
     });
     
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color3Lighter,
+        color4Lighter,
+        'FFFFFF',
+        color3Lighter
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'F0F0F0'];
+    }
+    
     return {
       id: 'logo-guidelines',
       type: 'logo',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color3Lighter.replace('#', ''),
-              color4Lighter.replace('#', ''),
-              'FFFFFF',
-              color3Lighter.replace('#', '')
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -343,12 +424,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="logo-guidelines-slide" style="background: linear-gradient(135deg, {color3Lighter} 0%, {color4Lighter} 25%, #FFFFFF 50%, {color3Lighter} 75%, #FFFFFF 100%);">
+<div class="logo-guidelines-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">
@@ -359,13 +441,43 @@
     <div class="content">
       <div class="logo-section">
         <div class="section-title" style="color: {sectionTitleColorStyle};">Primary Logo</div>
-        <div class="logo-placeholder">
-          {#if logoData}
-            <img src={logoData} alt="{brandName} Logo" class="logo-image" />
-          {:else if logoUrl}
-            <img src={logoUrl} alt="{brandName} Logo" class="logo-image" />
+        <div class="logo-placeholder" class:editable={isEditable}>
+          {#if isEditable}
+            <label class="logo-upload-label">
+              {#if logoData}
+                <img src={logoData} alt="{brandName} Logo" class="logo-image" />
+              {:else if logoUrl}
+                <img src={logoUrl} alt="{brandName} Logo" class="logo-image" />
+              {:else}
+                <div class="logo-upload-placeholder">
+                  <span class="upload-icon">📷</span>
+                  <span class="upload-text">Click to upload logo</span>
+                </div>
+              {/if}
+              <input 
+                type="file" 
+                accept="image/*"
+                onchange={(e) => {
+                  const file = e.currentTarget.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      logoData = event.target?.result as string;
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                class="logo-upload-input"
+              />
+            </label>
           {:else}
-            <div class="logo-text">{brandName}</div>
+            {#if logoData}
+              <img src={logoData} alt="{brandName} Logo" class="logo-image" />
+            {:else if logoUrl}
+              <img src={logoUrl} alt="{brandName} Logo" class="logo-image" />
+            {:else}
+              <div class="logo-text">{brandName}</div>
+            {/if}
           {/if}
         </div>
         <div class="spacing-guide">
@@ -373,13 +485,21 @@
             <div class="spacing-demo" style="border: {spacingDemoBorderStyle};">
               <span style="font-size: 10px;">MIN</span>
             </div>
-            <div class="spacing-label">Minimum Size<br>32px</div>
+            {#if isEditable}
+              <textarea bind:value={minSizeLabel} class="spacing-label-input"></textarea>
+            {:else}
+              <div class="spacing-label">{minSizeLabel}</div>
+            {/if}
           </div>
           <div class="spacing-box">
             <div class="spacing-demo" style="border: {spacingDemoBorderStyle};">
               <span style="font-size: 14px;">CLEAR</span>
             </div>
-            <div class="spacing-label">Clear Space<br>10% padding</div>
+            {#if isEditable}
+              <textarea bind:value={clearSpaceLabel} class="spacing-label-input"></textarea>
+            {:else}
+              <div class="spacing-label">{clearSpaceLabel}</div>
+            {/if}
           </div>
         </div>
       </div>
@@ -388,23 +508,43 @@
         <div class="section-title" style="color: {sectionTitleColorStyle};">Usage Guidelines</div>
         
         <div class="guideline-item" style="--guideline-color: {guidelineItemColorStyle};">
-          <div class="guideline-title">Minimum Size</div>
-          <div class="guideline-desc">Never scale the logo below 32px in height to maintain legibility.</div>
+          {#if isEditable}
+            <input type="text" bind:value={guideline1Title} class="guideline-title-input" />
+            <textarea bind:value={guideline1Desc} class="guideline-desc-input"></textarea>
+          {:else}
+            <div class="guideline-title">{guideline1Title}</div>
+            <div class="guideline-desc">{guideline1Desc}</div>
+          {/if}
         </div>
         
         <div class="guideline-item" style="--guideline-color: {guidelineItemColorStyle};">
-          <div class="guideline-title">Clear Space</div>
-          <div class="guideline-desc">Maintain clear space equal to 10% of the logo's width on all sides.</div>
+          {#if isEditable}
+            <input type="text" bind:value={guideline2Title} class="guideline-title-input" />
+            <textarea bind:value={guideline2Desc} class="guideline-desc-input"></textarea>
+          {:else}
+            <div class="guideline-title">{guideline2Title}</div>
+            <div class="guideline-desc">{guideline2Desc}</div>
+          {/if}
         </div>
         
         <div class="guideline-item" style="--guideline-color: {guidelineItemColorStyle};">
-          <div class="guideline-title">Background Usage</div>
-          <div class="guideline-desc">Use on white or light backgrounds for optimal visibility and impact.</div>
+          {#if isEditable}
+            <input type="text" bind:value={guideline3Title} class="guideline-title-input" />
+            <textarea bind:value={guideline3Desc} class="guideline-desc-input"></textarea>
+          {:else}
+            <div class="guideline-title">{guideline3Title}</div>
+            <div class="guideline-desc">{guideline3Desc}</div>
+          {/if}
         </div>
         
         <div class="guideline-item" style="--guideline-color: {guidelineItemColorStyle};">
-          <div class="guideline-title">Do Not Modify</div>
-          <div class="guideline-desc">Never rotate, distort, or change the logo colors or proportions.</div>
+          {#if isEditable}
+            <input type="text" bind:value={guideline4Title} class="guideline-title-input" />
+            <textarea bind:value={guideline4Desc} class="guideline-desc-input"></textarea>
+          {:else}
+            <div class="guideline-title">{guideline4Title}</div>
+            <div class="guideline-desc">{guideline4Desc}</div>
+          {/if}
         </div>
       </div>
     </div>
@@ -485,6 +625,50 @@
     position: relative;
   }
   
+  .logo-placeholder.editable {
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .logo-placeholder.editable:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+  }
+  
+  .logo-upload-label {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+  }
+  
+  .logo-upload-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .logo-upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #666;
+  }
+  
+  .upload-icon {
+    font-size: 48px;
+  }
+  
+  .upload-text {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
   .logo-image {
     max-width: 100%;
     max-height: 100%;
@@ -557,6 +741,43 @@
     font-size: 14px;
     color: #666;
     line-height: 1.5;
+  }
+  
+  .guideline-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 4px;
+    background: white;
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+  }
+  
+  .guideline-desc-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 4px;
+    background: white;
+    font-size: 14px;
+    color: #666;
+    resize: vertical;
+    min-height: 40px;
+  }
+  
+  .spacing-label-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 4px;
+    background: white;
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+    resize: vertical;
+    min-height: 40px;
   }
 </style>
 

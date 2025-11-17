@@ -4,7 +4,7 @@
   export let brandName: string = 'Brand Name';
   export let logoUrl: string = '';
   export let logoData: string = '';
-  export let primaryColor: string = '#1E40AF';
+  export let color1Hex: string = '#1E40AF'; // PRIMARY_COLOR (for title)
   export let color2Lighter: string = '#DBEAFE';
   export let color3Lighter: string = '#BFDBFE';
   export let color4Lighter: string = '#93C5FD';
@@ -13,10 +13,57 @@
   export let color4Rgba12: string = 'rgba(147, 197, 253, 0.12)';
   export let isEditable: boolean = false;
   
+  // Editable background
+  export let background: {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } = {
+    type: 'gradient',
+    gradient: {
+      colors: [color2Lighter, color3Lighter, '#FFFFFF', color4Lighter, color5Lighter, '#FFFFFF'],
+      direction: 135
+    }
+  };
+  
+  // Background style
+  $: backgroundStyle = (() => {
+    if (background && background.type === 'color' && background.color) {
+      return background.color;
+    } else if (background && background.type === 'gradient' && background.gradient && background.gradient.colors && background.gradient.colors.length > 0) {
+      const colors = background.gradient.colors;
+      const stops = colors.map((c, i) => `${c} ${(i / (colors.length - 1)) * 100}%`).join(', ');
+      return `linear-gradient(${background.gradient.direction || 135}deg, ${stops})`;
+    } else {
+      // Fallback to default gradient
+      return `linear-gradient(135deg, ${color2Lighter} 0%, ${color3Lighter} 15%, #FFFFFF 45%, ${color4Lighter} 65%, ${color5Lighter} 85%, #FFFFFF 100%)`;
+    }
+  })();
+  
+  // Editable DON'T card content
+  export let dontCard1Title: string = 'Do Not Stretch or Distort';
+  export let dontCard1Hint: string = 'Always maintain original proportions; avoid non-uniform scaling.';
+  export let dontCard2Title: string = 'Do Not Change Colors';
+  export let dontCard2Hint: string = 'Never use unapproved colors outside the brand palette.';
+  export let dontCard3Title: string = 'Do Not Add Effects';
+  export let dontCard3Hint: string = 'Avoid shadows, glows, outlines, or other decorative effects.';
+  export let dontCard4Title: string = 'Do Not Place on Busy Backgrounds';
+  export let dontCard4Hint: string = 'Avoid low-contrast or cluttered backgrounds that reduce legibility.';
+  
+  // Editable guidelines
+  export let guidelinesTitle: string = 'Usage Restrictions';
+  export let guideline1: string = 'Do not stretch, rotate, skew, or alter proportions.';
+  export let guideline2: string = 'Do not modify colors beyond approved brand palette.';
+  export let guideline3: string = 'Do not add outlines, shadows, or visual effects.';
+  export let guideline4: string = 'Do not place over complex imagery or low-contrast backgrounds.';
+  
   // Dynamic styles computed from props
-  $: headerBorderStyle = `4px solid ${primaryColor}`;
-  $: titleColorStyle = primaryColor;
-  $: guidelinesTitleColorStyle = primaryColor;
+  $: headerBorderStyle = `4px solid ${color1Hex}`;
+  $: titleColorStyle = color1Hex; // HTML uses {{PRIMARY_COLOR}} for title
+  $: guidelinesTitleColorStyle = color1Hex;
   $: radialOverlayStyle = `radial-gradient(ellipse at top left, ${color2Rgba12} 0%, transparent 55%), radial-gradient(ellipse at bottom right, ${color4Rgba12} 0%, transparent 55%)`;
   
   $: slideData = createSlideData();
@@ -42,7 +89,7 @@
       fontSize: 36,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 3
@@ -54,8 +101,8 @@
       type: 'shape' as const,
       position: { x: paddingX, y: paddingY + pyToIn(60), w: 10 - (paddingX * 2), h: pyToIn(4) },
       shapeType: 'rect',
-      fillColor: primaryColor.replace('#', ''),
-      lineColor: primaryColor.replace('#', ''),
+      fillColor: color1Hex.replace('#', ''),
+      lineColor: color1Hex.replace('#', ''),
       lineWidth: 0,
       zIndex: 3
     });
@@ -71,13 +118,15 @@
     const guidelinesColWidth = contentWidth * (1.0 / 2.6);
     const columnGap = pxToIn(32); // gap: 32px from UI
     
-    // Examples grid: 2x2 cards
-    const cardGap = pxToIn(20); // gap: 20px from UI
+    // Examples grid: 2x2 cards with proper spacing to prevent overlap
+    // Calculate card dimensions to fit within available space
+    const cardGap = pxToIn(28); // Gap between cards
+    const rowGap = pyToIn(28); // Gap between rows
     const cardWidth = (examplesColWidth - cardGap) / 2;
-    const cardHeight = pyToIn(200); // Adjusted card height
+    // Calculate card height to fit 2 rows within available content height
+    const cardHeight = (contentHeight - rowGap) / 2;
     const cardsStartX = paddingX; // Left column starts at padding
     const cardsStartY = contentStartY;
-    const rowGap = pyToIn(20); // gap: 20px from UI
     
     // DON'T example cards in 2x2 grid
     const dontExamples = [
@@ -151,8 +200,10 @@
       });
       
       // Logo demo area (centered in card, below header)
-      // Match UI: .logo-demo has height: 140px, full width of card
-      const logoAreaHeight = pyToIn(140); // 140px height
+      // Calculate available space: card height - padding - badge - gap - hint space
+      const availableHeight = cardHeight - (cardPadding * 2) - badgeHeight - pyToIn(12) - pyToIn(35); // Reserve 35px for hint
+      // Match UI: .logo-demo has height: 140px, but respect available space
+      const logoAreaHeight = Math.min(pyToIn(140), availableHeight); // 140px height but not more than available
       // Logo area should take full card width (card has padding: 20px)
       // In UI, logo-demo is full width of card (no explicit width, so 100%)
       const logoAreaWidth = cardWidth - (cardPadding * 2); // Full card width minus card padding
@@ -253,19 +304,25 @@
         }
       }
       
-      // Logo image or text (on top of background)
-      // Images should fill the demo area - for stretched effect, we widen the image area
+      // Logo image or text (on top of background with padding to prevent stretching)
+      // Add padding inside logo area to prevent image from stretching to edges
+      const logoInnerPadding = pxToIn(8);
+      const logoImageWidth = logoAreaWidth - (logoInnerPadding * 2);
+      const logoImageHeight = logoAreaHeight - (logoInnerPadding * 2);
+      const logoImageX = logoAreaX + logoInnerPadding;
+      const logoImageY = logoAreaY + logoInnerPadding;
+      
       if (logoData || logoUrl) {
-        let logoW = logoAreaWidth;
-        let logoX = logoAreaX;
-        let logoH = logoAreaHeight;
-        let logoY = logoAreaY;
+        let logoW = logoImageWidth;
+        let logoX = logoImageX;
+        let logoH = logoImageHeight;
+        let logoY = logoImageY;
         
         if (index === 0) {
-          // First card: Stretched logo (scaleX 1.25)
-          // Widen the image area by 25% while keeping it centered
-          logoW = logoAreaWidth * 1.25;
-          logoX = logoAreaX - ((logoW - logoAreaWidth) / 2);
+          // First card: Stretched logo (scaleX 1.25) - widen by 25% but keep height same
+          // This simulates horizontal stretching while maintaining vertical aspect
+          logoW = logoImageWidth * 1.25;
+          logoX = logoImageX - ((logoW - logoImageWidth) / 2);
           // Ensure it stays within card bounds
           const maxX = cardX + cardWidth - cardPadding;
           if (logoX + logoW > maxX) {
@@ -273,11 +330,18 @@
           }
           if (logoX < cardX + cardPadding) {
             logoX = cardX + cardPadding;
-            logoW = Math.min(logoAreaWidth * 1.25, maxX - logoX);
+            logoW = Math.min(logoImageWidth * 1.25, maxX - logoX);
           }
+        } else {
+          // For other cards, use square aspect ratio to prevent stretching
+          const logoSize = Math.min(logoImageWidth, logoImageHeight);
+          logoW = logoSize;
+          logoH = logoSize;
+          logoX = logoImageX + (logoImageWidth - logoSize) / 2;
+          logoY = logoImageY + (logoImageHeight - logoSize) / 2;
         }
         
-        // Image fills the entire area (or stretched area for index 0)
+        // Image with proper sizing to prevent stretching
         elements.push({
           id: `dont-logo-${index}`,
           type: 'image' as const,
@@ -351,21 +415,33 @@
         zIndex: 4
       });
       
-      // Hint text (below logo)
+      // Hint text (below logo with proper spacing to avoid overlap)
+      // Calculate hint position to ensure it fits within card bounds and doesn't overlap
       const hintY = logoAreaY + logoAreaHeight + pyToIn(10);
-      elements.push({
-        id: `dont-hint-${index}`,
-        type: 'text' as const,
-        position: { x: cardX + cardPadding, y: hintY, w: cardWidth - cardPadding * 2, h: cardHeight - hintY + cardY - pyToIn(10) },
-        text: example.hint,
-        fontSize: 10,
-        fontFace: 'Arial',
-        italic: true,
-        color: '999999',
-        align: 'left' as const,
-        valign: 'top' as const,
-        zIndex: 2
-      });
+      const hintMaxHeight = cardY + cardHeight - hintY - pyToIn(10); // Leave 10px margin at bottom
+      const hintHeight = Math.min(pyToIn(25), hintMaxHeight); // Fixed height but respect card bounds
+      
+      // Only add hint if there's enough space (at least 15px)
+      if (hintHeight > pyToIn(15)) {
+        elements.push({
+          id: `dont-hint-${index}`,
+          type: 'text' as const,
+          position: { 
+            x: cardX + cardPadding, 
+            y: hintY, 
+            w: cardWidth - cardPadding * 2, 
+            h: hintHeight
+          },
+          text: example.hint,
+          fontSize: 9,
+          fontFace: 'Arial',
+          italic: true,
+          color: '999999',
+          align: 'left' as const,
+          valign: 'top' as const,
+          zIndex: 2
+        });
+      }
     });
     
     // Right column: Guidelines section
@@ -391,22 +467,18 @@
       id: 'guidelines-title',
       type: 'text' as const,
       position: { x: guidelinesX + guidelinesPadding, y: guidelinesY + guidelinesPadding, w: guidelinesColWidth - (guidelinesPadding * 2), h: pyToIn(18) },
-      text: 'Usage Restrictions',
+      text: guidelinesTitle,
       fontSize: 16,
       fontFace: 'Arial',
       bold: true,
-      color: primaryColor.replace('#', ''),
+      color: color1Hex.replace('#', ''),
       align: 'left' as const,
       valign: 'top' as const,
       zIndex: 2
     });
     
-    const guidelineItems = [
-      'Do not stretch, rotate, skew, or alter proportions.',
-      'Do not modify colors beyond approved brand palette.',
-      'Do not add outlines, shadows, or visual effects.',
-      'Do not place on busy or low-contrast backgrounds.'
-    ];
+    // Use exported props
+    const guidelineItems = [guideline1, guideline2, guideline3, guideline4];
     
     guidelineItems.forEach((item, index) => {
       elements.push({
@@ -448,24 +520,51 @@
       });
     });
     
+    // Use the current background prop (which may have been edited)
+    let bgColors: string[] = [];
+    let bgDirection = 135;
+    
+    if (background && background.type === 'gradient' && background.gradient && background.gradient.colors) {
+      bgColors = background.gradient.colors
+        .filter(c => c != null && typeof c === 'string')
+        .map(c => (c || '').replace('#', ''))
+        .filter(c => c.length > 0);
+      bgDirection = background.gradient.direction || 135;
+    } else if (background && background.type === 'color' && background.color) {
+      const color = (background.color || '').replace('#', '');
+      if (color) bgColors = [color];
+    }
+    
+    // Fallback to default if no valid colors found
+    if (bgColors.length === 0) {
+      const fallbackColors = [
+        color2Lighter,
+        color3Lighter,
+        'FFFFFF',
+        color4Lighter,
+        color5Lighter,
+        'FFFFFF'
+      ].filter(c => c != null && typeof c === 'string');
+      
+      bgColors = fallbackColors.length > 0
+        ? fallbackColors.map(c => (c || '').replace('#', ''))
+        : ['FFFFFF', 'F0F0F0', 'FFFFFF', 'E0E0E0', 'D0D0D0', 'FFFFFF'];
+    }
+    
     return {
       id: 'logo-donts',
       type: 'logo',
       layout: {
         width: 10,
         height: 5.625,
-        background: {
+        background: bgColors.length === 1 ? {
+          type: 'color',
+          color: bgColors[0]
+        } : {
           type: 'gradient',
           gradient: {
-            colors: [
-              color2Lighter.replace('#', ''),
-              color3Lighter.replace('#', ''),
-              'FFFFFF',
-              color4Lighter.replace('#', ''),
-              color5Lighter.replace('#', ''),
-              'FFFFFF'
-            ],
-            direction: 135
+            colors: bgColors,
+            direction: bgDirection
           }
         }
       },
@@ -473,12 +572,13 @@
     };
   }
   
+  // Always call createSlideData() to get the latest values (including edited content)
   export function getSlideData(): SlideData {
-    return slideData;
+    return createSlideData();
   }
 </script>
 
-<div class="logo-donts-slide" style="background: linear-gradient(135deg, {color2Lighter} 0%, {color3Lighter} 15%, #FFFFFF 45%, {color4Lighter} 65%, {color5Lighter} 85%, #FFFFFF 100%);">
+<div class="logo-donts-slide" style="background: {backgroundStyle};">
   <div class="radial-overlay" style="background: {radialOverlayStyle};"></div>
   
   <div class="slide">
@@ -491,82 +591,245 @@
         <div class="example-card">
           <div class="card-header">
             <div class="badge-dont">DON'T</div>
-            <div class="card-title">Do Not Stretch or Distort</div>
-          </div>
-          <div class="logo-demo" style="transform: scaleX(1.25);">
-            <div class="strike"></div>
-            {#if logoData}
-              <img src={logoData} alt="{brandName} Logo" />
-            {:else if logoUrl}
-              <img src={logoUrl} alt="{brandName} Logo" />
+            {#if isEditable}
+              <input type="text" bind:value={dontCard1Title} class="card-title-input" />
             {:else}
-              <div class="logo-placeholder">{brandName}</div>
+              <div class="card-title">{dontCard1Title}</div>
             {/if}
           </div>
-          <div class="hint">Always maintain original proportions; avoid non-uniform scaling.</div>
+          <div class="logo-demo" style="transform: scaleX(1.25);" class:editable={isEditable}>
+            <div class="strike"></div>
+            {#if isEditable}
+              <label class="logo-upload-label">
+                {#if logoData}
+                  <img src={logoData} alt="{brandName} Logo" />
+                {:else if logoUrl}
+                  <img src={logoUrl} alt="{brandName} Logo" />
+                {:else}
+                  <div class="logo-upload-placeholder">
+                    <span class="upload-icon">📷</span>
+                    <span class="upload-text">Upload</span>
+                  </div>
+                {/if}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onchange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        logoData = event.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  class="logo-upload-input"
+                />
+              </label>
+            {:else}
+              {#if logoData}
+                <img src={logoData} alt="{brandName} Logo" />
+              {:else if logoUrl}
+                <img src={logoUrl} alt="{brandName} Logo" />
+              {:else}
+                <div class="logo-placeholder">{brandName}</div>
+              {/if}
+            {/if}
+          </div>
+          {#if isEditable}
+            <textarea bind:value={dontCard1Hint} class="hint-input"></textarea>
+          {:else}
+            <div class="hint">{dontCard1Hint}</div>
+          {/if}
         </div>
         
         <div class="example-card">
           <div class="card-header">
             <div class="badge-dont">DON'T</div>
-            <div class="card-title">Do Not Change Colors</div>
-          </div>
-          <div class="logo-demo" style="background: linear-gradient(135deg, #A855F7 0%, #F97316 100%);">
-            <div class="strike"></div>
-            {#if logoData}
-              <img src={logoData} alt="{brandName} Logo" />
-            {:else if logoUrl}
-              <img src={logoUrl} alt="{brandName} Logo" />
+            {#if isEditable}
+              <input type="text" bind:value={dontCard2Title} class="card-title-input" />
             {:else}
-              <div class="logo-placeholder">{brandName}</div>
+              <div class="card-title">{dontCard2Title}</div>
             {/if}
           </div>
-          <div class="hint">Never use unapproved colors outside the brand palette.</div>
+          <div class="logo-demo" style="background: linear-gradient(135deg, #A855F7 0%, #F97316 100%);" class:editable={isEditable}>
+            <div class="strike"></div>
+            {#if isEditable}
+              <label class="logo-upload-label">
+                {#if logoData}
+                  <img src={logoData} alt="{brandName} Logo" />
+                {:else if logoUrl}
+                  <img src={logoUrl} alt="{brandName} Logo" />
+                {:else}
+                  <div class="logo-upload-placeholder">
+                    <span class="upload-icon">📷</span>
+                    <span class="upload-text">Upload</span>
+                  </div>
+                {/if}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onchange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        logoData = event.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  class="logo-upload-input"
+                />
+              </label>
+            {:else}
+              {#if logoData}
+                <img src={logoData} alt="{brandName} Logo" />
+              {:else if logoUrl}
+                <img src={logoUrl} alt="{brandName} Logo" />
+              {:else}
+                <div class="logo-placeholder">{brandName}</div>
+              {/if}
+            {/if}
+          </div>
+          {#if isEditable}
+            <textarea bind:value={dontCard2Hint} class="hint-input"></textarea>
+          {:else}
+            <div class="hint">{dontCard2Hint}</div>
+          {/if}
         </div>
         
         <div class="example-card">
           <div class="card-header">
             <div class="badge-dont">DON'T</div>
-            <div class="card-title">Do Not Add Effects</div>
-          </div>
-          <div class="logo-demo" style="filter: drop-shadow(6px 6px 0 #000) blur(1px);">
-            <div class="strike"></div>
-            {#if logoData}
-              <img src={logoData} alt="{brandName} Logo" />
-            {:else if logoUrl}
-              <img src={logoUrl} alt="{brandName} Logo" />
+            {#if isEditable}
+              <input type="text" bind:value={dontCard3Title} class="card-title-input" />
             {:else}
-              <div class="logo-placeholder">{brandName}</div>
+              <div class="card-title">{dontCard3Title}</div>
             {/if}
           </div>
-          <div class="hint">Avoid shadows, glows, outlines, or other decorative effects.</div>
+          <div class="logo-demo" style="filter: drop-shadow(6px 6px 0 #000) blur(1px);" class:editable={isEditable}>
+            <div class="strike"></div>
+            {#if isEditable}
+              <label class="logo-upload-label">
+                {#if logoData}
+                  <img src={logoData} alt="{brandName} Logo" />
+                {:else if logoUrl}
+                  <img src={logoUrl} alt="{brandName} Logo" />
+                {:else}
+                  <div class="logo-upload-placeholder">
+                    <span class="upload-icon">📷</span>
+                    <span class="upload-text">Upload</span>
+                  </div>
+                {/if}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onchange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        logoData = event.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  class="logo-upload-input"
+                />
+              </label>
+            {:else}
+              {#if logoData}
+                <img src={logoData} alt="{brandName} Logo" />
+              {:else if logoUrl}
+                <img src={logoUrl} alt="{brandName} Logo" />
+              {:else}
+                <div class="logo-placeholder">{brandName}</div>
+              {/if}
+            {/if}
+          </div>
+          {#if isEditable}
+            <textarea bind:value={dontCard3Hint} class="hint-input"></textarea>
+          {:else}
+            <div class="hint">{dontCard3Hint}</div>
+          {/if}
         </div>
         
         <div class="example-card">
           <div class="card-header">
             <div class="badge-dont">DON'T</div>
-            <div class="card-title">Do Not Place on Busy Backgrounds</div>
-          </div>
-          <div class="logo-demo" style="background: repeating-linear-gradient(45deg, #222, #222 10px, #555 10px, #555 20px);">
-            <div class="strike"></div>
-            {#if logoData}
-              <img src={logoData} alt="{brandName} Logo" />
-            {:else if logoUrl}
-              <img src={logoUrl} alt="{brandName} Logo" />
+            {#if isEditable}
+              <input type="text" bind:value={dontCard4Title} class="card-title-input" />
             {:else}
-              <div class="logo-placeholder">{brandName}</div>
+              <div class="card-title">{dontCard4Title}</div>
             {/if}
           </div>
-          <div class="hint">Avoid low-contrast or cluttered backgrounds that reduce legibility.</div>
+          <div class="logo-demo" style="background: repeating-linear-gradient(45deg, #222, #222 10px, #555 10px, #555 20px);" class:editable={isEditable}>
+            <div class="strike"></div>
+            {#if isEditable}
+              <label class="logo-upload-label">
+                {#if logoData}
+                  <img src={logoData} alt="{brandName} Logo" />
+                {:else if logoUrl}
+                  <img src={logoUrl} alt="{brandName} Logo" />
+                {:else}
+                  <div class="logo-upload-placeholder">
+                    <span class="upload-icon">📷</span>
+                    <span class="upload-text">Upload</span>
+                  </div>
+                {/if}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onchange={(e) => {
+                    const file = e.currentTarget.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        logoData = event.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  class="logo-upload-input"
+                />
+              </label>
+            {:else}
+              {#if logoData}
+                <img src={logoData} alt="{brandName} Logo" />
+              {:else if logoUrl}
+                <img src={logoUrl} alt="{brandName} Logo" />
+              {:else}
+                <div class="logo-placeholder">{brandName}</div>
+              {/if}
+            {/if}
+          </div>
+          {#if isEditable}
+            <textarea bind:value={dontCard4Hint} class="hint-input"></textarea>
+          {:else}
+            <div class="hint">{dontCard4Hint}</div>
+          {/if}
         </div>
       </div>
       
       <div class="guidelines">
-        <div class="guidelines-title" style="color: {guidelinesTitleColorStyle};">Usage Restrictions</div>
-        <div class="guideline-item">Do not stretch, rotate, skew, or alter proportions.</div>
-        <div class="guideline-item">Do not modify colors beyond approved brand palette.</div>
-        <div class="guideline-item">Do not add outlines, shadows, or visual effects.</div>
-        <div class="guideline-item">Do not place over complex imagery or low-contrast backgrounds.</div>
+        {#if isEditable}
+          <input type="text" bind:value={guidelinesTitle} class="guidelines-title-input" style="color: {guidelinesTitleColorStyle};" />
+        {:else}
+          <div class="guidelines-title" style="color: {guidelinesTitleColorStyle};">{guidelinesTitle}</div>
+        {/if}
+        {#if isEditable}
+          <input type="text" bind:value={guideline1} class="guideline-item-input" />
+          <input type="text" bind:value={guideline2} class="guideline-item-input" />
+          <input type="text" bind:value={guideline3} class="guideline-item-input" />
+          <input type="text" bind:value={guideline4} class="guideline-item-input" />
+        {:else}
+          <div class="guideline-item">{guideline1}</div>
+          <div class="guideline-item">{guideline2}</div>
+          <div class="guideline-item">{guideline3}</div>
+          <div class="guideline-item">{guideline4}</div>
+        {/if}
       </div>
     </div>
   </div>
@@ -670,6 +933,50 @@
     object-fit: contain;
   }
   
+  .logo-demo.editable {
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .logo-demo.editable:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+  }
+  
+  .logo-upload-label {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+  }
+  
+  .logo-upload-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .logo-upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: #666;
+  }
+  
+  .upload-icon {
+    font-size: 32px;
+  }
+  
+  .upload-text {
+    font-size: 12px;
+    font-weight: 500;
+  }
+  
   .logo-placeholder {
     font-size: 24px;
     font-weight: bold;
@@ -722,6 +1029,52 @@
     left: 0;
     color: #EF4444;
     font-weight: bold;
+  }
+  
+  .card-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 4px;
+    background: white;
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+  }
+  
+  .hint-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 4px;
+    background: white;
+    font-size: 12px;
+    color: #666;
+    resize: vertical;
+    min-height: 40px;
+  }
+  
+  .guidelines-title-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 8px;
+    background: white;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 12px;
+  }
+  
+  .guideline-item-input {
+    width: 100%;
+    border: 2px dashed rgba(0,0,0,0.2);
+    border-radius: 4px;
+    padding: 6px;
+    background: white;
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 10px;
+    padding-left: 26px;
   }
 </style>
 

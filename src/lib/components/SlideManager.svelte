@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import CoverSlide from '$lib/templates_svelte/default/CoverSlide.svelte';
   import BrandIntroductionSlide from '$lib/templates_svelte/default/BrandIntroductionSlide.svelte';
   import BrandPositioningSlide from '$lib/templates_svelte/default/BrandPositioningSlide.svelte';
@@ -14,6 +14,7 @@
   import ThankYouSlide from '$lib/templates_svelte/default/ThankYouSlide.svelte';
   import { convertSvelteSlidesToPptx } from '$lib/services/svelte-slide-to-pptx';
   import type { SlideData } from '$lib/types/slide-data';
+  import EditingPanel from './EditingPanel.svelte';
   
   export let brandData: any = null;
   
@@ -36,6 +37,341 @@
   let isEditable = false;
   let isDownloading = false;
   let downloadProgress = { current: 0, total: 0 };
+  let showEditingPanel = false;
+  let editingPanelData: any = {};
+  
+  // Get current slide name
+  $: currentSlideName = slides[currentSlideIndex]?.name || '';
+  
+  // Get current slide's background (reactive to both slide index and background changes)
+  $: currentSlideBackground = slideBackgrounds[currentSlideIndex] || getDefaultBackground(currentSlideIndex);
+  
+  // Update editing panel data when slide changes or isEditable changes
+  $: if (isEditable && currentSlideIndex !== undefined) {
+    updateEditingPanelData();
+  }
+  
+  function updateEditingPanelData() {
+    // Get current slide's background or create default
+    const currentBackground = slideBackgrounds[currentSlideIndex] || getDefaultBackground(currentSlideIndex);
+    
+    editingPanelData = {
+      brandName,
+      tagline,
+      primaryColor,
+      secondaryColor,
+      color2,
+      color3,
+      logoData,
+      logoUrl,
+      positioningStatement,
+      mission,
+      vision,
+      values,
+      personality,
+      colors,
+      primaryFont,
+      secondaryFont,
+      primaryWeights,
+      secondaryWeights,
+      icons,
+      applications,
+      website,
+      email,
+      phone,
+      thankYouText,
+      subtitleText,
+      hierarchyH1,
+      hierarchyH2,
+      hierarchyH3,
+      hierarchyBody,
+      photoLabel1,
+      photoLabel2,
+      photoLabel3,
+      photoLabel4,
+      photoEmoji1,
+      photoEmoji2,
+      photoEmoji3,
+      photoEmoji4,
+      guidelineTitle1,
+      guidelineItems,
+      guidelineTitle2,
+      doText,
+      dontText,
+      background: currentBackground
+    };
+  }
+  
+  // Helper function to get default background for each slide
+  function getDefaultBackground(slideIndex: number): {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  } {
+    switch (slideIndex) {
+      case 0: // Cover
+        // HTML template: linear-gradient(135deg, {{PRIMARY_COLOR}} 0%, {{COLOR_2_HEX}} 30%, {{COLOR_3_HEX}} 60%, {{SECONDARY_COLOR}} 100%)
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color1Hex, color2Hex, color3Hex, color4Hex],
+            direction: 135
+          }
+        };
+      case 1: // Brand Introduction
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color1Lighter, color2Lighter, color3Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 2: // Brand Positioning
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color2Lighter, color3Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 3: // Logo Guidelines
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color1Lighter, color2Lighter, '#FFFFFF', color3Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 4: // Logo Do's
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color1Lighter, color2Lighter, '#FFFFFF', color3Lighter, color4Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 5: // Logo Don'ts
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color2Lighter, color3Lighter, '#FFFFFF', color4Lighter, color5Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 6: // Color Palette
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color1Lighter, color2Lighter, '#FFFFFF', color3Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 7: // Typography
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color4Lighter, color5Lighter, '#FFFFFF', color6Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 8: // Iconography
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color5Lighter, color6Lighter, '#FFFFFF', color7Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 9: // Photography
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color6Lighter, color7Lighter, '#FFFFFF', color8Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 10: // Applications
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color7Lighter, color8Lighter, '#FFFFFF', color1Lighter, color2Lighter, '#FFFFFF'],
+            direction: 135
+          }
+        };
+      case 11: // Thank You
+        // HTML template: linear-gradient(135deg, {{SECONDARY_COLOR}} 0%, {{COLOR_3_HEX}} 25%, {{COLOR_4_HEX}} 50%, {{PRIMARY_COLOR}} 75%, {{COLOR_2_HEX}} 100%)
+        return {
+          type: 'gradient',
+          gradient: {
+            colors: [color4Hex, color3Hex, color4Hex, color1Hex, color2Hex],
+            direction: 135
+          }
+        };
+      default:
+        return {
+          type: 'color',
+          color: '#FFFFFF'
+        };
+    }
+  }
+  
+  function handleEditingPanelUpdate(event: CustomEvent) {
+    const { type, target, value, index } = event.detail;
+    
+    switch (type) {
+      case 'color':
+        if (target === 'primaryColor') primaryColor = value;
+        else if (target === 'secondaryColor') secondaryColor = value;
+        else if (target.startsWith('color-')) {
+          const idx = parseInt(target.split('-')[1]);
+          if (colors[idx]) colors[idx].hex = value;
+        }
+        break;
+      case 'text':
+        if (target === 'brandName') brandName = value;
+        else if (target === 'tagline') tagline = value;
+        else if (target === 'mission') mission = value;
+        else if (target === 'vision') vision = value;
+        else if (target === 'values') values = value;
+        else if (target === 'personality') personality = value;
+        else if (target === 'positioningStatement') positioningStatement = value;
+        else if (target === 'primaryWeights') primaryWeights = value;
+        else if (target === 'secondaryWeights') secondaryWeights = value;
+        else if (target === 'website') website = value;
+        else if (target === 'email') email = value;
+        else if (target === 'phone') phone = value;
+        else if (target === 'primaryColor') primaryColor = value;
+        else if (target === 'secondaryColor') secondaryColor = value;
+        break;
+      case 'image':
+        if (target === 'logoData') logoData = value;
+        break;
+      case 'font':
+        if (target === 'primaryFont') primaryFont = value;
+        else if (target === 'secondaryFont') secondaryFont = value;
+        break;
+      case 'color-name':
+        if (colors[index]) colors[index].name = value;
+        colors = [...colors]; // Trigger reactivity
+        break;
+      case 'color-hex':
+        if (colors[index]) colors[index].hex = value;
+        colors = [...colors];
+        break;
+      case 'color-usage':
+        if (colors[index]) colors[index].usage = value;
+        colors = [...colors];
+        break;
+      case 'add-color':
+        colors = [...colors, { name: '', hex: '#000000', usage: '' }];
+        break;
+      case 'remove-color':
+        colors = colors.filter((_: any, i: number) => i !== index);
+        break;
+      case 'icon-symbol':
+        if (icons[index]) icons[index].symbol = value;
+        icons = [...icons];
+        break;
+      case 'icon-name':
+        if (icons[index]) icons[index].name = value;
+        icons = [...icons];
+        break;
+      case 'add-icon':
+        icons = [...icons, { symbol: '', name: '' }];
+        break;
+      case 'remove-icon':
+        icons = icons.filter((_: any, i: number) => i !== index);
+        break;
+      case 'app-icon':
+        if (applications[index]) applications[index].icon = value;
+        applications = [...applications];
+        break;
+      case 'app-name':
+        if (applications[index]) applications[index].name = value;
+        applications = [...applications];
+        break;
+      case 'app-description':
+        if (applications[index]) applications[index].description = value;
+        applications = [...applications];
+        break;
+      case 'add-app':
+        applications = [...applications, { icon: '', name: '', description: '' }];
+        break;
+      case 'remove-app':
+        applications = applications.filter((_: any, i: number) => i !== index);
+        break;
+      case 'thank-you-text':
+        thankYouText = value;
+        break;
+      case 'subtitle-text':
+        subtitleText = value;
+        break;
+      case 'hierarchy-h1':
+        hierarchyH1 = value;
+        break;
+      case 'hierarchy-h2':
+        hierarchyH2 = value;
+        break;
+      case 'hierarchy-h3':
+        hierarchyH3 = value;
+        break;
+      case 'hierarchy-body':
+        hierarchyBody = value;
+        break;
+      case 'photo-label':
+        if (index === 0) photoLabel1 = value;
+        else if (index === 1) photoLabel2 = value;
+        else if (index === 2) photoLabel3 = value;
+        else if (index === 3) photoLabel4 = value;
+        break;
+      case 'photo-emoji':
+        if (index === 0) photoEmoji1 = value;
+        else if (index === 1) photoEmoji2 = value;
+        else if (index === 2) photoEmoji3 = value;
+        else if (index === 3) photoEmoji4 = value;
+        break;
+      case 'guideline-title-1':
+        guidelineTitle1 = value;
+        break;
+      case 'guideline-title-2':
+        guidelineTitle2 = value;
+        break;
+      case 'guideline-item':
+        if (guidelineItems[index] !== undefined) {
+          guidelineItems[index] = value;
+          guidelineItems = [...guidelineItems]; // Trigger reactivity
+        }
+        break;
+      case 'add-guideline-item':
+        guidelineItems = [...guidelineItems, ''];
+        break;
+      case 'remove-guideline-item':
+        guidelineItems = guidelineItems.filter((_: any, i: number) => i !== index);
+        break;
+      case 'do-text':
+        doText = value;
+        break;
+      case 'dont-text':
+        dontText = value;
+        break;
+      case 'background':
+        // Store background for current slide (reassign to trigger reactivity)
+        slideBackgrounds = { ...slideBackgrounds, [currentSlideIndex]: value };
+        updateEditingPanelData();
+        break;
+    }
+    updateEditingPanelData();
+  }
+  
+  function toggleEditingPanel() {
+    showEditingPanel = !showEditingPanel;
+    if (showEditingPanel) {
+      updateEditingPanelData();
+    }
+  }
   
   // Editable state variables (initialized from brandData)
   let brandName = 'Brand Name';
@@ -61,6 +397,48 @@
   let website = 'your-website.com';
   let email = 'contact@example.com';
   let phone = '';
+  
+  // Editable content for ThankYouSlide
+  let thankYouText = 'Thank You';
+  let subtitleText = 'Let\'s Create Something Amazing Together';
+  
+  // Editable content for TypographySlide
+  let hierarchyH1 = 'H1: 32pt - Main titles';
+  let hierarchyH2 = 'H2: 24pt - Section headers';
+  let hierarchyH3 = 'H3: 20pt - Subsection headers';
+  let hierarchyBody = 'Body: 16pt - Main content';
+  
+  // Editable content for PhotographySlide
+  let photoLabel1 = 'Authentic Moments';
+  let photoLabel2 = 'Natural Lighting';
+  let photoLabel3 = 'Vibrant Colors';
+  let photoLabel4 = 'People-Focused';
+  let photoEmoji1 = '📷';
+  let photoEmoji2 = '🌟';
+  let photoEmoji3 = '🎨';
+  let photoEmoji4 = '👥';
+  let guidelineTitle1 = 'Style Guidelines';
+  let guidelineItems: string[] = [
+    'Natural, authentic moments',
+    'Bright, well-lit environments',
+    'Warm, inviting tones',
+    'Diverse, inclusive representation',
+    'Professional yet approachable'
+  ];
+  let guidelineTitle2 = 'Do\'s & Don\'ts';
+  let doText = 'Use natural lighting & authentic scenes';
+  let dontText = 'Avoid staged poses & heavy filters';
+  
+  // Background state for each slide (keyed by slide index)
+  // Using object instead of Map for better Svelte reactivity
+  let slideBackgrounds: Record<number, {
+    type: 'color' | 'gradient';
+    color?: string;
+    gradient?: {
+      colors: string[];
+      direction: number;
+    };
+  }> = {};
   
   // Initialize from brandData when it changes
   $: if (brandData) {
@@ -104,6 +482,11 @@
     colors = extractColorsArray(brandData, primaryColor, secondaryColor, color2, color3);
   }
   
+  // Save Svelte slides to database when brandData is set and slides are ready
+  // Use a more reliable approach with onMount and reactive checks
+  // Note: Svelte slides are automatically saved server-side when HTML slides are generated
+  // via the /api/preview-slides-html endpoint. No client-side saving is needed.
+  
   // Helper functions
   function extractColor(data: any, type: string): string | null {
     if (!data?.colors) return null;
@@ -135,20 +518,50 @@
     if (data?.colors) {
       // Try allColors first
       if (Array.isArray(data.colors.allColors) && data.colors.allColors.length > 0) {
-        return data.colors.allColors.map((c: any) => ({
+        const extracted = data.colors.allColors.map((c: any) => ({
           name: c.name || 'Color',
           hex: c.hex || c,
           usage: c.usage || 'Brand color'
         }));
+        // Fill to 8 colors if needed (matching HTML generator logic)
+        if (extracted.length < 8) {
+          const defaultColors = [
+            { name: 'Color 5', hex: '#F59E0B', usage: 'Brand color' },
+            { name: 'Color 6', hex: '#EF4444', usage: 'Brand color' },
+            { name: 'Color 7', hex: '#8B5CF6', usage: 'Brand color' },
+            { name: 'Color 8', hex: '#06B6D4', usage: 'Brand color' }
+          ];
+          const filled = [...extracted];
+          for (let i = extracted.length; i < 8; i++) {
+            filled.push(defaultColors[i - 4] || defaultColors[0]);
+          }
+          return filled;
+        }
+        return extracted;
       }
       
       // Try core_palette
       if (Array.isArray(data.colors.core_palette) && data.colors.core_palette.length > 0) {
-        return data.colors.core_palette.map((c: any) => ({
+        const extracted = data.colors.core_palette.map((c: any) => ({
           name: c.name || 'Color',
           hex: c.hex || c,
           usage: c.usage || 'Brand color'
         }));
+        // Fill to 8 colors if needed (matching HTML generator logic)
+        if (extracted.length < 8) {
+          const defaultColors = [
+            { name: 'Color 5', hex: '#F59E0B', usage: 'Brand color' },
+            { name: 'Color 6', hex: '#EF4444', usage: 'Brand color' },
+            { name: 'Color 7', hex: '#8B5CF6', usage: 'Brand color' },
+            { name: 'Color 8', hex: '#06B6D4', usage: 'Brand color' }
+          ];
+          const filled = [...extracted];
+          for (let i = extracted.length; i < 8; i++) {
+            filled.push(defaultColors[i - 4] || defaultColors[0]);
+          }
+          return filled;
+        }
+        return extracted;
       }
       
       // Build from individual colors
@@ -274,13 +687,30 @@
       );
     }
     
-    return fallbackColors;
+    // Fill to 8 colors (matching HTML generator logic)
+    // HTML generator uses defaultColors array to fill remaining slots
+    const defaultColors = [
+      { name: 'Color 5', hex: '#F59E0B', usage: 'Brand color' },
+      { name: 'Color 6', hex: '#EF4444', usage: 'Brand color' },
+      { name: 'Color 7', hex: '#8B5CF6', usage: 'Brand color' },
+      { name: 'Color 8', hex: '#06B6D4', usage: 'Brand color' }
+    ];
+    
+    // Fill missing colors with defaults (same logic as HTML generator)
+    const filledColors = [...fallbackColors];
+    for (let i = fallbackColors.length; i < 8; i++) {
+      filledColors.push(defaultColors[i - 4] || defaultColors[0]);
+    }
+    
+    return filledColors;
   }
   
   function extractPositioningStatement(data: any): string {
     // Try direct property first
     if (data?.positioningStatement || data?.positioning_statement) {
-      return data.positioningStatement || data.positioning_statement;
+      let statement = data.positioningStatement || data.positioning_statement;
+      // Clean it to remove any mission/vision content
+      return cleanPositioningStatement(statement);
     }
     
     // Try to parse from stepHistory
@@ -290,26 +720,91 @@
       
       // If it's an object, extract directly
       if (typeof content === 'object' && content.positioning_statement) {
-        return content.positioning_statement;
+        return cleanPositioningStatement(content.positioning_statement);
       }
       
       // If it's a string, parse it
       if (typeof content === 'string') {
-        // Try to find positioning statement in markdown format
-        const match = content.match(/\*\*Positioning Statement\*\*:\s*(.+?)(?=\n\n|\n\*\*|$)/is) ||
-                     content.match(/Positioning Statement[:\s]+(.+?)(?=\n\n|\n(?:Mission|Vision)|$)/is) ||
-                     content.match(/Positioning[:\s]+(.+?)(?=\n\n|\n(?:Mission|Vision)|$)/is);
-        if (match && match[1]) {
-          return match[1].trim();
+        // Try to find positioning statement in markdown format - be very specific
+        // Look for "Brand Positioning:" or "Positioning Statement:" and stop at next section
+        const patterns = [
+          /\*\*Brand Positioning\*\*:\s*([\s\S]+?)(?=\n\n\*\*(?:Mission|Vision|Core Values|Target Audience|Voice|Tone)|$)/i,
+          /\*\*Positioning Statement\*\*:\s*([\s\S]+?)(?=\n\n\*\*(?:Mission|Vision|Core Values|Target Audience|Voice|Tone)|$)/i,
+          /Brand Positioning[:\s]+([\s\S]+?)(?=\n\n(?:Mission|Vision|Core Values|Target Audience|Voice|Tone)|$)/i,
+          /Positioning Statement[:\s]+([\s\S]+?)(?=\n\n(?:Mission|Vision|Core Values|Target Audience|Voice|Tone)|$)/i,
+          /Positioning[:\s]+([\s\S]+?)(?=\n\n(?:Mission|Vision|Core Values|Target Audience|Voice|Tone)|$)/i
+        ];
+        
+        for (const pattern of patterns) {
+          const match = content.match(pattern);
+          if (match && match[1]) {
+            let extracted = match[1].trim();
+            // Remove any trailing markdown formatting
+            extracted = extracted.replace(/\*\*/g, '').trim();
+            // Remove any leading/trailing newlines
+            extracted = extracted.replace(/^\n+|\n+$/g, '');
+            if (extracted.length > 10) {
+              return cleanPositioningStatement(extracted);
+            }
+          }
         }
         
-        // Fallback: use first paragraph
-        const firstPara = content.split('\n\n').find(p => p.trim().length > 20);
-        if (firstPara) return firstPara.trim();
+        // Last resort: use first paragraph only if it doesn't contain other section headers
+        const firstPara = content.split('\n\n').find(p => {
+          const trimmed = p.trim();
+          return trimmed.length > 20 && 
+                 !trimmed.match(/^(Mission|Vision|Core Values|Target Audience|Voice|Tone)[:\s]/i);
+        });
+        if (firstPara) {
+          let cleaned = firstPara.trim();
+          // Remove section headers if they appear
+          cleaned = cleaned.replace(/^\*\*Brand Positioning\*\*:\s*/i, '');
+          cleaned = cleaned.replace(/^Brand Positioning[:\s]+/i, '');
+          return cleanPositioningStatement(cleaned);
+        }
       }
     }
     
     return 'Our brand positioning statement';
+  }
+  
+  // Helper function to clean positioning statement and remove mission/vision content
+  function cleanPositioningStatement(statement: string): string {
+    if (!statement) return 'Our brand positioning statement';
+    
+    // Remove markdown formatting
+    let cleaned = statement.replace(/\*\*/g, '').trim();
+    
+    // Split by sentences and stop at first mention of Mission, Vision, etc.
+    const stopKeywords = ['Mission', 'Vision', 'Core Values', 'Target Audience', 'Voice', 'Tone', 'Values'];
+    
+    // Check if the statement contains any stop keywords
+    for (const keyword of stopKeywords) {
+      const index = cleaned.indexOf(keyword);
+      if (index > 0) {
+        // Take only the text before the keyword
+        cleaned = cleaned.substring(0, index).trim();
+        // Remove any trailing punctuation that might be left
+        cleaned = cleaned.replace(/[.,;:]$/, '').trim();
+        break;
+      }
+    }
+    
+    // Also split by double newlines and take only the first paragraph
+    const paragraphs = cleaned.split(/\n\n+/);
+    if (paragraphs.length > 0) {
+      cleaned = paragraphs[0].trim();
+    }
+    
+    // Remove any section headers that might be in the text
+    cleaned = cleaned.replace(/^(Brand Positioning|Positioning Statement|Positioning)[:\s]+/i, '');
+    
+    // Ensure it's not empty and has reasonable length
+    if (cleaned.length < 10) {
+      return 'Our brand positioning statement';
+    }
+    
+    return cleaned;
   }
   
   function extractMission(data: any): string {
@@ -623,40 +1118,51 @@
     return [];
   }
   
-  // Color variants for gradients
-  $: color1Lighter = lightenColor(primaryColor, 0.9);
-  $: color2Lighter = lightenColor(color2, 0.9);
-  $: color3Lighter = lightenColor(color3, 0.9);
-  $: color4Lighter = lightenColor(secondaryColor, 0.9);
-  $: color5Lighter = lightenColor('#60A5FA', 0.9);
-  $: color6Lighter = lightenColor('#3B82F6', 0.9);
-  $: color7Lighter = lightenColor('#1E40AF', 0.9);
-  $: color8Lighter = lightenColor('#2563EB', 0.9);
-  $: color1Hex = primaryColor;
-  $: color2Hex = color2;
-  $: color3Hex = color3;
-  $: color4Hex = secondaryColor;
-  $: color1Rgba10 = hexToRgba(primaryColor, 0.1);
-  $: color2Rgba10 = hexToRgba(color2, 0.1);
-  $: color3Rgba10 = hexToRgba(color3, 0.1);
-  $: color1Rgba15 = hexToRgba(primaryColor, 0.15);
-  $: color2Rgba15 = hexToRgba(color2, 0.15);
-  $: color3Rgba15 = hexToRgba(color3, 0.15);
-  $: color1Rgba12 = hexToRgba(primaryColor, 0.12);
-  $: color2Rgba12 = hexToRgba(color2, 0.12);
-  $: color3Rgba12 = hexToRgba(color3, 0.12);
-  $: color4Rgba12 = hexToRgba(secondaryColor, 0.12);
-  $: color5Rgba12 = hexToRgba('#60A5FA', 0.12);
-  $: color6Rgba12 = hexToRgba('#3B82F6', 0.12);
-  $: color7Rgba12 = hexToRgba('#1E40AF', 0.12);
-  $: color4Rgba8 = hexToRgba(secondaryColor, 0.08);
-  $: color5Rgba8 = hexToRgba('#60A5FA', 0.08);
-  $: color6Rgba8 = hexToRgba('#3B82F6', 0.08);
-  $: color5Rgba10 = hexToRgba('#60A5FA', 0.1);
-  $: color6Rgba10 = hexToRgba('#3B82F6', 0.1);
-  $: color7Rgba10 = hexToRgba('#1E40AF', 0.1);
-  $: color1Rgba5 = hexToRgba(primaryColor, 0.05);
-  $: color8Rgba12 = hexToRgba('#2563EB', 0.12);
+  // Extract colors from colors array in the same order as HTML templates
+  // COLOR_1 = colors[0], COLOR_2 = colors[1], etc.
+  $: color1Hex = colors.length > 0 ? colors[0].hex : primaryColor;
+  $: color2Hex = colors.length > 1 ? colors[1].hex : (colors.length > 0 ? colors[0].hex : color2);
+  $: color3Hex = colors.length > 2 ? colors[2].hex : (colors.length > 1 ? colors[1].hex : color3);
+  $: color4Hex = colors.length > 3 ? colors[3].hex : (colors.length > 2 ? colors[2].hex : secondaryColor);
+  $: color5Hex = colors.length > 4 ? colors[4].hex : '#60A5FA';
+  $: color6Hex = colors.length > 5 ? colors[5].hex : '#3B82F6';
+  $: color7Hex = colors.length > 6 ? colors[6].hex : '#1E40AF';
+  $: color8Hex = colors.length > 7 ? colors[7].hex : '#2563EB';
+  
+  // Color variants for gradients - using same logic as HTML templates
+  // HTML uses lightenColor(hex, 0.92) for LIGHTER variants
+  $: color1Lighter = lightenColor(color1Hex, 0.92);
+  $: color2Lighter = lightenColor(color2Hex, 0.92);
+  $: color3Lighter = lightenColor(color3Hex, 0.92);
+  $: color4Lighter = lightenColor(color4Hex, 0.92);
+  $: color5Lighter = lightenColor(color5Hex, 0.92);
+  $: color6Lighter = lightenColor(color6Hex, 0.92);
+  $: color7Lighter = lightenColor(color7Hex, 0.92);
+  $: color8Lighter = lightenColor(color8Hex, 0.92);
+  
+  // RGBA variants - matching HTML template variables
+  $: color1Rgba10 = hexToRgba(color1Hex, 0.1);
+  $: color2Rgba10 = hexToRgba(color2Hex, 0.1);
+  $: color3Rgba10 = hexToRgba(color3Hex, 0.1);
+  $: color4Rgba10 = hexToRgba(color4Hex, 0.1);
+  $: color5Rgba10 = hexToRgba(color5Hex, 0.1);
+  $: color6Rgba10 = hexToRgba(color6Hex, 0.1);
+  $: color7Rgba10 = hexToRgba(color7Hex, 0.1);
+  $: color1Rgba15 = hexToRgba(color1Hex, 0.15);
+  $: color2Rgba15 = hexToRgba(color2Hex, 0.15);
+  $: color3Rgba15 = hexToRgba(color3Hex, 0.15);
+  $: color1Rgba12 = hexToRgba(color1Hex, 0.12);
+  $: color2Rgba12 = hexToRgba(color2Hex, 0.12);
+  $: color3Rgba12 = hexToRgba(color3Hex, 0.12);
+  $: color4Rgba12 = hexToRgba(color4Hex, 0.12);
+  $: color5Rgba12 = hexToRgba(color5Hex, 0.12);
+  $: color6Rgba12 = hexToRgba(color6Hex, 0.12);
+  $: color7Rgba12 = hexToRgba(color7Hex, 0.12);
+  $: color4Rgba8 = hexToRgba(color4Hex, 0.08);
+  $: color5Rgba8 = hexToRgba(color5Hex, 0.08);
+  $: color6Rgba8 = hexToRgba(color6Hex, 0.08);
+  $: color1Rgba5 = hexToRgba(color1Hex, 0.05);
+  $: color8Rgba12 = hexToRgba(color8Hex, 0.12);
   
   // Slide list
   const slides = [
@@ -682,8 +1188,8 @@
     // Try direct icons property first
     if (data?.icons && Array.isArray(data.icons)) {
       return data.icons.map((icon: any) => ({
-        symbol: typeof icon === 'string' ? icon : (icon.symbol || icon.icon || icon.emoji || '◐'),
-        name: typeof icon === 'string' ? 'Icon' : (icon.name || icon.label || 'Icon')
+        symbol: '', // No longer using symbols/emojis - using Lucide icons
+        name: typeof icon === 'string' ? icon : (icon.name || icon.label || 'Icon')
       }));
     }
     
@@ -697,15 +1203,15 @@
         // Try different object structures
         if (Array.isArray(content.icons)) {
           return content.icons.map((icon: any) => ({
-            symbol: typeof icon === 'string' ? icon : (icon.symbol || icon.icon || icon.emoji || '◐'),
-            name: typeof icon === 'string' ? 'Icon' : (icon.name || icon.label || 'Icon')
+            symbol: '', // No longer using symbols/emojis
+            name: typeof icon === 'string' ? icon : (icon.name || icon.label || 'Icon')
           }));
         }
         
         if (Array.isArray(content)) {
           return content.map((icon: any) => ({
-            symbol: typeof icon === 'string' ? icon : (icon.symbol || icon.icon || icon.emoji || '◐'),
-            name: typeof icon === 'string' ? 'Icon' : (icon.name || icon.label || 'Icon')
+            symbol: '', // No longer using symbols/emojis
+            name: typeof icon === 'string' ? icon : (icon.name || icon.label || 'Icon')
           }));
         }
         
@@ -713,10 +1219,10 @@
         for (const key in content) {
           if (Array.isArray(content[key])) {
             const potentialIcons = content[key];
-            if (potentialIcons.length > 0 && (potentialIcons[0].symbol || potentialIcons[0].icon || typeof potentialIcons[0] === 'string')) {
+            if (potentialIcons.length > 0) {
               return potentialIcons.map((icon: any) => ({
-                symbol: typeof icon === 'string' ? icon : (icon.symbol || icon.icon || icon.emoji || '◐'),
-                name: typeof icon === 'string' ? 'Icon' : (icon.name || icon.label || 'Icon')
+                symbol: '', // No longer using symbols/emojis
+                name: typeof icon === 'string' ? icon : (icon.name || icon.label || 'Icon')
               }));
             }
           }
@@ -729,45 +1235,45 @@
         
         // Try multiple patterns to match different formats
         for (const line of lines) {
-          // Pattern 1: • Symbol Name or - Symbol Name or * Symbol Name
-          let match = line.match(/^[\s]*[•\-\*]\s*([^\s]+)\s+(.+)/);
+          // Skip empty lines
+          if (!line.trim()) continue;
+          
+          // Pattern 1: • Icon Name or - Icon Name or * Icon Name
+          let match = line.match(/^[\s]*[•\-\*]\s*(.+)$/);
           if (match) {
-            icons.push({
-              symbol: match[1].trim(),
-              name: match[2].trim()
-            });
-            continue;
-          }
-          
-          // Pattern 2: **Symbol**: Name or Symbol: Name
-          match = line.match(/\*\*([^\*]+)\*\*[:\s]+(.+)/i) || line.match(/([^\s:]+)[:\s]+(.+)/);
-          if (match && match[1].length <= 3) { // Symbols are usually 1-3 characters
-            icons.push({
-              symbol: match[1].trim(),
-              name: match[2].trim()
-            });
-            continue;
-          }
-          
-          // Pattern 3: Symbol - Name or Symbol – Name
-          match = line.match(/([^\s\-–]+)\s*[–\-]\s*(.+)/);
-          if (match && match[1].length <= 3) {
-            icons.push({
-              symbol: match[1].trim(),
-              name: match[2].trim()
-            });
-            continue;
-          }
-          
-          // Pattern 4: Just a symbol and name separated by space (if line is short)
-          if (line.trim().length < 50 && line.trim().split(/\s+/).length === 2) {
-            const parts = line.trim().split(/\s+/);
-            if (parts[0].length <= 3) {
+            const iconName = match[1].trim();
+            // Remove any leading emoji/symbol if present
+            const cleanName = iconName.replace(/^[⚫⚪⚡⚙⚠⚰⚱★☆♦♠♣♥♪♫♬♭♮♯◐◑◒◓◔◕◖◗◘◙◚◛◜◝◞◟◠◡☀☁☂☎☐☑☒☓☕☘☝☞☟☠☢☣☮☯☸☹☺☻☼☽☾♀♁♂♃♄♅♆♇♈♉♊♋♌♍♎♏♐♑♒♓♔♕♖♗♘♙♚♛♜♝♞♟\s]+/, '').trim();
+            if (cleanName && cleanName.length > 2) {
               icons.push({
-                symbol: parts[0],
-                name: parts[1]
+                symbol: '', // No longer using symbols/emojis
+                name: cleanName
               });
             }
+            continue;
+          }
+          
+          // Pattern 2: Icon Name (colon separated)
+          match = line.match(/^\s*([^:]+):\s*(.+)$/);
+          if (match) {
+            const iconName = match[2].trim() || match[1].trim();
+            if (iconName.length > 2) {
+              icons.push({
+                symbol: '', // No longer using symbols/emojis
+                name: iconName
+              });
+            }
+            continue;
+          }
+          
+          // Pattern 3: Icon Name (dash separated)
+          match = line.match(/^\s*([^\-]+)\s*-\s*(.+)$/);
+          if (match && match[2].trim().length > 2) {
+            icons.push({
+              symbol: '', // No longer using symbols/emojis
+              name: match[2].trim()
+            });
+            continue;
           }
         }
         
@@ -779,8 +1285,8 @@
             if (Array.isArray(parsed)) {
               parsed.forEach((icon: any) => {
                 icons.push({
-                  symbol: typeof icon === 'string' ? icon : (icon.symbol || icon.icon || icon.emoji || '◐'),
-                  name: typeof icon === 'string' ? 'Icon' : (icon.name || icon.label || 'Icon')
+                  symbol: '', // No longer using symbols/emojis
+                  name: typeof icon === 'string' ? icon : (icon.name || icon.label || 'Icon')
                 });
               });
             }
@@ -791,33 +1297,33 @@
       }
     }
     
-    // Remove duplicates based on symbol
+    // Remove duplicates based on name (since we're using names for icon lookup)
     const uniqueIcons = icons.filter((icon, index, self) => 
-      index === self.findIndex(i => i.symbol === icon.symbol)
+      index === self.findIndex(i => i.name.toLowerCase() === icon.name.toLowerCase())
     );
     
     if (uniqueIcons.length > 0) {
       return uniqueIcons.slice(0, 12); // Return up to 12 icons
     }
     
-    // Default icons if none found
+    // Default icons if none found - use icon names for Lucide icons
     return [
-      { symbol: '◐', name: 'Brand' },
-      { symbol: '★', name: 'Featured' },
-      { symbol: '♥', name: 'Favorites' },
-      { symbol: '◆', name: 'Premium' },
-      { symbol: '✓', name: 'Success' },
-      { symbol: '→', name: 'Navigation' },
-      { symbol: '⊕', name: 'Add' },
-      { symbol: '⚙', name: 'Settings' }
+      { symbol: '', name: 'Brand' },
+      { symbol: '', name: 'Featured' },
+      { symbol: '', name: 'Success' },
+      { symbol: '', name: 'Navigation' },
+      { symbol: '', name: 'Add' },
+      { symbol: '', name: 'Settings' }
     ];
   }
   
+  // Same lightenColor function as HTML generator (matching exactly)
   function lightenColor(hex: string, amount: number): string {
     if (!hex || !hex.startsWith('#')) return hex;
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
+    // Lighten by mixing with white (same as HTML generator)
     const newR = Math.round(r + (255 - r) * amount);
     const newG = Math.round(g + (255 - g) * amount);
     const newB = Math.round(b + (255 - b) * amount);
@@ -1225,6 +1731,45 @@
     return finalSlides;
   }
   
+  // Function to collect all slide data
+  function collectAllSlideData(): SlideData[] {
+    const allSlideData: SlideData[] = [];
+    
+    // Collect data from all slide components in correct order
+    const slideRefs = [
+      coverSlideRef,
+      brandIntroRef,
+      brandPositioningRef,
+      logoGuidelinesRef,
+      logoDosRef,
+      logoDontsRef,
+      colorPaletteRef,
+      typographyRef,
+      iconographyRef,
+      photographyRef,
+      applicationsRef,
+      thankYouRef
+    ];
+    
+    for (const ref of slideRefs) {
+      if (ref && typeof ref.getSlideData === 'function') {
+        try {
+          const slideData = ref.getSlideData();
+          if (slideData && slideData.elements && slideData.elements.length > 0) {
+            allSlideData.push(slideData);
+          }
+        } catch (error) {
+          console.error('❌ Error getting slide data:', error);
+        }
+      }
+    }
+    
+    return allSlideData;
+  }
+  
+  // Note: Svelte slides are automatically saved server-side when HTML slides are generated
+  // via the /api/preview-slides-html endpoint. No client-side saving is needed.
+  
   async function downloadAllSlidesPPTX() {
     if (isDownloading) return;
     
@@ -1232,42 +1777,7 @@
     try {
       console.log('🔄 Collecting slide data from all components...');
       
-      const allSlideData: SlideData[] = [];
-      
-      // Collect data from all slide components in correct order
-      // All slides are rendered (but hidden), so refs should be available
-      const slideRefs = [
-        coverSlideRef,
-        brandIntroRef,
-        brandPositioningRef,
-        logoGuidelinesRef,
-        logoDosRef,
-        logoDontsRef,
-        colorPaletteRef,
-        typographyRef,
-        iconographyRef,
-        photographyRef,
-        applicationsRef,
-        thankYouRef
-      ];
-      
-      for (const ref of slideRefs) {
-        if (ref && typeof ref.getSlideData === 'function') {
-          try {
-            const slideData = ref.getSlideData();
-            if (slideData && slideData.elements && slideData.elements.length > 0) {
-              allSlideData.push(slideData);
-              console.log(`✅ Collected slide: ${slideData.id} with ${slideData.elements.length} elements`);
-            } else {
-              console.warn('⚠️ Slide data is empty or invalid:', slideData);
-            }
-          } catch (error) {
-            console.error('❌ Error getting slide data:', error);
-          }
-        } else {
-          console.warn('⚠️ Slide ref not available or missing getSlideData function');
-        }
-      }
+      const allSlideData = collectAllSlideData();
       
       console.log(`📊 Collected ${allSlideData.length} slides, converting to PPTX...`);
       
@@ -1309,12 +1819,30 @@
   <div class="controls-bar">
     <div class="controls-left">
       <button
-        onclick={() => isEditable = !isEditable}
+        onclick={() => {
+          isEditable = !isEditable;
+          if (isEditable) {
+            showEditingPanel = true;
+            updateEditingPanelData();
+          } else {
+            showEditingPanel = false;
+          }
+        }}
         class="btn"
         class:active={isEditable}
       >
         {isEditable ? '🔒 Lock Editing' : '✏️ Edit Slides'}
       </button>
+      
+      {#if isEditable}
+        <button
+          onclick={toggleEditingPanel}
+          class="btn"
+          class:active={showEditingPanel}
+        >
+          {showEditingPanel ? '📋 Hide Panel' : '📋 Show Panel'}
+        </button>
+      {/if}
       
       <button
         onclick={downloadAllSlidesPPTX}
@@ -1370,11 +1898,12 @@
             month: 'long', 
             day: 'numeric' 
           })}
-          bind:primaryColor
-          bind:color2
-          bind:color3
-          bind:secondaryColor
+          color1Hex={color1Hex}
+          color2Hex={color2Hex}
+          color3Hex={color3Hex}
+          color4Hex={color4Hex}
           {logoData}
+          background={currentSlideIndex === 0 ? currentSlideBackground : getDefaultBackground(0)}
           {isEditable}
         />
       </div>
@@ -1382,12 +1911,13 @@
         <BrandIntroductionSlide
           bind:this={brandIntroRef}
           bind:positioningStatement
-          bind:primaryColor
+          color1Hex={color1Hex}
           color1Lighter={color1Lighter}
           color2Lighter={color2Lighter}
           color3Lighter={color3Lighter}
           color1Rgba10={color1Rgba10}
           color2Rgba10={color2Rgba10}
+          background={currentSlideIndex === 1 ? currentSlideBackground : getDefaultBackground(1)}
           {isEditable}
         />
       </div>
@@ -1398,7 +1928,6 @@
           bind:vision
           bind:values
           bind:personality
-          bind:primaryColor
           color1Hex={color1Hex}
           color2Hex={color2Hex}
           color3Hex={color3Hex}
@@ -1409,6 +1938,7 @@
           color2Rgba15={color2Rgba15}
           color3Rgba15={color3Rgba15}
           color1Rgba5={color1Rgba5}
+          background={currentSlideIndex === 2 ? currentSlideBackground : getDefaultBackground(2)}
           {isEditable}
         />
       </div>
@@ -1418,11 +1948,12 @@
           bind:brandName
           bind:logoUrl
           bind:logoData
-          bind:primaryColor
+          color1Hex={color1Hex}
           color3Lighter={color3Lighter}
           color4Lighter={color4Lighter}
           color3Rgba12={color3Rgba12}
           color4Rgba12={color4Rgba12}
+          background={currentSlideIndex === 3 ? currentSlideBackground : getDefaultBackground(3)}
           {isEditable}
         />
       </div>
@@ -1432,8 +1963,8 @@
           bind:brandName
           bind:logoUrl
           bind:logoData
-          bind:primaryColor
-          bind:secondaryColor
+          color1Hex={color1Hex}
+          color4Hex={color4Hex}
           color1Lighter={color1Lighter}
           color2Lighter={color2Lighter}
           color3Lighter={color3Lighter}
@@ -1441,6 +1972,7 @@
           color1Rgba10={color1Rgba10}
           color2Rgba10={color2Rgba10}
           color3Rgba10={color3Rgba10}
+          background={currentSlideIndex === 4 ? currentSlideBackground : getDefaultBackground(4)}
           {isEditable}
         />
       </div>
@@ -1450,7 +1982,7 @@
           bind:brandName
           bind:logoUrl
           bind:logoData
-          bind:primaryColor
+          color1Hex={color1Hex}
           color2Lighter={color2Lighter}
           color3Lighter={color3Lighter}
           color4Lighter={color4Lighter}
@@ -1458,6 +1990,7 @@
           color1Rgba10={color1Rgba10}
           color2Rgba10={color2Rgba10}
           color3Rgba10={color3Rgba10}
+          background={currentSlideIndex === 5 ? currentSlideBackground : getDefaultBackground(5)}
           {isEditable}
         />
       </div>
@@ -1465,7 +1998,6 @@
         <ColorPaletteSlide
           bind:this={colorPaletteRef}
           bind:colors
-          bind:primaryColor
           color1Hex={color1Hex}
           color1Lighter={color1Lighter}
           color2Lighter={color2Lighter}
@@ -1474,6 +2006,7 @@
           color1Rgba15={color1Rgba15}
           color2Rgba15={color2Rgba15}
           color3Rgba10={color3Rgba10}
+          background={currentSlideIndex === 6 ? currentSlideBackground : getDefaultBackground(6)}
           {isEditable}
         />
       </div>
@@ -1484,13 +2017,14 @@
           bind:secondaryFont
           bind:primaryWeights
           bind:secondaryWeights
-          bind:primaryColor
+          color1Hex={color1Hex}
           color4Lighter={color4Lighter}
           color5Lighter={color5Lighter}
           color6Lighter={color6Lighter}
           color4Rgba8={color4Rgba8}
           color5Rgba8={color5Rgba8}
           color6Rgba8={color6Rgba8}
+          background={currentSlideIndex === 7 ? currentSlideBackground : getDefaultBackground(7)}
           {isEditable}
         />
       </div>
@@ -1498,26 +2032,41 @@
         <IconographySlide
           bind:this={iconographyRef}
           bind:icons
-          bind:primaryColor
-          bind:secondaryColor
+          color1Hex={color1Hex}
+          color4Hex={color4Hex}
           color5Lighter={color5Lighter}
           color6Lighter={color6Lighter}
           color7Lighter={color7Lighter}
           color5Rgba12={color5Rgba12}
           color6Rgba12={color6Rgba12}
+          background={currentSlideIndex === 8 ? currentSlideBackground : getDefaultBackground(8)}
           {isEditable}
         />
       </div>
       <div class="slide-wrapper" class:hidden={currentSlideIndex !== 9}>
         <PhotographySlide
           bind:this={photographyRef}
-          bind:primaryColor
-          bind:secondaryColor
+          color1Hex={color1Hex}
+          color4Hex={color4Hex}
+          bind:photoLabel1
+          bind:photoLabel2
+          bind:photoLabel3
+          bind:photoLabel4
+          bind:photoEmoji1
+          bind:photoEmoji2
+          bind:photoEmoji3
+          bind:photoEmoji4
+          bind:guidelineTitle1
+          bind:guidelineItems
+          bind:guidelineTitle2
+          bind:doText
+          bind:dontText
           color6Lighter={color6Lighter}
           color7Lighter={color7Lighter}
           color8Lighter={color8Lighter}
           color6Rgba10={color6Rgba10}
           color7Rgba10={color7Rgba10}
+          background={currentSlideIndex === 9 ? currentSlideBackground : getDefaultBackground(9)}
           {isEditable}
         />
       </div>
@@ -1525,8 +2074,8 @@
         <ApplicationsSlide
           bind:this={applicationsRef}
           bind:applications
-          bind:primaryColor
-          bind:secondaryColor
+          color1Hex={color1Hex}
+          color4Hex={color4Hex}
           color7Lighter={color7Lighter}
           color8Lighter={color8Lighter}
           color1Lighter={color1Lighter}
@@ -1534,6 +2083,7 @@
           color7Rgba12={color7Rgba12}
           color8Rgba12={color8Rgba12}
           color1Rgba5={color1Rgba5}
+          background={currentSlideIndex === 10 ? currentSlideBackground : getDefaultBackground(10)}
           {isEditable}
         />
       </div>
@@ -1541,18 +2091,30 @@
         <ThankYouSlide
           bind:this={thankYouRef}
           bind:brandName
-          bind:primaryColor
-          color1Lighter={color1Lighter}
-          color2Lighter={color2Lighter}
-          color3Lighter={color3Lighter}
-          color1Rgba10={color1Rgba10}
-          color2Rgba10={color2Rgba10}
-          color3Rgba10={color3Rgba10}
+          bind:thankYouText
+          bind:subtitleText
+          bind:website
+          bind:email
+          bind:phone
+          color1Hex={color1Hex}
+          color2Hex={color2Hex}
+          color3Hex={color3Hex}
+          color4Hex={color4Hex}
+          background={currentSlideIndex === 11 ? currentSlideBackground : getDefaultBackground(11)}
           {isEditable}
         />
       </div>
     </div>
   </div>
+  
+  <!-- Editing Panel -->
+  <EditingPanel
+    isOpen={showEditingPanel && isEditable}
+    slideType={currentSlideName}
+    editableData={editingPanelData}
+    on:update={handleEditingPanelUpdate}
+    on:close={() => showEditingPanel = false}
+  />
 </div>
 
 <style>
