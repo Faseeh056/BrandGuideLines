@@ -8,17 +8,11 @@
 		CardHeader,
 		CardTitle
 	} from '$lib/components/ui/card';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Separator } from '$lib/components/ui/separator';
 	import {
-		Upload,
 		Download,
 		Eye,
 		Palette,
 		Type,
-		MessageCircle,
 		Loader2,
 		CheckCircle,
 		AlertCircle,
@@ -26,7 +20,6 @@
 		Edit3,
 		Save,
 		X,
-		Trash2,
 		FileText,
 		Zap,
 		FileDown
@@ -39,6 +32,7 @@
 	import { downloadBrandGuidelinesPptx } from '$lib/utils/pptx-client';
 	import ProgressiveGenerator from '$lib/components/ProgressiveGenerator.svelte';
 	import ThemeSelect from '$lib/components/ThemeSelect.svelte';
+	import BrandBuilderChatbot from '$lib/components/BrandBuilderChatbot.svelte';
 
 	// Form fields
 	let brandName = '';
@@ -60,14 +54,12 @@
 	let showGuidelines = false;
 	let comprehensiveGuidelines: BrandGuidelinesSpec | null = null;
 	let errorMessage = '';
+	
+	// Component references
+	let progressiveGeneratorRef: ProgressiveGenerator;
+	let chatbotRef: BrandBuilderChatbot;
 
-	// Progressive generation state
-	let showProgressiveGenerator = false;
-	let savedGuidelineId: string | null = null;
-	let savedLogoPath: string | null = null;
-	let progressiveStepHistory: Array<{ step: string; content: string; approved: boolean }> = [];
-
-	// Expanded domain options (consolidated from both fields)
+	// Expanded domain options (consolidated from both fields) - MUST BE BEFORE questions array
 	const domainOptions = [
 		'SaaS',
 		'Fintech',
@@ -94,6 +86,165 @@
 		'Beauty & Personal Care',
 		'Creative Agency & Design'
 	];
+
+	
+	const questions = [
+		// Brand Identity Questions
+		{ 
+			id: 'brandName', 
+			question: 'What is your brand name?', 
+			placeholder: 'Enter your brand name',
+			helper: 'This is the official name of your brand or company',
+			type: 'text',
+			required: true,
+			icon: '🏢',
+			getValue: () => brandName,
+			setValue: (val: string) => brandName = val,
+			suggestions: []
+		},
+		{ 
+			id: 'brandDomain', 
+			question: 'What industry does your brand operate in?', 
+			placeholder: 'Type your own or select from suggestions below',
+			helper: 'Choose from common industries or type your own',
+			type: 'text-with-suggestions',
+			required: true,
+			icon: '🎯',
+			getValue: () => brandDomain,
+			setValue: (val: string) => brandDomain = val,
+			suggestions: domainOptions
+		},
+		{ 
+			id: 'shortDescription', 
+			question: 'Briefly describe what your brand does', 
+			placeholder: 'Tell us about your brand and what makes it unique...',
+			helper: 'A few sentences about your brand\'s purpose and offerings',
+			type: 'textarea',
+			required: true,
+			icon: '📝',
+			getValue: () => shortDescription,
+			setValue: (val: string) => shortDescription = val,
+			suggestions: []
+		},
+		{ 
+			id: 'brandValues', 
+			question: 'What are your brand\'s core values and mission?', 
+			placeholder: 'Describe your brand\'s values, mission, and what makes you unique...',
+			helper: 'Help us understand your brand\'s purpose and personality',
+			type: 'textarea',
+			required: false,
+			icon: '💎',
+			getValue: () => brandValues,
+			setValue: (val: string) => brandValues = val,
+			suggestions: []
+		},
+		// Brand Positioning Questions
+		{ 
+			id: 'selectedMood', 
+			question: 'How should your brand feel and communicate?', 
+			placeholder: 'Type your own or select from suggestions below',
+			helper: 'Choose a mood or describe your own brand personality',
+			type: 'text-with-suggestions',
+			required: false,
+			icon: '🎨',
+			getValue: () => selectedMood,
+			setValue: (val: string) => selectedMood = val,
+			suggestions: mockMoodOptions
+		},
+		{ 
+			id: 'selectedAudience', 
+			question: 'Who is your target audience?', 
+			placeholder: 'Type your own or select from suggestions below',
+			helper: 'Choose from common audiences or describe your own',
+			type: 'text-with-suggestions',
+			required: false,
+			icon: '👥',
+			getValue: () => selectedAudience,
+			setValue: (val: string) => selectedAudience = val,
+			suggestions: mockTargetAudiences
+		},
+		// Contact Information - Individual Questions
+		{ 
+			id: 'contactName', 
+			question: 'What is your contact name?', 
+			placeholder: 'e.g., John Doe',
+			helper: 'Your full name for the brand guidelines',
+			type: 'text',
+			required: false,
+			icon: '👤',
+			getValue: () => contactName,
+			setValue: (val: string) => contactName = val,
+			suggestions: []
+		},
+		{ 
+			id: 'contactEmail', 
+			question: 'What is your contact email?', 
+			placeholder: 'e.g., john@company.com',
+			helper: 'Your email address',
+			type: 'email',
+			required: false,
+			icon: '📧',
+			getValue: () => contactEmail,
+			setValue: (val: string) => contactEmail = val,
+			suggestions: []
+		},
+		{ 
+			id: 'contactRole', 
+			question: 'What is your role?', 
+			placeholder: 'e.g., Marketing Manager',
+			helper: 'Your position or role in the company',
+			type: 'text',
+			required: false,
+			icon: '💼',
+			getValue: () => contactRole,
+			setValue: (val: string) => contactRole = val,
+			suggestions: []
+		},
+		{ 
+			id: 'contactCompany', 
+			question: 'What is your company name?', 
+			placeholder: 'e.g., Acme Corp',
+			helper: 'The name of your company or organization',
+			type: 'text',
+			required: false,
+			icon: '🏢',
+			getValue: () => contactCompany,
+			setValue: (val: string) => contactCompany = val,
+			suggestions: []
+		},
+		// Additional Details Question
+		{ 
+			id: 'customPrompt', 
+			question: 'Any additional requirements or preferences?', 
+			placeholder: 'Taglines, style preferences, color inspirations, specific requirements...',
+			helper: 'Share any additional details that would help us create your brand guidelines',
+			type: 'textarea',
+			required: false,
+			icon: '✨',
+			getValue: () => customPrompt,
+			setValue: (val: string) => customPrompt = val,
+			suggestions: []
+		},
+		// Logo Upload Question
+		{ 
+			id: 'logo', 
+			question: 'Do you have a logo to upload?', 
+			placeholder: '',
+			helper: 'Upload your existing logo or skip to generate one with AI',
+			type: 'logo',
+			required: false,
+			icon: '🖼️',
+			getValue: () => logoPreview,
+			setValue: () => {}, // Handled by upload function
+			suggestions: []
+		}
+	];
+
+	// Progressive generation state
+	let showProgressiveGenerator = false;
+	let savedGuidelineId: string | null = null;
+	let savedLogoPath: string | null = null;
+	let progressiveStepHistory: Array<{ step: string; content: string; approved: boolean }> = [];
 
 	async function handleLogoUpload(event: Event) {
 		const target = event.target as HTMLInputElement;
@@ -194,6 +345,11 @@
 		savedGuidelineId = null;
 		savedLogoPath = null;
 		progressiveStepHistory = [];
+	}
+	
+	// Check if we can generate (all required questions answered)
+	function canGenerate(): boolean {
+		return brandName.trim() !== '' && brandDomain !== '' && shortDescription.trim() !== '';
 	}
 
 	function exportAsPDFFile() {
@@ -364,7 +520,48 @@ ${customPrompt}`;
 		}
 	}
 
-	function handleProgressiveGeneration() {
+	function handleProgressiveGeneration(chatData?: any) {
+		// If called from chatbot, populate form fields
+		if (chatData) {
+			brandName = chatData.brandName || brandName;
+			brandDomain = chatData.brandDomain || brandDomain;
+			shortDescription = chatData.shortDescription || shortDescription;
+			brandValues = chatData.brandValues || brandValues;
+			selectedMood = chatData.selectedMood || selectedMood;
+			selectedAudience = chatData.selectedAudience || selectedAudience;
+			customPrompt = chatData.customPrompt || customPrompt;
+			
+			// Handle individual contact info fields
+			contactName = chatData.contactName || contactName;
+			contactEmail = chatData.contactEmail || contactEmail;
+			contactRole = chatData.contactRole || contactRole;
+			contactCompany = chatData.contactCompany || contactCompany;
+			
+			// Handle logo
+			if (chatData.logoData) {
+				// Check if it's an uploaded logo or AI-generated
+				if (chatData.logoData.type === 'ai-generated') {
+					// AI-generated logo - pass the flag to backend
+					logoFiles = [{
+						filename: 'ai-generated-logo.png',
+						filePath: '',
+						fileData: '',
+						usageTag: 'primary',
+						aiGenerated: true
+					}];
+				} else {
+					// Uploaded logo
+					logoPreview = chatData.logoData.fileData;
+					logoFiles = [{
+						filename: chatData.logoData.filename,
+						filePath: chatData.logoData.filePath,
+						fileData: chatData.logoData.fileData,
+						usageTag: 'primary'
+					}];
+				}
+			}
+		}
+		
 		// Validate required fields for progressive generation
 		if (!brandName || !brandDomain || !shortDescription) {
 			errorMessage =
@@ -375,6 +572,33 @@ ${customPrompt}`;
 		showProgressiveGenerator = true;
 		showGuidelines = false;
 		errorMessage = '';
+		
+		// Auto-start generation when chatbot-controlled
+		// Wait for component to mount
+		setTimeout(() => {
+			if (progressiveGeneratorRef) {
+				progressiveGeneratorRef.startProgressiveGeneration();
+			}
+		}, 100);
+	}
+	
+	// Wrapper functions for step approval/regeneration
+	function handleApproveStep(stepIndex: number) {
+		if (progressiveGeneratorRef) {
+			progressiveGeneratorRef.approveStep(stepIndex);
+		}
+	}
+	
+	function handleRegenerateStep(stepIndex: number, feedback: string) {
+		if (progressiveGeneratorRef) {
+			progressiveGeneratorRef.regenerateStep(stepIndex, feedback);
+		}
+	}
+	
+	function handleStepGenerated(step: any) {
+		if (chatbotRef) {
+			chatbotRef.handleStepGenerated(step);
+		}
 	}
 
 	function handleProgressiveComplete(data: {
@@ -1034,325 +1258,40 @@ ${customPrompt}`;
 	}
 </script>
 
-<div class="max-w-6xl">
-	<div class="mb-8">
-		<div class="flex items-center justify-between">
-			<div>
-				<h1 class="mb-2 text-3xl font-bold text-foreground">Brand Builder</h1>
-				<p class="text-muted-foreground">Create brand guidelines step-by-step with AI assistance</p>
+<!-- Enhanced Header with Gradient - Full Width -->
+<div class="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500/10 via-orange-600/5 to-transparent p-8 border border-orange-500/20">
+	<!-- Animated Background Elements -->
+	<div class="absolute inset-0 overflow-hidden pointer-events-none">
+		<div class="absolute -top-1/2 -right-1/2 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse"></div>
+		<div class="absolute -bottom-1/2 -left-1/2 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+	</div>
+	
+	<div class="relative flex items-center justify-between">
+		<div class="space-y-2">
+			<div class="flex items-center gap-3">
+				<div class="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20">
+					<Zap class="h-6 w-6 text-white" />
+				</div>
+				<h1 class="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Brand Builder</h1>
 			</div>
-			<div class="flex gap-2">
-				<Button variant="outline" size="sm" onclick={goToHistory}>
-					<History class="mr-2 h-4 w-4" />
-					View History
-				</Button>
-			</div>
+			<p class="text-muted-foreground text-lg ml-14">Create brand guidelines step-by-step with AI assistance</p>
+		</div>
+		<div class="flex gap-2">
+			<Button variant="outline" size="sm" onclick={goToHistory} class="border-orange-500/20 hover:bg-orange-500/10 hover:border-orange-500/40 transition-all duration-300">
+				<History class="mr-2 h-4 w-4" />
+				View History
+			</Button>
 		</div>
 	</div>
+</div>
 
-	<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
-		<!-- Form Section -->
-		<div class="space-y-6">
-			<Card>
-				<CardHeader>
-					<CardTitle class="flex items-center gap-2">
-						<Zap class="h-5 w-5 text-primary" />
-						Brand Information
-					</CardTitle>
-					<CardDescription>
-						Provide detailed brand information for AI-powered progressive guidelines generation
-					</CardDescription>
-				</CardHeader>
-				<CardContent class="space-y-6">
-					<div class="space-y-6">
-							<!-- Brand Identity Section -->
-							<div class="space-y-4">
-								<div class="mb-3 flex items-center gap-2">
-									<div class="h-2 w-2 rounded-full bg-primary"></div>
-									<h3 class="text-lg font-semibold text-foreground">Brand Identity</h3>
-								</div>
-
-								<div class="space-y-2">
-									<Label for="brand-name">Brand Name *</Label>
-									<Input
-										id="brand-name"
-										name="brandName"
-										bind:value={brandName}
-										placeholder="Enter your brand name"
-										required
-										class="text-base"
-									/>
-									<p class="text-xs text-muted-foreground">The official name of your brand or company</p>
-								</div>
-
-								<div class="space-y-2">
-									<Label for="brand-domain">Brand Domain *</Label>
-									<ThemeSelect
-										id="brand-domain"
-										name="brandDomain"
-										bind:value={brandDomain}
-										placeholder="Select your brand domain"
-										options={domainOptions}
-										required
-									/>
-									<p class="text-xs text-muted-foreground">
-										This determines the specialized AI adaptations and industry-specific guidelines
-									</p>
-								</div>
-
-								<div class="space-y-2">
-									<Label for="short-description">Short Description *</Label>
-									<Textarea
-										id="short-description"
-										name="shortDescription"
-										bind:value={shortDescription}
-										placeholder="Brief description of your brand and what you do..."
-										rows={3}
-										required
-									/>
-								</div>
-
-								<div class="space-y-2">
-									<Label for="brand-values">Brand Values & Mission Statement</Label>
-									<Textarea
-										id="brand-values"
-										name="brandValues"
-										bind:value={brandValues}
-										placeholder="Describe your brand's core values, mission, and what makes you unique..."
-										rows={4}
-									/>
-									<p class="text-xs text-muted-foreground">
-										Help us understand your brand's purpose and personality
-									</p>
-								</div>
-							</div>
-
-							<Separator />
-
-							<!-- Brand Positioning Section -->
-							<div class="space-y-4">
-								<div class="mb-3 flex items-center gap-2">
-									<div class="h-2 w-2 rounded-full bg-primary"></div>
-									<h3 class="text-lg font-semibold text-foreground">Brand Positioning</h3>
-								</div>
-
-								<div class="space-y-2">
-									<Label for="mood">Brand Mood & Personality</Label>
-									<ThemeSelect
-										id="mood"
-										name="mood"
-										bind:value={selectedMood}
-										placeholder="Select brand mood"
-										options={mockMoodOptions}
-									/>
-									<p class="text-xs text-muted-foreground">How should your brand feel and communicate?</p>
-								</div>
-
-								<div class="space-y-2">
-									<Label for="audience">Target Audience</Label>
-									<ThemeSelect
-										id="audience"
-										name="audience"
-										bind:value={selectedAudience}
-										placeholder="Select target audience"
-										options={mockTargetAudiences}
-									/>
-									<p class="text-xs text-muted-foreground">Who are your primary customers or users?</p>
-								</div>
-							</div>
-
-							<Separator />
-
-							<!-- Contact Information Section -->
-							<div class="space-y-4">
-								<div class="mb-3 flex items-center gap-2">
-									<div class="h-2 w-2 rounded-full bg-accent"></div>
-									<h3 class="text-lg font-semibold text-foreground">Contact Information</h3>
-								</div>
-
-								<div class="grid grid-cols-2 gap-4">
-									<div class="space-y-2">
-										<Label for="contact-name">Contact Name</Label>
-										<Input
-											id="contact-name"
-											name="contactName"
-											bind:value={contactName}
-											placeholder="John Doe"
-										/>
-									</div>
-
-									<div class="space-y-2">
-										<Label for="contact-email">Contact Email</Label>
-										<Input
-											id="contact-email"
-											name="contactEmail"
-											bind:value={contactEmail}
-											placeholder="john@company.com"
-											type="email"
-										/>
-									</div>
-								</div>
-
-								<div class="grid grid-cols-2 gap-4">
-									<div class="space-y-2">
-										<Label for="contact-role">Role</Label>
-										<Input
-											id="contact-role"
-											name="contactRole"
-											bind:value={contactRole}
-											placeholder=""
-										/>
-									</div>
-
-									<div class="space-y-2">
-										<Label for="contact-company">Company</Label>
-										<Input
-											id="contact-company"
-											name="contactCompany"
-											bind:value={contactCompany}
-											placeholder=""
-										/>
-									</div>
-								</div>
-							</div>
-
-							<Separator />
-
-							<!-- Additional Details Section -->
-							<div class="space-y-4">
-								<div class="mb-3 flex items-center gap-2">
-									<div class="h-2 w-2 rounded-full bg-accent"></div>
-									<h3 class="text-lg font-semibold text-foreground">Additional Details</h3>
-								</div>
-
-								<div class="space-y-2">
-									<Label for="custom-prompt">Custom Brand Description & Requirements</Label>
-									<Textarea
-										id="custom-prompt"
-										name="customPrompt"
-										bind:value={customPrompt}
-										placeholder="Describe your brand vision, style preferences, tagline ideas, or any specific requirements for the brand guidelines..."
-										rows={4}
-									/>
-									<p class="text-xs text-muted-foreground">
-										Include taglines, style preferences, color inspirations, or any specific
-										requirements
-									</p>
-								</div>
-							</div>
-						</div>
-				</CardContent>
-			</Card>
-
-			<Card>
-				<CardHeader>
-					<CardTitle>Logo</CardTitle>
-					<CardDescription>Upload existing logo or let AI generate one for you</CardDescription>
-				</CardHeader>
-				<CardContent class="space-y-4">
-					{#if logoPreview}
-						<!-- Logo Preview -->
-						<div class="relative rounded-lg border border-border p-4">
-							<div class="mb-3 flex items-center justify-between">
-								<h4 class="text-sm font-medium text-foreground">Logo Preview</h4>
-								<Button
-									variant="ghost"
-									size="sm"
-									onclick={removeLogo}
-									class="text-destructive hover:text-destructive"
-								>
-									<Trash2 class="h-4 w-4" />
-								</Button>
-							</div>
-							<div class="flex justify-center">
-								<img
-									src={logoPreview}
-									alt="Brand Logo"
-									class="max-h-32 max-w-full object-contain"
-								/>
-							</div>
-							<p class="mt-2 text-center text-xs text-muted-foreground">Brand Logo Analysis</p>
-						</div>
-
-						<!-- Logo Analysis Section -->
-						<div class="mt-4 rounded-lg border border-primary/20 bg-primary/10 p-4">
-							<h4 class="mb-3 text-sm font-semibold text-primary">Logo Analysis</h4>
-							<div class="text-sm leading-relaxed text-primary">
-								<p class="mb-3">
-									<strong>Visual Elements:</strong> The logo features a modern, clean design with geometric
-									shapes and contemporary typography. The composition suggests professionalism and innovation.
-								</p>
-								<p class="mb-3">
-									<strong>Color Palette:</strong> The design incorporates a sophisticated color scheme
-									that conveys trust, reliability, and forward-thinking approach. The colors work harmoniously
-									to create visual impact.
-								</p>
-								<p class="mb-3">
-									<strong>Typography:</strong> The font choice reflects modern sensibilities with clean
-									lines and excellent readability across different sizes and applications.
-								</p>
-								<p>
-									<strong>Brand Personality:</strong> This logo evokes a sense of professionalism, innovation,
-									and trustworthiness - perfect for establishing credibility in your target market.
-								</p>
-							</div>
-						</div>
-					{:else}
-						<!-- Upload Area -->
-						<div class="rounded-lg border-2 border-dashed border-border p-6 text-center">
-							<Upload class="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-							<div class="space-y-2">
-								<p class="text-sm font-medium text-foreground">Upload your logo</p>
-								<p class="text-xs text-muted-foreground">PNG, JPG, SVG up to 5MB</p>
-							</div>
-							<input
-								id="logo-upload"
-								type="file"
-								class="mt-4 block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
-								accept="image/*"
-								onchange={handleLogoUpload}
-							/>
-						</div>
-					{/if}
-
-					<div class="text-center">
-						<p class="mb-2 text-sm text-muted-foreground">or</p>
-						<Button variant="outline" class="w-full">Generate Logo with AI</Button>
-					</div>
-				</CardContent>
-			</Card>
-
-			<div class="space-y-3">
-				<Button
-					class="w-full"
-					size="lg"
-					onclick={handleProgressiveGeneration}
-					disabled={!brandName.trim() || !brandDomain || !shortDescription.trim()}
-				>
-					<Zap class="mr-2 h-4 w-4" />
-					Generate Brand Guidelines
-				</Button>
-			</div>
-
-			{#if !brandName.trim() || !brandDomain || !shortDescription.trim()}
-				<div class="text-center">
-					<p class="text-sm text-muted-foreground">
-						{#if !brandName.trim()}
-							Brand name is required
-						{:else if !brandDomain}
-							Brand domain is required
-						{:else if !shortDescription.trim()}
-							Short description is required
-						{/if}
-					</p>
-				</div>
-			{/if}
-		</div>
-
-		<!-- Preview Section -->
-		<div class="space-y-6">
+<div class="flex justify-end pr-6 lg:pr-12">
+	<div class="grid grid-cols-1 gap-8 lg:grid-cols-2 items-start max-w-[1400px]">
+		<!-- Brand Guidelines Generator (Left Side) -->
+		<div class="space-y-6 h-[1000px]">
 			{#if showProgressiveGenerator}
 				<ProgressiveGenerator
+					bind:this={progressiveGeneratorRef}
 					brandInput={{
 						brand_name: brandName,
 						brand_domain: brandDomain,
@@ -1373,19 +1312,23 @@ ${customPrompt}`;
 					}}
 					{logoFiles}
 					onComplete={handleProgressiveComplete}
+					chatbotControlled={true}
+					onStepGenerated={handleStepGenerated}
 				/>
 			{:else if errorMessage}
-				<Card>
+				<Card class="border-destructive/20 shadow-lg bg-destructive/5 backdrop-blur-sm h-full w-[650px]">
 					<CardContent class="p-6">
-						<div class="flex items-start gap-3">
-							<AlertCircle class="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" />
-							<div>
-								<h3 class="text-sm font-medium text-destructive">Generation Error</h3>
-								<p class="mt-1 text-sm text-destructive">{errorMessage}</p>
+						<div class="flex items-start gap-4">
+							<div class="p-3 rounded-full bg-destructive/20">
+								<AlertCircle class="h-6 w-6 text-destructive" />
+							</div>
+							<div class="flex-1">
+								<h3 class="text-base font-semibold text-destructive mb-2">Generation Error</h3>
+								<p class="text-sm text-destructive/90 mb-4">{errorMessage}</p>
 								<Button
 									variant="outline"
 									size="sm"
-									class="mt-3"
+									class="border-destructive/30 hover:bg-destructive/10"
 									onclick={() => {
 										errorMessage = '';
 										showGuidelines = false;
@@ -1399,41 +1342,86 @@ ${customPrompt}`;
 				</Card>
 		{:else if showGuidelines && comprehensiveGuidelines}
 			<!-- Brand guidelines completed -->
-			<Card>
-				<CardContent class="p-8 text-center">
-					<CheckCircle class="mx-auto mb-4 h-16 w-16 text-primary" />
-					<h2 class="mb-2 text-2xl font-bold text-foreground">
+			<Card class="border-orange-500/20 shadow-xl bg-gradient-to-br from-orange-500/5 to-transparent backdrop-blur-sm relative overflow-hidden h-full w-[650px]">
+				<!-- Animated Success Background -->
+				<div class="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-orange-600/10"></div>
+				<div class="absolute top-0 right-0 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl animate-pulse"></div>
+				
+				<CardContent class="relative p-8 text-center">
+					<div class="mb-6 inline-flex p-4 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 animate-bounce">
+						<CheckCircle class="h-16 w-16 text-orange-500" />
+					</div>
+					<h2 class="mb-3 text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
 						Brand Guidelines Created Successfully!
 					</h2>
-					<p class="mb-6 text-muted-foreground">
+					<p class="mb-8 text-base text-muted-foreground max-w-lg mx-auto">
 						Your brand guidelines have been generated and saved. You can view them in your history or download as PowerPoint.
 					</p>
-					<div class="flex justify-center gap-4">
-						<Button onclick={() => goto('/dashboard/history')} size="lg">
+					<div class="flex flex-col sm:flex-row justify-center gap-3">
+						<Button 
+							onclick={() => goto('/dashboard/history')} 
+							size="lg"
+							class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 transition-all duration-300"
+						>
 							<History class="mr-2 h-5 w-5" />
 							View in History
 						</Button>
-						<Button variant="outline" onclick={handleDownloadPptx} size="lg">
+						<Button 
+							variant="outline" 
+							onclick={handleDownloadPptx} 
+							size="lg"
+							class="border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500/50 transition-all duration-300"
+						>
 							<FileDown class="mr-2 h-5 w-5" />
 							Download PowerPoint
 						</Button>
-						<Button variant="outline" onclick={resetForm} size="lg">
+						<Button 
+							variant="outline" 
+							onclick={resetForm} 
+							size="lg"
+							class="border-border/50 hover:bg-muted transition-all duration-300"
+						>
 							Create New Guidelines
 						</Button>
 					</div>
 				</CardContent>
 			</Card>
 			{:else}
-				<Card class="flex h-96 items-center justify-center">
-					<div class="text-center text-muted-foreground">
-						<Zap class="mx-auto mb-4 h-16 w-16 opacity-50" />
-						<p class="mb-2 text-lg font-medium">Brand Guidelines Preview</p>
-						<p class="text-sm">
-							Fill out the form and click "Generate" to see your AI-generated brand guidelines
+				<Card class="flex h-full w-[650px] items-center justify-center border-border/50 shadow-lg bg-card/50 backdrop-blur-sm relative overflow-hidden group">
+					<!-- Animated Background -->
+					<div class="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-orange-600/5"></div>
+					<div class="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
+					<div class="absolute bottom-0 left-0 w-64 h-64 bg-orange-600/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000" style="animation-delay: 0.5s;"></div>
+					
+					<div class="relative text-center text-muted-foreground p-8">
+						<div class="mb-6 inline-flex p-5 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 group-hover:scale-110 transition-transform duration-300">
+							<Zap class="h-16 w-16 text-orange-500 animate-pulse" />
+						</div>
+						<p class="mb-3 text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Brand Guidelines Generator</p>
+						<p class="text-base text-muted-foreground max-w-md">
+							Answer the questions in the chat to start generating your AI-powered brand guidelines
 						</p>
+						<div class="mt-6 flex justify-center gap-2">
+							<div class="h-2 w-2 rounded-full bg-orange-500 animate-bounce"></div>
+							<div class="h-2 w-2 rounded-full bg-orange-500 animate-bounce" style="animation-delay: 0.1s;"></div>
+							<div class="h-2 w-2 rounded-full bg-orange-500 animate-bounce" style="animation-delay: 0.2s;"></div>
+						</div>
 					</div>
 				</Card>
 			{/if}
+		</div>
+
+		<!-- Chatbot Interface (Right Side) -->
+		<div class="space-y-6">
+			<BrandBuilderChatbot
+				bind:this={chatbotRef}
+				{questions}
+				onComplete={handleProgressiveGeneration}
+				{canGenerate}
+				totalSteps={7}
+				onApproveStep={handleApproveStep}
+				onRegenerateStep={handleRegenerateStep}
+			/>
 		</div>
 	</div>
 </div>

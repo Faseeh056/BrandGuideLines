@@ -19,6 +19,22 @@
 	export let canRevert: boolean = false;
 	export let readOnly: boolean = false;
 	
+	// Navigation props
+	export let showNavigationButtons: boolean = false;
+	export let onPrevious: () => void = () => {};
+	export let onNext: () => void = () => {};
+	export let canGoNext: boolean = false;
+	export let canGoPrevious: boolean = false;
+	export let showCompleteButton: boolean = false;
+	export let onComplete: () => void = () => {};
+	
+	// Progress indicator props
+	export let showProgressIndicator: boolean = false;
+	export let currentStep: number = 1;
+	export let totalSteps: number = 7;
+	export let progressPercentage: number = 0;
+	export let allSteps: Array<{ title: string; description: string; isApproved: boolean; isCurrent: boolean }> = [];
+	
 	// Internal state for feedback
 	let showFeedback = false;
 	let userFeedback = '';
@@ -470,13 +486,32 @@
 
 <Card class="step-slide">
 	<CardHeader>
-		<CardTitle class="flex items-center gap-2 step-title">
-			<span>{stepTitle}</span>
-			{#if isGenerating}
-				<Loader2 class="h-4 w-4 animate-spin" />
-			{/if}
-		</CardTitle>
-		<p class="step-description">{stepDescription}</p>
+		<!-- Progress Indicator Inside Card -->
+		{#if showProgressIndicator}
+			<div class="flex items-center justify-between pb-4 border-b border-border/50 mb-4">
+				<div class="text-sm font-medium text-muted-foreground">Step {currentStep} of {totalSteps}</div>
+				<span class="text-sm font-medium text-orange-500">{progressPercentage}% Complete</span>
+			</div>
+			
+			<!-- Progress Bar -->
+			<div class="relative h-1.5 bg-muted/30 rounded-full overflow-hidden mb-4">
+				<div 
+					class="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500 ease-out shadow-lg shadow-orange-500/50"
+					style="width: {progressPercentage}%"
+				></div>
+			</div>
+		{/if}
+		
+		<!-- Step Title with Glowing Border -->
+		<div class="p-4 rounded-xl border-2 border-orange-500/40 bg-gradient-to-br from-orange-500/5 to-transparent shadow-lg shadow-orange-500/20">
+			<CardTitle class="flex items-center gap-2 step-title">
+				<span>{stepTitle}</span>
+				{#if isGenerating}
+					<Loader2 class="h-4 w-4 animate-spin" />
+				{/if}
+			</CardTitle>
+			<p class="step-description mt-2">{stepDescription}</p>
+		</div>
 	</CardHeader>
 	<CardContent>
 		{#if stepData}
@@ -1741,25 +1776,70 @@
 			{#if !readOnly && !showFeedback}
 				<div class="approval-actions">
 					{#if !isApproved && showApproveButton}
-						<Button onclick={handleApprove} class="approve-btn">
+						<Button onclick={handleApprove} class="approve-btn bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/30">
 							<ThumbsUp class="mr-2 h-4 w-4" />
 							Approve & Continue
 						</Button>
-						<Button variant="outline" onclick={handleEdit} class="reject-btn">
+						<Button variant="outline" onclick={handleEdit} class="reject-btn border-border/50 hover:bg-muted">
 							<ThumbsDown class="mr-2 h-4 w-4" />
 							Request Changes
 						</Button>
 					{:else if isApproved || (!showApproveButton && !isGenerating)}
-						<Button variant="outline" onclick={handleEdit} class="edit-btn">
+						<Button variant="outline" onclick={handleEdit} class="edit-btn border-border/50 hover:bg-muted">
 							<Edit class="mr-2 h-4 w-4" />
 							Edit This Step
 						</Button>
 						{#if canRevert}
-							<Button variant="outline" onclick={handleRevert} class="revert-btn">
+							<Button variant="outline" onclick={handleRevert} class="revert-btn border-border/50 hover:bg-muted">
 								<RefreshCw class="mr-2 h-4 w-4" />
 								Revert to Previous
 							</Button>
 						{/if}
+					{/if}
+				</div>
+			{/if}
+			
+			<!-- Navigation Buttons -->
+			{#if showNavigationButtons && !showFeedback}
+				<div class="flex items-center justify-between gap-4 pt-6 border-t border-border/50 mt-6">
+					<Button
+						variant="outline"
+						size="lg"
+						onclick={onPrevious}
+						disabled={!canGoPrevious}
+						class="flex-1 border-border/50 hover:bg-muted transition-all duration-300 disabled:opacity-50"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="m15 18-6-6 6-6"/></svg>
+						Previous
+					</Button>
+					
+					{#if showCompleteButton}
+						<Button
+							size="lg"
+							onclick={onComplete}
+							class="flex-1 group relative overflow-hidden bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 transition-all duration-300"
+						>
+							<div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+							<CheckCircle class="mr-2 h-5 w-5" />
+							<span class="text-base font-semibold">Save Brand Guidelines</span>
+						</Button>
+					{:else if canGoNext}
+						<Button
+							size="lg"
+							onclick={onNext}
+							class="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/30 transition-all duration-300"
+						>
+							Next
+							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-2"><path d="m9 18 6-6-6-6"/></svg>
+						</Button>
+					{:else}
+						<Button
+							size="lg"
+							disabled
+							class="flex-1 opacity-50"
+						>
+							Approve step to continue
+						</Button>
 					{/if}
 				</div>
 			{/if}

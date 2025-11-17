@@ -20,6 +20,8 @@
 	export let brandInput: BrandGuidelinesInput;
 	export let logoFiles: Array<{ filename: string; fileData: string; usageTag: string }> = [];
 	export let onComplete: (guidelines: any) => void;
+	export let chatbotControlled: boolean = false; // If true, chatbot handles approval
+	export let onStepGenerated: ((step: any) => void) | null = null; // Callback when step is generated
 
 	// Progressive generation state - store all generated steps
 	interface GeneratedStep {
@@ -36,6 +38,9 @@
 	let generatedSteps: GeneratedStep[] = [];
 	let isGeneratingNewStep = false;
 	let hasStarted = false;
+	
+	// Navigation state - which step is currently visible
+	let currentStepIndex = 0;
 
 	// Available step definitions (without final-review)
 	let stepDefinitions = [
@@ -123,7 +128,24 @@
 	async function startProgressiveGeneration() {
 		hasStarted = true;
 		generatedSteps = [];
+		currentStepIndex = 0;
 		await generateNextStep();
+	}
+	
+	// Export function for external calls
+	export { startProgressiveGeneration, approveStep, regenerateStep };
+	
+	// Navigation functions
+	function nextStepNavigation() {
+		if (currentStepIndex < generatedSteps.length - 1) {
+			currentStepIndex++;
+		}
+	}
+	
+	function prevStepNavigation() {
+		if (currentStepIndex > 0) {
+			currentStepIndex--;
+		}
 	}
 
 	async function generateNextStep() {
@@ -139,6 +161,7 @@
 		const stepInfo = getStepInfo(nextStepDef.id);
 
 		// Add a placeholder for the new step
+		const newStepIndex = generatedSteps.length;
 		generatedSteps = [
 			...generatedSteps,
 			{
@@ -152,6 +175,22 @@
 				hasBeenEdited: false
 			}
 		];
+		
+		// Focus the generator view on the newly created step
+		currentStepIndex = newStepIndex;
+		
+		// Notify chatbot if in chatbot-controlled mode (show generating state)
+		if (chatbotControlled && onStepGenerated) {
+			onStepGenerated({
+				stepId: nextStepDef.id,
+				stepTitle: stepInfo.title,
+				stepDescription: stepInfo.description,
+				content: null,
+				stepIndex: newStepIndex,
+				isGenerating: true,
+				isApproved: false
+			});
+		}
 
 		try {
 			const response = await fetch('/api/brand-guidelines/progressive', {
@@ -199,6 +238,20 @@
 					hasContent: !!generatedSteps[generatedSteps.length - 1]?.content,
 					contentType: typeof generatedSteps[generatedSteps.length - 1]?.content
 				});
+				
+				// Notify chatbot if in chatbot-controlled mode
+				if (chatbotControlled && onStepGenerated) {
+					const newStep = generatedSteps[generatedSteps.length - 1];
+					onStepGenerated({
+						stepId: newStep.stepId,
+						stepTitle: newStep.stepTitle,
+						stepDescription: newStep.stepDescription,
+						content: newStep.content,
+						stepIndex: generatedSteps.length - 1,
+						isGenerating: false,
+						isApproved: false
+					});
+				}
 			} else {
 				throw new Error(result.error || 'Failed to generate step');
 			}
@@ -219,12 +272,30 @@
 			idx === stepIndex ? { ...s, isApproved: true } : s
 		);
 		
-		// Just generate the next step if there are more
+		// Notify chatbot about approval update
+		if (chatbotControlled && onStepGenerated && generatedSteps[stepIndex]) {
+			const approvedStep = generatedSteps[stepIndex];
+			onStepGenerated({
+				stepId: approvedStep.stepId,
+				stepTitle: approvedStep.stepTitle,
+				stepDescription: approvedStep.stepDescription,
+				content: approvedStep.content,
+				stepIndex: stepIndex,
+				isGenerating: approvedStep.isGenerating,
+				isApproved: true
+			});
+		}
+		
+		// Generate next step if there are more
 		if (generatedSteps.length < stepDefinitions.length) {
 			await generateNextStep();
+			// Advance to the newly generated step
+			currentStepIndex = generatedSteps.length - 1;
 		} else {
-			// All steps generated, complete the process
-			await completeGeneration();
+			// All steps generated, advance to next (or complete)
+			if (currentStepIndex < generatedSteps.length - 1) {
+				currentStepIndex++;
+			}
 		}
 	}
 
@@ -270,6 +341,20 @@
 				generatedSteps = generatedSteps.map((s, idx) =>
 					idx === stepIndex ? { ...s, content: result.content, isGenerating: false } : s
 				);
+				
+				// Notify chatbot if in chatbot-controlled mode
+				if (chatbotControlled && onStepGenerated) {
+					const updatedStep = generatedSteps[stepIndex];
+					onStepGenerated({
+						stepId: updatedStep.stepId,
+						stepTitle: updatedStep.stepTitle,
+						stepDescription: updatedStep.stepDescription,
+						content: updatedStep.content,
+						stepIndex: stepIndex,
+						isGenerating: false,
+						isApproved: updatedStep.isApproved
+					});
+				}
 			} else {
 				throw new Error(result.error || 'Failed to regenerate step');
 			}
@@ -403,96 +488,75 @@
 	}
 </script>
 
-<div class="progressive-generator">
-	<!-- Progress Header -->
-	<div class="progress-header">
-		<div class="progress-info">
-			<h2 class="text-2xl font-bold text-foreground">Progressive Brand Guidelines Generation</h2>
-			<p class="text-muted-foreground">
-				Steps will appear one by one. Review and approve each to continue, or edit any step anytime.
-			</p>
-		</div>
-
-		{#if hasStarted}
-			<div class="progress-bar">
-				<div class="progress-track">
-					<div 
-						class="progress-fill" 
-						style="width: {getProgressPercentage()}%; transition: width 0.5s ease-in-out;"
-					></div>
-				</div>
-				<span class="progress-text">
-					{generatedSteps.filter(s => !s.isGenerating).length} of {stepDefinitions.length} steps complete ({getProgressPercentage()}%)
-				</span>
-			</div>
-		{/if}
-	</div>
-
+<div class="progressive-generator h-full">
 	{#if !hasStarted}
 		<!-- Start Button -->
-		<Card>
-			<CardContent class="p-8 text-center">
+		<Card class="border-border/50 shadow-lg bg-card/50 backdrop-blur-sm h-full w-[580px] flex flex-col">
+			<CardContent class="p-8 text-center flex-1 flex flex-col justify-center">
 				<div class="start-generation">
-					<p class="mb-4 text-muted-foreground">
+					<h2 class="text-2xl font-bold text-foreground mb-3">Progressive Brand Guidelines Generation</h2>
+					<p class="text-muted-foreground mb-6">
+						Steps will appear one by one. Review and approve each to continue, or edit any step anytime.
+					</p>
+					<div class="mb-6 inline-flex p-4 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10">
+						<ArrowRight class="h-12 w-12 text-orange-500" />
+					</div>
+					<p class="mb-6 text-base text-muted-foreground">
 						Ready to start generating your brand guidelines step by step?
 					</p>
-					<Button onclick={startProgressiveGeneration} class="start-btn">
-						<ArrowRight class="mr-2 h-4 w-4" />
+					<Button 
+						onclick={startProgressiveGeneration} 
+						class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/30"
+						size="lg"
+					>
+						<ArrowRight class="mr-2 h-5 w-5" />
 						Start Progressive Generation
 					</Button>
 				</div>
 			</CardContent>
 		</Card>
 	{:else}
-		<!-- Generated Steps Stack -->
-		<div class="generated-steps-stack">
-			{#each generatedSteps as step, index}
-				<div class="step-container" id="step-{index}">
-					{#if step.content || step.isGenerating}
-						<StepSlide
-							stepData={step.content}
-							stepTitle={step.stepTitle}
-							stepDescription={step.stepDescription}
-							stepId={step.stepId}
-							isGenerating={step.isGenerating}
-							onApprove={() => approveStep(index)}
-							onRegenerate={(feedback) => regenerateStep(index, feedback)}
-							onRevert={() => revertStep(index)}
-							{logoFiles}
-							stepIndex={index}
-							isLastStep={index === generatedSteps.length - 1 && !step.isGenerating}
-							isApproved={step.isApproved}
-							canRevert={step.hasBeenEdited && step.previousContent !== null}
-							showApproveButton={index === generatedSteps.length - 1 &&
-								!step.isGenerating &&
-								!step.isApproved &&
-								generatedSteps.length < stepDefinitions.length}
-						/>
-					{/if}
-				</div>
-			{/each}
-
-			<!-- Show completion button when all steps are done -->
-			{#if generatedSteps.length === stepDefinitions.length && !isGeneratingNewStep}
-				<div class="completion-section">
-					<Card>
-						<CardContent class="p-8 text-center">
-							<CheckCircle class="mx-auto mb-4 h-16 w-16 text-primary" />
-							<h3 class="mb-2 text-xl font-semibold text-foreground">
-								All Steps Complete!
-							</h3>
-							<p class="mb-6 text-muted-foreground">
-								Review your brand guidelines above. You can edit any step before saving.
-							</p>
-							<Button onclick={completeGeneration} class="complete-btn" size="lg">
-								<CheckCircle class="mr-2 h-5 w-5" />
-								Save Brand Guidelines
-							</Button>
-						</CardContent>
-					</Card>
-				</div>
-			{/if}
-		</div>
+		<!-- Single Step Display -->
+		{#if generatedSteps[currentStepIndex]}
+			{@const step = generatedSteps[currentStepIndex]}
+			<div class="single-step-view">
+				{#if step.content || step.isGenerating}
+					<StepSlide
+						stepData={step.content}
+						stepTitle={step.stepTitle}
+						stepDescription={step.stepDescription}
+						stepId={step.stepId}
+						isGenerating={step.isGenerating}
+						onApprove={() => approveStep(currentStepIndex)}
+						onRegenerate={(feedback) => regenerateStep(currentStepIndex, feedback)}
+						onRevert={() => revertStep(currentStepIndex)}
+						{logoFiles}
+						stepIndex={currentStepIndex}
+						isLastStep={currentStepIndex === stepDefinitions.length - 1}
+						isApproved={step.isApproved}
+						canRevert={step.hasBeenEdited && step.previousContent !== null}
+						showApproveButton={!step.isGenerating && !step.isApproved && !chatbotControlled}
+						readOnly={chatbotControlled}
+						showNavigationButtons={true}
+						onPrevious={prevStepNavigation}
+						onNext={nextStepNavigation}
+						canGoNext={step.isApproved && currentStepIndex < generatedSteps.length - 1}
+						canGoPrevious={currentStepIndex > 0}
+						showCompleteButton={currentStepIndex === stepDefinitions.length - 1 && generatedSteps.length === stepDefinitions.length && step.isApproved}
+						onComplete={completeGeneration}
+						showProgressIndicator={true}
+						currentStep={currentStepIndex + 1}
+						totalSteps={stepDefinitions.length}
+						progressPercentage={Math.round(((currentStepIndex + 1) / stepDefinitions.length) * 100)}
+						allSteps={stepDefinitions.map((stepDef, idx) => ({
+							...getStepInfo(stepDef.id),
+							isApproved: generatedSteps[idx]?.isApproved || false,
+							isCurrent: idx === currentStepIndex
+						}))}
+					/>
+				{/if}
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -500,7 +564,7 @@
 	.progressive-generator {
 		max-width: 1200px;
 		margin: 0 auto;
-		padding: 2rem;
+		padding: 0;
 	}
 
 	.progress-header {
