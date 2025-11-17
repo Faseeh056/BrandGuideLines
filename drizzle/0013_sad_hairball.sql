@@ -1,0 +1,1 @@
+ALTER TABLE "generated_slides" ALTER COLUMN "svelteContent" DROP NOT NULL;

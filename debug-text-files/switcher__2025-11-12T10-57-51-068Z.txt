@@ -1,0 +1,66 @@
+ï»¿MUHAMMAD FASEEH
+SOFTWARE DEVELOPER
+Lahore, Pakistan |  muhammadfaseeh565@gmail.com | LinkedIN  | Github  | +923184651645
+
+SUMMARY
+Iâm Muhammad Faseeh, a Computer Science graduate from Riphah International University, Lahore. Iâve built
+real-world projects across mobile and web platforms and AI, gaining hands-on experience through internships
+and student-led initiatives. My active involvement in tech communities and bootcamps has strengthened my
+leadership and collaboration skillsIâm committed to continuous learning with certifications in cloud, AI, and
+cybersecurity.
+EXPERIENCE
+Vanar, Game Developer Intern June 2024 - Aug 2024
+Designed and developed a knife-throwing game using Unity and C#.
+Implemented gameplay mechanics and object interactions to enhance user experience.
+Co Lead, AWS Learning club Riphah 2024 - 2025
+Managed and organized AWS-related events and workshops.
+Guided AWS certification and training sessions.
+Computing Society President, Riphah International University 2024 - 2025
+Managed and led the Computing Society as President, organizing tech events, coding
+competitions, and industry workshops.
+PR & Marketing, Codemo Teams 2024 - Present
+PR & MARKETING REPRESENTATIVE
+SKILLS
+Language & Frameworks:  Flutter, java, App dev,Game dev,  AI/Deep-learning  javascript
+DataBases:  MySQL & oracle, Firbase
+Tools: Git & GitHub, VS Code / IntelliJ / Android Studio, Google Colab / Jupyter, Figma / Canva
+Concepts: Data Structures & Algorithms, APIâs, Designing, cloud, Software development.
+Soft Skills: Communication & Leadership, Event & Project Management, critical thinking.
+PROJECTS
+Care Cub, Final year project Sep 2024 - July 2025
+Developed CareCub, a Flutter-based mobile application designed to support parents, doctors,
+and daycare centers in early child care. It features AI-powered cry analysis(using Yamnet
+deeplearning model), health tracking, milestone guidance, and appointment booking. My role
+included full-stack development, UI/UX design, and integrating Firebase services for real-time
+updates, secure authentication, and data management.
+Check it out here: https://github.com/Faseeh021/Care-Cub.git
+Knife Fury (C#) Aug 2024
+A Unity-based game developed in C# where players throw knives at a rotating wheel to break it
+and clear levels. Featuring seven dynamic mechanics like bidirectional rotation, increasing speed,
+horizontal movement, and disappearing targets, it challenges timing and precision. Designed with
+progressive difficulty and visual feedback, the game enhances engagement and showcases real-
+time physics, prefab handling, and level-based logic in Unity.
+Check it out here: https://github.com/Faseeh021/Knife-Fury.gitMadMate  â Flutter Fast Food Ordering App Jan 2024
+Fast food ordering platform with Firebase backend enables users to browse menus, place
+orders, and track delivery in real-time. Built using Flutter for the UI, it integrates Firebase for
+authentication and data storage, and Maps API for delivery navigation.
+Check it out here: https://github.com/Faseeh021/Fast-Food-App.git
+Pharmacy-Management-System-in-JAVA Jan 2024
+This project offers a complete solution for managing pharmacy operations, featuring user roles,
+billing, and inventory control. Built using Java Swing for the GUI, it ensures an interactive
+experience, with MySQL as the backend database to store and manage records efficiently.
+Check it out here: https://github.com/Faseeh021/Pharmacy-Management-System-in-JAVA.git
+EDUCATION
+Bachelor in Computer Science Oct 2021 - July 2025
+Riphah International University, Lahore
+CERTIFICATIONS
+Click links to View
+Object Oriented Programming in Java                                                                               (Coursera)
+Building a Dynamic Web App using PHP & MySQL                                                            (Coursera)
+Ordered Data Structures                                                                                                      (Coursera)
+Generative AI                                                                                                                         (Coursera)
+Introduction to Artificial Intelligence (AI)                                                                           (Coursera)
+Internship in Game Development                                                                                              (Vanar)
+Site Reliability Engineering: Measuring and Managing Reliability                                      (Google)
+AWS Academy Cloud Architecting                     (Amazon WebServices Training and Certification)
+Connect and Protect: Networks and Network Security                                                    (Coursera)

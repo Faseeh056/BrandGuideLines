@@ -480,7 +480,7 @@ export async function POST({ request }) {
       }
     } else {
       console.warn('⚠️ No screenshot available for annotation - ScreenshotAnnotator requires a screenshot file');
-      console.warn('💡 Screenshot generation requires Chrome/Puppeteer. Element positions are still available.');
+      console.warn('💡 Screenshot generation requires Chrome/Playwright. Element positions are still available.');
     }
     
     // Use visual report if available, otherwise use basic audit results
