@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { db } from '$lib/db';
 import { brandGuidelines } from '$lib/db/schema';
 import { generateComprehensiveBrandGuidelines } from '$lib/services/gemini';
+import { performGroundingSearch } from '$lib/services/grounding-search';
 import { PowerPointGenerator } from '$lib/services/powerpoint-generator';
 import { AssetsGenerator } from '$lib/services/assets-generator';
 import type { RequestHandler } from './$types';
@@ -83,8 +84,31 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				console.log('Progressive generation - skipping comprehensive AI generation, using step history directly');
 			} else {
 				console.log('No stepHistory found - generating comprehensive brand guidelines');
+				
+				// Perform grounding search before generating comprehensive guidelines
+				let groundingData;
+				if (input.brand_domain) {
+					console.log('🔍 Starting grounding search for comprehensive generation:', input.brand_domain);
+					try {
+						const groundingResult = await performGroundingSearch(input.brand_domain);
+						groundingData = {
+							summary: groundingResult.summary,
+							keyFindings: groundingResult.keyFindings,
+							websites: groundingResult.websites.map(w => ({
+								url: w.url,
+								title: w.title,
+								extractedFacts: w.extractedFacts
+							}))
+						};
+						console.log('✅ Grounding search completed for comprehensive generation');
+					} catch (error) {
+						console.error('⚠️ Grounding search failed, continuing without it:', error);
+						groundingData = undefined;
+					}
+				}
+				
 				// Generate comprehensive brand guidelines (legacy path)
-				const brandGuidelinesSpec = await generateComprehensiveBrandGuidelines(input);
+				const brandGuidelinesSpec = await generateComprehensiveBrandGuidelines(input, groundingData);
 				structuredDataToSave = brandGuidelinesSpec;
 				contentToSave = JSON.stringify(brandGuidelinesSpec);
 			}
@@ -275,8 +299,30 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		};
 
+		// Perform grounding search before generating comprehensive guidelines
+		let groundingData;
+		if (brandDomain) {
+			console.log('🔍 Starting grounding search for comprehensive generation:', brandDomain);
+			try {
+				const groundingResult = await performGroundingSearch(brandDomain);
+				groundingData = {
+					summary: groundingResult.summary,
+					keyFindings: groundingResult.keyFindings,
+					websites: groundingResult.websites.map(w => ({
+						url: w.url,
+						title: w.title,
+						extractedFacts: w.extractedFacts
+					}))
+				};
+				console.log('✅ Grounding search completed for comprehensive generation');
+			} catch (error) {
+				console.error('⚠️ Grounding search failed, continuing without it:', error);
+				groundingData = undefined;
+			}
+		}
+		
 		// Generate comprehensive brand guidelines
-		const brandGuidelinesSpec = await generateComprehensiveBrandGuidelines(input);
+		const brandGuidelinesSpec = await generateComprehensiveBrandGuidelines(input, groundingData);
 
 		// Build complete contact info object
 		const contactInfo = {

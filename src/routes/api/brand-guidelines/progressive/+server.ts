@@ -7,6 +7,8 @@ import {
 	extractColorsFromLogo, 
 	convertExtractedColorsToProgressiveFormat
 } from '$lib/services/color-extraction';
+import { generateProfessionalIcon } from '$lib/services/icon-generator-service';
+import { performGroundingSearch } from '$lib/services/grounding-search';
 import {
 	COMMON_GENERATION_STEPS,
 	type GenerationStep,
@@ -184,6 +186,34 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		const description = previousSteps?.short_description || previousSteps?.description || '';
 		const values = previousSteps?.brandValues || previousSteps?.values || '';
 		
+		// Perform grounding search if this is the first step (brand-positioning) and we have industry
+		// Also check if grounding data already exists in previousSteps (cached)
+		let groundingData = (previousSteps as any)?.groundingData;
+		
+		if (step === 'brand-positioning' && industry && !groundingData) {
+			console.log('🔍 Starting grounding search for industry:', industry);
+			try {
+				const groundingResult = await performGroundingSearch(industry);
+				groundingData = {
+					summary: groundingResult.summary,
+					keyFindings: groundingResult.keyFindings,
+					websites: groundingResult.websites.map(w => ({
+						url: w.url,
+						title: w.title,
+						extractedFacts: w.extractedFacts
+					}))
+				};
+				console.log('✅ Grounding search completed:', {
+					websitesAnalyzed: groundingData.websites.length,
+					keyFindings: groundingData.keyFindings.length
+				});
+			} catch (error) {
+				console.error('⚠️ Grounding search failed, continuing without it:', error);
+				// Continue without grounding data if search fails
+				groundingData = undefined;
+			}
+		}
+		
 		// Use enhanced progressive generator if we have the required fields
 		let stepResult;
 		if (brandName && industry && style) {
@@ -192,7 +222,8 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 				industry,
 				style,
 				audience,
-				hasIndustrySpecificInfo: Object.keys(industrySpecificInfo).length > 0
+				hasIndustrySpecificInfo: Object.keys(industrySpecificInfo).length > 0,
+				hasGroundingData: !!groundingData
 			});
 			
 			stepResult = await generateEnhancedProgressiveStep({
@@ -207,7 +238,8 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 				previousSteps: previousSteps || {},
 				feedback: feedback || undefined,
 				extractedColors: extractedColors || undefined,
-				extractedTypography: extractedTypography || undefined
+				extractedTypography: extractedTypography || undefined,
+				groundingData: groundingData
 			});
 		} else {
 			// Fallback to old generator if required fields are missing
@@ -218,8 +250,17 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 				userApproval,
 				feedback,
 				extractedColors,
-				extractedTypography
+				extractedTypography,
+				groundingData: groundingData
 			});
+		}
+
+		if (step === 'iconography') {
+			try {
+				stepResult.content = await enhanceIconographyContent(stepResult.content);
+			} catch (error) {
+				console.error('Failed to enhance iconography content:', error);
+			}
 		}
 
 		console.log('Step result:', {
@@ -254,6 +295,88 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 			console.log('[progressive API] Industry-specific step, using estimated progress:', progress);
 		}
 
+async function enhanceIconographyContent(content: any) {
+	if (!content) return content;
+
+	// If already structured with icons, enrich SVGs if missing
+	if (typeof content === 'object' && Array.isArray(content.icons)) {
+		const enrichedIcons = await Promise.all(
+			content.icons.map(async (icon: any) => {
+				if (icon?.svg) return icon;
+				if (!icon?.name) return icon;
+				try {
+					const svg = await generateProfessionalIcon(icon.name, 96, '#111827', 2, 'outline');
+					return { ...icon, svg };
+				} catch {
+					return icon;
+				}
+			})
+		);
+		return { ...content, icons: enrichedIcons };
+	}
+
+	if (typeof content !== 'string') return content;
+
+	const iconEntries = extractIconEntries(content).slice(0, 6);
+	if (iconEntries.length === 0) return content;
+
+	const iconsWithSvg = await Promise.all(
+		iconEntries.map(async (icon) => {
+			try {
+				const svg = await generateProfessionalIcon(icon.name, 96, '#111827', 2, 'outline');
+				return { ...icon, svg };
+			} catch (error) {
+				console.warn('Icon SVG generation failed for', icon.name, error);
+				return icon;
+			}
+		})
+	);
+
+	return {
+		rawText: content,
+		icons: iconsWithSvg
+	};
+}
+
+function extractIconEntries(text: string): Array<{ name: string; description?: string }> {
+	if (!text) return [];
+	const lines = text.split('\n');
+	const separators = [' — ', ' – ', ' - ', ': ', ' | '];
+	const seen = new Set<string>();
+	const icons: Array<{ name: string; description?: string }> = [];
+
+	for (const rawLine of lines) {
+		let line = rawLine.trim();
+		if (!line) continue;
+		line = line.replace(/^[\s\-\•\*]+/, '').replace(/^[^A-Za-z0-9]+/, '').trim();
+		if (!line) continue;
+
+		let name = line;
+		let description: string | undefined;
+
+		for (const sep of separators) {
+			const idx = line.indexOf(sep);
+			if (idx > 0) {
+				name = line.substring(0, idx).trim();
+				description = line.substring(idx + sep.length).trim();
+				break;
+			}
+		}
+
+		name = name.replace(/^[^A-Za-z0-9]+/, '').trim();
+		if (!name || name.length < 2) continue;
+		if (seen.has(name.toLowerCase())) continue;
+		seen.add(name.toLowerCase());
+
+		icons.push({
+			name,
+			description: description && description.length > 2 ? description : undefined
+		});
+	}
+
+	return icons;
+}
+
 		const response = {
 			success: true,
 			step,
@@ -261,7 +384,9 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 			nextStep,
 			progress,
 			requiresApproval: true,
-			message: stepResult.message
+			message: stepResult.message,
+			// Include grounding data in response so client can cache it for subsequent steps
+			groundingData: groundingData
 		};
 
 		console.log('Returning response for step:', step, {

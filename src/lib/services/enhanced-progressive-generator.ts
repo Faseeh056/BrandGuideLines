@@ -24,6 +24,11 @@ export interface EnhancedGenerationRequest {
 	feedback?: string;
 	extractedColors?: string;
 	extractedTypography?: string;
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	};
 }
 
 /**
@@ -90,8 +95,26 @@ export async function generateEnhancedProgressiveStep(
 }
 
 function createEnhancedProgressivePrompt(request: EnhancedGenerationRequest): string {
-	const { step, brandName, industry, style, audience, description, values, industrySpecificInfo, previousSteps, feedback, extractedColors, extractedTypography } = request;
+	const { step, brandName, industry, style, audience, description, values, industrySpecificInfo, previousSteps, feedback, extractedColors, extractedTypography, groundingData } = request;
 
+	// Build grounding data section if available
+	const groundingSection = groundingData ? `
+	
+🔍 GROUNDING SEARCH DATA - REAL INDUSTRY INSIGHTS:
+Based on analysis of ${groundingData.websites.length} leading websites in the ${industry} industry:
+
+INDUSTRY SUMMARY:
+${groundingData.summary}
+
+KEY FINDINGS FROM INDUSTRY WEBSITES:
+${groundingData.keyFindings.map((finding, i) => `${i + 1}. ${finding}`).join('\n')}
+
+WEBSITES ANALYZED:
+${groundingData.websites.map(w => `- ${w.title} (${w.url}): ${w.extractedFacts.slice(0, 3).join('; ')}`).join('\n')}
+
+CRITICAL: Use these real-world industry insights to inform your brand guideline generation. These findings are based on actual analysis of successful brands in this industry. Reference these patterns and best practices when creating guidelines.
+` : '';
+	
 	// Build context string - PRIORITY: Industry + Vibe are PRIMARY, everything else is secondary
 	const contextInfo = `
 🎯 PRIMARY DRIVERS (MANDATORY - NON-NEGOTIABLE):
@@ -105,6 +128,7 @@ ${description ? `- Description: "${description}"` : ''}
 ${values ? `- Brand Values: "${values}"` : ''}
 ${industrySpecificInfo ? `- Industry-Specific Info: ${JSON.stringify(industrySpecificInfo)}` : ''}
 ${previousSteps?.short_description ? `- Previous Context: ${previousSteps.short_description}` : ''}
+${groundingSection}
 ${feedback ? `\n\n🚨 USER FEEDBACK: "${feedback}"\nIMPORTANT: Incorporate this feedback ONLY if it aligns with ${industry} industry and ${style} vibe.` : ''}
 `;
 

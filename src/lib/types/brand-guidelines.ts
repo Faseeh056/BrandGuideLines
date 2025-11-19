@@ -151,6 +151,11 @@ export interface BrandGuidelinesInput {
 	brand_name: string;
 	brand_domain: string;
 	short_description: string;
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	};
 	// Brand positioning fields from builder form
 	selectedMood?: string;
 	selectedAudience?: string;

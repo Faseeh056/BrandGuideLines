@@ -86,6 +86,11 @@
 		industrySpecificInfo?: Record<string, any>;
 	} = {}; // NEW: Collected information
 
+let groundingData: any = null;
+let groundingIndustry: string | null = null;
+let isFetchingGroundingData = false;
+let hasAnnouncedGrounding = false;
+
 	// Focus input when appropriate
 	$: if ((!waitingForConfirmation && !conversationComplete) && (textInput || textareaInput)) {
 		// Use setTimeout to avoid autofocus conflicts
@@ -131,6 +136,9 @@
 				isGeneratingGuidelines = parsedState.isGeneratingGuidelines ?? false;
 				waitingForStepFeedback = parsedState.waitingForStepFeedback ?? false;
 				currentRegeneratingStepIndex = parsedState.currentRegeneratingStepIndex ?? -1;
+				groundingData = parsedState.groundingData ?? null;
+				groundingIndustry = parsedState.groundingIndustry ?? null;
+				hasAnnouncedGrounding = parsedState.hasAnnouncedGrounding ?? false;
 				
 				// Restore UI state
 				const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
@@ -179,7 +187,10 @@
 						hasFetchedIndustryQuestions,
 						isGeneratingGuidelines,
 						waitingForStepFeedback,
-						currentRegeneratingStepIndex
+						currentRegeneratingStepIndex,
+						groundingData,
+						groundingIndustry,
+						hasAnnouncedGrounding
 					}));
 				}
 			} catch (error) {
@@ -192,6 +203,61 @@
 	function delay(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
+
+async function ensureGroundingDataForIndustry(industry?: string) {
+	const normalizedIndustry = typeof industry === 'string' ? industry.trim() : '';
+	if (!normalizedIndustry) return;
+
+	const industryChanged =
+		!groundingIndustry || groundingIndustry.toLowerCase() !== normalizedIndustry.toLowerCase();
+
+	if (!industryChanged && groundingData) {
+		return;
+	}
+
+	if (isFetchingGroundingData) {
+		return;
+	}
+
+	isFetchingGroundingData = true;
+
+	try {
+		if (!hasAnnouncedGrounding || industryChanged) {
+			await sendBotMessage(
+				`🌐 Let me research successful ${normalizedIndustry} brands so I can tailor the next questions.`
+			);
+			hasAnnouncedGrounding = true;
+		}
+
+		const response = await fetch('/api/grounding-search', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ industry: normalizedIndustry })
+		});
+
+		if (!response.ok) {
+			throw new Error('Failed to fetch grounding search data');
+		}
+
+		const result = await response.json();
+		if (result?.groundingData) {
+			groundingData = result.groundingData;
+			groundingIndustry = normalizedIndustry;
+			await sendBotMessage(
+				`📊 I analyzed ${groundingData.websites.length} real ${normalizedIndustry} brands. I'll keep those insights in mind for our follow-up questions.`
+			);
+		}
+	} catch (error) {
+		console.error('Grounding search failed:', error);
+		if (industryChanged || !groundingData) {
+			await sendBotMessage(
+				`⚠️ I couldn't analyze ${normalizedIndustry} websites right now, but I'll continue with what we have.`
+			);
+		}
+	} finally {
+		isFetchingGroundingData = false;
+	}
+}
 
 	// Scroll to bottom of chat
 	async function scrollToBottom() {
@@ -317,6 +383,10 @@
 				allQuestions = []; // Clear old questions
 				currentQuestionIndex = -1; // Reset question index
 				// Keep collectedInfo but will update it with new analysis
+				groundingData = null;
+				groundingIndustry = null;
+				hasAnnouncedGrounding = false;
+				isFetchingGroundingData = false;
 			}
 			
 			// Analyze the prompt
@@ -355,6 +425,10 @@
 			if (promptAnalysis.audience) collectedInfo.audience = promptAnalysis.audience;
 			if (promptAnalysis.description) collectedInfo.description = promptAnalysis.description;
 			if (promptAnalysis.values) collectedInfo.values = promptAnalysis.values;
+
+			if (collectedInfo.industry) {
+				await ensureGroundingDataForIndustry(collectedInfo.industry);
+			}
 
 			await delay(500);
 
@@ -426,6 +500,8 @@
 		const industry = collectedInfo.industry || answers['industry'];
 		
 		if (industry) {
+		await ensureGroundingDataForIndustry(industry);
+
 			// Mark as fetched immediately to prevent duplicate calls
 			hasFetchedIndustryQuestions = true;
 			
@@ -435,6 +511,7 @@
 			try {
 				// Get already asked question IDs to prevent duplicates
 				const alreadyAskedIds = allQuestions.map(q => q.id);
+				const alreadyAskedTexts = allQuestions.map(q => q.question).filter(Boolean);
 				
 				const response = await fetch('/api/brand-builder/industry-questions', {
 					method: 'POST',
@@ -446,7 +523,9 @@
 							style: collectedInfo.style || answers['style'],
 							audience: collectedInfo.audience || answers['audience']
 						},
-						alreadyAskedQuestionIds: alreadyAskedIds // Pass already asked IDs
+						alreadyAskedQuestionIds: alreadyAskedIds, // Pass already asked IDs
+						askedQuestions: alreadyAskedTexts,
+						groundingData
 					})
 				});
 
@@ -643,6 +722,7 @@
 				if (currentQuestion.id === 'industry') {
 					collectedInfo.industry = userInput.trim();
 					// Industry changed, we'll get industry questions after this question
+					await ensureGroundingDataForIndustry(userInput.trim());
 				}
 				if (currentQuestion.id === 'style') collectedInfo.style = userInput.trim();
 
@@ -718,16 +798,10 @@
 			// Analyze the prompt and respond accordingly
 			try {
 				// If conversation is complete, treat this as a new brand guideline request
+				// but keep previous messages for context/history
 				if (conversationComplete) {
-					// Clear old messages related to the previous conversation (keep only initial greeting)
-					const initialMessageIndex = messages.findIndex(m => 
-						m.type === 'bot' && m.content.includes("I'm your Brand Builder Assistant")
-					);
-					if (initialMessageIndex >= 0) {
-						// Keep only messages from initial greeting onwards, but remove the old conversation
-						// Actually, let's keep all messages for context, but reset the state
-						messages = messages.slice(0, initialMessageIndex + 1);
-					}
+					await sendBotMessage("🆕 Starting a fresh plan—I'll keep our previous conversation for reference.");
+					conversationComplete = false;
 				}
 				
 				await analyzePromptAndGenerateQuestions(prompt);
@@ -751,6 +825,7 @@
 		if (currentQuestion.id === 'industry') {
 			collectedInfo.industry = suggestion;
 			// Industry changed, we'll get industry questions after this question
+		await ensureGroundingDataForIndustry(suggestion);
 		}
 		if (currentQuestion.id === 'style') collectedInfo.style = suggestion;
 
@@ -990,6 +1065,7 @@
 			contactCompany: answers['contactCompany'] || '',
 			customPrompt: answers['customPrompt'] || collectedInfo.description || '',
 			logoData: answers['logo'], // Already in correct format from server upload
+			groundingData: groundingData,
 			// Include industry-specific info so progressive generator can use it
 			industrySpecificInfo: industrySpecificInfo
 		};
@@ -1024,6 +1100,10 @@
 		allQuestions = [];
 		hasFetchedIndustryQuestions = false;
 		collectedInfo = {};
+	groundingData = null;
+	groundingIndustry = null;
+	isFetchingGroundingData = false;
+	hasAnnouncedGrounding = false;
 		
 		// Clear input element references
 		textInput = null;
@@ -1353,6 +1433,19 @@
 				{/if}
 			{/each}
 
+			{#if isFetchingGroundingData}
+				<div class="grounding-indicator">
+					<div class="grounding-dots">
+						<span class="grounding-dot delay-0"></span>
+						<span class="grounding-dot delay-1"></span>
+						<span class="grounding-dot delay-2"></span>
+					</div>
+					<span class="grounding-text">
+						Researching {collectedInfo.industry || answers['industry'] || 'industry'} sites…
+					</span>
+				</div>
+			{/if}
+
 			{#if isTyping}
 				<TypingIndicator />
 			{/if}
@@ -1523,3 +1616,56 @@
 	</CardContent>
 </Card>
 
+<style>
+	.grounding-indicator {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		margin-left: 2.25rem;
+		margin-top: 0.1rem;
+		font-size: 0.78rem;
+		color: var(--muted-foreground);
+	}
+
+	:global(.dark) .grounding-indicator {
+		color: rgba(226, 232, 240, 0.9);
+	}
+
+	.grounding-dots {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+	}
+
+	.grounding-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 9999px;
+		background: rgba(249, 115, 22, 0.8);
+		animation: grounding-bounce 1.2s infinite ease-in-out;
+	}
+
+	.grounding-dot.delay-1 {
+		animation-delay: 0.2s;
+	}
+
+	.grounding-dot.delay-2 {
+		animation-delay: 0.4s;
+	}
+
+	@keyframes grounding-bounce {
+		0%, 80%, 100% {
+			transform: scale(0.6);
+			opacity: 0.5;
+		}
+		40% {
+			transform: scale(1);
+			opacity: 1;
+		}
+	}
+
+	.grounding-text {
+		font-size: 0.85rem;
+		color: inherit;
+	}
+</style>

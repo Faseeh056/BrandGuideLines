@@ -11,13 +11,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const body = await request.json();
-		const { industry, existingInfo, alreadyAskedQuestionIds } = body;
+		const { industry, existingInfo, alreadyAskedQuestionIds, askedQuestions, groundingData } = body;
 
 		if (!industry || typeof industry !== 'string') {
 			return json({ error: 'industry is required' }, { status: 400 });
 		}
 
-		const questions = await generateIndustryQuestions(industry, existingInfo, alreadyAskedQuestionIds);
+		const questions = await generateIndustryQuestions(
+			industry,
+			existingInfo,
+			alreadyAskedQuestionIds,
+			groundingData,
+			askedQuestions
+		);
 
 		return json({
 			success: true,

@@ -1324,7 +1324,8 @@ ${customPrompt}`;
 							company: contactCompany || brandName
 						},
 						// Include industry-specific info if available (from chatbot)
-						...(chatData?.industrySpecificInfo ? { industrySpecificInfo: chatData.industrySpecificInfo } : {})
+						...(chatData?.industrySpecificInfo ? { industrySpecificInfo: chatData.industrySpecificInfo } : {}),
+						...(chatData?.groundingData ? { groundingData: chatData.groundingData } : {})
 					} as any}
 					{logoFiles}
 					onComplete={handleProgressiveComplete}

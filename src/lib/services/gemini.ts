@@ -310,7 +310,14 @@ export async function generateBrandGuidelines(request: BrandGuidelineRequest): P
 }
 
 // New comprehensive brand guidelines generator
-export async function generateComprehensiveBrandGuidelines(input: BrandGuidelinesInput): Promise<BrandGuidelinesSpec> {
+export async function generateComprehensiveBrandGuidelines(
+	input: BrandGuidelinesInput,
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	}
+): Promise<BrandGuidelinesSpec> {
 	try {
 		// Check if API key is available
 		if (!env?.GOOGLE_GEMINI_API) {
@@ -320,7 +327,7 @@ export async function generateComprehensiveBrandGuidelines(input: BrandGuideline
 		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 		// Create a comprehensive prompt for structured brand guideline generation
-		const prompt = createComprehensiveBrandGuidelinePrompt(input);
+		const prompt = createComprehensiveBrandGuidelinePrompt(input, groundingData);
 
 		const result = await model.generateContent(prompt);
 		const response = await result.response;
@@ -393,11 +400,36 @@ ${logoPath ? `**FINAL REMINDER**: You MUST include the uploaded logo in the Logo
 }
 
 
-function createComprehensiveBrandGuidelinePrompt(input: BrandGuidelinesInput): string {
+function createComprehensiveBrandGuidelinePrompt(
+	input: BrandGuidelinesInput,
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	}
+): string {
 	const { brand_name, brand_domain, short_description, logo_files, colors, typography, contact } = input;
 	
 	// Get domain-specific adaptations
 	const domainAdaptations = getDomainAdaptations(brand_domain);
+	
+	// Build grounding data section if available
+	const groundingSection = groundingData ? `
+
+🔍 GROUNDING SEARCH DATA - REAL INDUSTRY INSIGHTS:
+Based on analysis of ${groundingData.websites.length} leading websites in the ${brand_domain} industry:
+
+INDUSTRY SUMMARY:
+${groundingData.summary}
+
+KEY FINDINGS FROM INDUSTRY WEBSITES:
+${groundingData.keyFindings.map((finding, i) => `${i + 1}. ${finding}`).join('\n')}
+
+WEBSITES ANALYZED:
+${groundingData.websites.map(w => `- ${w.title} (${w.url}): ${w.extractedFacts.slice(0, 3).join('; ')}`).join('\n')}
+
+CRITICAL: Use these real-world industry insights to inform your brand guideline generation. These findings are based on actual analysis of successful brands in this industry. Reference these patterns and best practices when creating guidelines.
+` : '';
 	
 	return `Create a concise brand guidelines JSON specification tailored specifically for ${brand_domain}. Keep descriptions brief and focused.
 
@@ -407,7 +439,7 @@ INPUT:
 - Logo: ${logo_files.length > 0 ? 'Provided' : 'Not provided'}
 - Colors: ${colors ? 'Provided' : 'Generate'}
 - Typography: ${typography ? 'Provided' : 'Generate'}
-
+${groundingSection}
 REQUIREMENTS:
 - Keep all text content concise and to the point
 - Avoid lengthy explanations
@@ -678,6 +710,11 @@ export async function generateProgressiveBrandGuidelines(request: {
 	feedback?: string;
 	extractedColors?: string;
 	extractedTypography?: string;
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	};
 }): Promise<{
 	content: string;
 	brandGuidelines?: BrandGuidelinesSpec;
@@ -708,7 +745,7 @@ export async function generateProgressiveBrandGuidelines(request: {
 				}
 			});
 
-			// Create step-specific prompt
+			// Create step-specific prompt with grounding data
 			const prompt = createProgressivePrompt(request);
 
 			const result = await model.generateContent(prompt);
@@ -757,10 +794,33 @@ function createProgressivePrompt(request: {
 	feedback?: string;
 	extractedColors?: string;
 	extractedTypography?: string;
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	};
 }): string {
-	const { step, previousSteps, userApproval, feedback } = request;
+	const { step, previousSteps, userApproval, feedback, groundingData } = request;
 	
 	const domainAdaptations = getDomainAdaptations(previousSteps.brand_domain || 'General Business');
+	
+	// Build grounding data section if available
+	const groundingSection = groundingData ? `
+	
+🔍 GROUNDING SEARCH DATA - REAL INDUSTRY INSIGHTS:
+Based on analysis of ${groundingData.websites.length} leading websites in the ${previousSteps.brand_domain || 'General Business'} industry:
+
+INDUSTRY SUMMARY:
+${groundingData.summary}
+
+KEY FINDINGS FROM INDUSTRY WEBSITES:
+${groundingData.keyFindings.map((finding, i) => `${i + 1}. ${finding}`).join('\n')}
+
+WEBSITES ANALYZED:
+${groundingData.websites.map(w => `- ${w.title} (${w.url}): ${w.extractedFacts.slice(0, 3).join('; ')}`).join('\n')}
+
+CRITICAL: Use these real-world industry insights to inform your brand guideline generation. These findings are based on actual analysis of successful brands in this industry. Reference these patterns and best practices when creating guidelines.
+` : '';
 	
 	const baseInfo = `
 Brand: ${previousSteps.brand_name || 'Your Brand'}
@@ -770,6 +830,7 @@ Mood: ${previousSteps.selectedMood || (previousSteps as any).mood || 'Profession
 Target Audience: ${previousSteps.selectedAudience || (previousSteps as any).audience || 'General audience'}
 ${previousSteps.brandValues ? `Brand Values & Mission: ${previousSteps.brandValues}` : ''}
 ${previousSteps.customPrompt ? `Custom Requirements: ${previousSteps.customPrompt}` : ''}
+${groundingSection}
 ${feedback ? `
 USER FEEDBACK FOR REGENERATION:
 The user has provided the following feedback about the previous version: "${feedback}"

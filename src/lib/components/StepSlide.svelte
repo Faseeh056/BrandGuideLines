@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { CheckCircle, XCircle, Loader2, ThumbsUp, ThumbsDown, RefreshCw, Edit } from 'lucide-svelte';
+	import { CheckCircle, XCircle, Loader2, ThumbsUp, ThumbsDown, RefreshCw, Edit, Copy, Check } from 'lucide-svelte';
 	import DynamicIcon from '$lib/components/DynamicIcon.svelte';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
@@ -42,6 +42,33 @@
 	let showFeedback = false;
 	let userFeedback = '';
 	let isRegenerating = false;
+	let copiedIconName: string | null = null;
+	let copyIconTimeout: ReturnType<typeof setTimeout> | null = null;
+const iconAccentGradients = [
+	'linear-gradient(135deg, #f97316, #fb7185)',
+	'linear-gradient(135deg, #38bdf8, #6366f1)',
+	'linear-gradient(135deg, #34d399, #10b981)',
+	'linear-gradient(135deg, #facc15, #f97316)',
+	'linear-gradient(135deg, #a855f7, #ec4899)'
+];
+
+function getIconAccent(index: number): string {
+	return iconAccentGradients[index % iconAccentGradients.length];
+}
+
+	async function copyIconLabel(text: string) {
+		try {
+		if (!navigator?.clipboard) return;
+		await navigator.clipboard.writeText(text);
+			copiedIconName = text;
+			if (copyIconTimeout) clearTimeout(copyIconTimeout);
+			copyIconTimeout = setTimeout(() => {
+				copiedIconName = null;
+			}, 2000);
+		} catch (error) {
+			console.error('Failed to copy icon label', error);
+		}
+	}
 	
 	// Validate if a string looks like a valid font name
 	function isValidFontName(fontName: string): boolean {
@@ -463,57 +490,53 @@
 		return colors;
 	}
 
-	function extractIconsFromText(text: string): Array<{ name: string; icon?: string }> {
+	function extractIconsFromText(text: string): Array<{ name: string; description?: string }> {
 		if (!text) return [];
 
-		const icons: Array<{ name: string; icon?: string }> = [];
+		const icons: Array<{ name: string; description?: string }> = [];
+		const seen = new Set<string>();
 		const lines = text.split('\n');
+		const separators = [' — ', ' – ', ' - ', ' —', ' –', ' -', ': ', ' | '];
+
+		const pushIcon = (rawName: string, description?: string) => {
+			const name = rawName
+				.replace(/^[\s\-\•\*]+/, '')
+				.replace(/^[^A-Za-z0-9]+/, '')
+				.trim();
+			if (!name || name.length < 2) return;
+			if (seen.has(name.toLowerCase())) return;
+			seen.add(name.toLowerCase());
+
+			const cleanDescription = description?.trim();
+			icons.push({
+				name,
+				description: cleanDescription && cleanDescription.length > 2 ? cleanDescription : undefined
+			});
+		};
 
 		for (const line of lines) {
 			// Skip empty lines
 			if (!line.trim()) continue;
-			
-			// Try different patterns to match various AI-generated formats
-			// Pattern 1: • Icon Name or - Icon Name or * Icon Name
-			let iconMatch = line.match(/^\s*[\*\-\•]\s*(.+)$/);
-			if (iconMatch) {
-				const iconName = iconMatch[1].trim();
-				// Skip if it's just a symbol/emoji (very short or only special chars)
-				if (iconName.length > 2 && !/^[⚫⚪⚡⚙⚠⚰⚱★☆♦♠♣♥♪♫♬♭♮♯◐◑◒◓◔◕◖◗◘◙◚◛◜◝◞◟◠◡☀☁☂☎☐☑☒☓☕☘☝☞☟☠☢☣☮☯☸☹☺☻☼☽☾♀♁♂♃♄♅♆♇♈♉♊♋♌♍♎♏♐♑♒♓♔♕♖♗♘♙♚♛♜♝♞♟]+$/.test(iconName)) {
-					// Remove any leading emoji/symbol if present
-					const cleanName = iconName.replace(/^[⚫⚪⚡⚙⚠⚰⚱★☆♦♠♣♥♪♫♬♭♮♯◐◑◒◓◔◕◖◗◘◙◚◛◜◝◞◟◠◡☀☁☂☎☐☑☒☓☕☘☝☞☟☠☢☣☮☯☸☹☺☻☼☽☾♀♁♂♃♄♅♆♇♈♉♊♋♌♍♎♏♐♑♒♓♔♕♖♗♘♙♚♛♜♝♞♟\s]+/, '').trim();
-					if (cleanName) {
-						icons.push({ name: cleanName });
-					}
-				}
-				continue;
-			}
-			
-			// Pattern 2: Icon Name (colon separated)
-			iconMatch = line.match(/^\s*([^:]+):\s*(.+)$/);
-			if (iconMatch) {
-				const iconName = iconMatch[2].trim() || iconMatch[1].trim();
-				if (iconName.length > 2) {
-					icons.push({ name: iconName });
-				}
-				continue;
-			}
-			
-			// Pattern 3: Icon Name (dash separated)
-			iconMatch = line.match(/^\s*([^\-]+)\s*-\s*(.+)$/);
-			if (iconMatch && iconMatch[2].trim().length > 2) {
-				icons.push({ name: iconMatch[2].trim() });
-				continue;
-			}
-			
-			// Pattern 4: Just a name (if line is short and looks like an icon name)
-			const trimmed = line.trim();
-			if (trimmed.length > 2 && trimmed.length < 50 && !trimmed.includes('.') && !trimmed.includes('http')) {
-				// Check if it looks like an icon name (starts with capital, no special formatting)
-				if (/^[A-Z][a-zA-Z\s]+$/.test(trimmed) || /^[a-z\s]+$/.test(trimmed)) {
-					icons.push({ name: trimmed });
+
+			let working = line
+				.replace(/^[\s\-\•\*]+/, '')
+				.replace(/^[^A-Za-z0-9]+/, '')
+				.trim();
+			if (!working) continue;
+
+			let name = working;
+			let description: string | undefined;
+
+			for (const sep of separators) {
+				const idx = working.indexOf(sep);
+				if (idx > 0) {
+					name = working.substring(0, idx).trim();
+					description = working.substring(idx + sep.length).trim();
+					break;
 				}
 			}
+
+			pushIcon(name, description);
 		}
 
 		return icons;
@@ -1224,20 +1247,87 @@
 						<!-- Visual Icons Only -->
 						<h3 class="section-title">Icon System</h3>
 						<div class="icon-sections">
-							{#if typeof stepData === 'string'}
+							{#if typeof stepData === 'object' && stepData.icons}
+								{#if stepData.icons.length > 0}
+									<div class="icon-examples">
+										<h4 class="section-subtitle">Brand Icons</h4>
+										<div class="icon-gallery">
+											{#each stepData.icons as iconData, index}
+												<div class="icon-card">
+													<div class="icon-avatar" style={`background:${getIconAccent(index)}`}>
+														<span>{iconData.name?.charAt(0) || '?'}</span>
+													</div>
+													<div class="icon-card-body">
+														<div class="icon-card-header">
+															<div>
+																<div class="icon-card-title">{iconData.name}</div>
+																{#if iconData.description}
+																	<p class="icon-card-description">{iconData.description}</p>
+																{/if}
+															</div>
+															{#if iconData.svg}
+																<button
+																	type="button"
+																	class="icon-copy-btn"
+																	on:click={() => copyIconLabel(iconData.name)}
+																	aria-label="Copy icon name"
+																>
+																	{#if copiedIconName === iconData.name}
+																		<Check class="h-3 w-3" />
+																	{:else}
+																		<Copy class="h-3 w-3" />
+																	{/if}
+																</button>
+															{/if}
+														</div>
+														{#if iconData.svg}
+															<div class="icon-svg-preview" aria-hidden="true">
+																{@html iconData.svg}
+															</div>
+														{/if}
+													</div>
+												</div>
+											{/each}
+										</div>
+									</div>
+								{:else}
+									<div class="no-icons-message">
+										<p>Icons will appear here once generated.</p>
+									</div>
+								{/if}
+							{:else if typeof stepData === 'string'}
 								<!-- Extract icons from AI response and display visually -->
 								{@const extractedIcons = extractIconsFromText(stepData)}
 								{#if extractedIcons.length > 0}
 									<div class="icon-examples">
 										<h4 class="section-subtitle">Brand Icons</h4>
-										<div class="icon-list">
-											{#each extractedIcons as iconData}
-												<div class="icon-item">
-													<div class="icon-display">
-														<div class="icon-symbol">
-															<DynamicIcon name={iconData.name} size={32} strokeWidth={2} />
+										<div class="icon-gallery">
+											{#each extractedIcons as iconData, index}
+												<div class="icon-card">
+													<div class="icon-avatar" style={`background:${getIconAccent(index)}`}>
+														<span>{iconData.name.charAt(0)}</span>
+													</div>
+													<div class="icon-card-body">
+														<div class="icon-card-header">
+															<div>
+																<div class="icon-card-title">{iconData.name}</div>
+																{#if iconData.description}
+																	<p class="icon-card-description">{iconData.description}</p>
+																{/if}
+															</div>
+															<button
+																type="button"
+																class="icon-copy-btn"
+																on:click={() => copyIconLabel(iconData.name)}
+																aria-label="Copy icon name"
+															>
+																{#if copiedIconName === iconData.name}
+																	<Check class="h-3 w-3" />
+																{:else}
+																	<Copy class="h-3 w-3" />
+																{/if}
+															</button>
 														</div>
-														<div class="icon-name">{iconData.name}</div>
 													</div>
 												</div>
 											{/each}
@@ -1279,6 +1369,25 @@
 											</div>
 										{/if}
 									</div>
+								</div>
+							{:else}
+								<div class="icon-examples">
+									<h4 class="section-subtitle">Specific Icons</h4>
+									{#if stepData.specific_icons && stepData.specific_icons.length > 0}
+										<div class="icon-list">
+											{#each stepData.specific_icons as icon}
+												<div class="icon-item">
+													<div class="icon-display">
+														<div class="icon-name">{icon}</div>
+													</div>
+												</div>
+											{/each}
+										</div>
+									{:else}
+										<div class="no-icons-message">
+											<p>AI will generate domain-specific icons based on your brand inputs</p>
+										</div>
+									{/if}
 								</div>
 							{/if}
 						</div>
@@ -1900,6 +2009,111 @@
 		text-align: center;
 		font-weight: 500;
 		text-transform: capitalize;
+	}
+
+	.icon-gallery {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 1rem;
+	}
+
+	.icon-card {
+		display: flex;
+		gap: 0.85rem;
+		padding: 1rem;
+		border-radius: 1rem;
+		border: 1px solid oklch(var(--border));
+		background: oklch(var(--card));
+		box-shadow: 0 4px 12px oklch(var(--foreground) / 0.08);
+		transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+	}
+
+	:global(.dark) .icon-card {
+		background: oklch(var(--muted));
+	}
+
+	.icon-card:hover {
+		transform: translateY(-4px);
+		border-color: oklch(var(--accent));
+		box-shadow: 0 8px 18px oklch(var(--accent) / 0.25);
+	}
+
+	.icon-avatar {
+		width: 48px;
+		height: 48px;
+		border-radius: 14px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-weight: 700;
+		font-size: 1.25rem;
+		color: #fff;
+		text-transform: uppercase;
+		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+	}
+
+	.icon-card-body {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.icon-card-header {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		align-items: flex-start;
+	}
+
+	.icon-card-title {
+		font-weight: 600;
+		font-size: 0.95rem;
+		color: oklch(var(--foreground));
+	}
+
+	.icon-card-description {
+		font-size: 0.825rem;
+		color: oklch(var(--muted-foreground));
+		margin: 0.25rem 0 0;
+		line-height: 1.35;
+	}
+
+	.icon-copy-btn {
+		border: none;
+		background: rgba(255, 255, 255, 0.2);
+		color: oklch(var(--foreground));
+		border-radius: 50%;
+		padding: 0.3rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: background 0.2s ease;
+	}
+
+	:global(.dark) .icon-copy-btn {
+		background: rgba(0, 0, 0, 0.25);
+		color: #fff;
+	}
+
+	.icon-copy-btn:hover {
+		background: rgba(0, 0, 0, 0.1);
+	}
+
+	.icon-svg-preview {
+		margin-top: 0.5rem;
+		padding: 0.5rem;
+		border-radius: 0.65rem;
+		background: rgba(15, 23, 42, 0.04);
+		display: inline-flex;
+		justify-content: center;
+		align-items: center;
+	}
+
+	.icon-svg-preview :global(svg) {
+		width: 56px;
+		height: 56px;
 	}
 
 	.logo-guidelines-grid {
