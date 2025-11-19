@@ -8,9 +8,10 @@
 	import ChatMessage from './ChatMessage.svelte';
 	import TypingIndicator from './TypingIndicator.svelte';
 	import SuggestionChips from './SuggestionChips.svelte';
+	import { getEssentialQuestions } from '$lib/services/industry-questions';
 
 	// Props
-	export let questions: any[];
+	export let questions: any[] = [];
 	export let onComplete: (data: any) => void;
 	export let canGenerate: boolean;
 	
@@ -52,25 +53,60 @@
 	let userInput = '';
 	let chatContainer: HTMLElement;
 	let fileInput: HTMLInputElement;
+	let textInput: HTMLInputElement | null = null;
+	let textareaInput: HTMLTextAreaElement | null = null;
 	let logoPreview: string | null = null;
 	let logoFile: File | null = null;
 	let isMultiline = false;
 	let showSuggestions = false;
 	let currentSuggestions: string[] = [];
 	let conversationComplete = false;
-	let waitingForConfirmation = true;
+	let waitingForConfirmation = false; // Changed: Start with prompt input
 	let isEditingMode = false;
 	let editingQuestionIndex = -1;
 	let returnToQuestionIndex = -1; // Remember where we were before editing
 	let isGeneratingGuidelines = false; // Track if we're in generation phase
 	let waitingForStepFeedback = false; // Track if we're waiting for user feedback for regeneration
 	let currentRegeneratingStepIndex = -1; // Track which step is being regenerated
+	
+	// New state for enhanced flow
+	let waitingForInitialPrompt = true; // NEW: Wait for user's initial prompt
+	let isAnalyzingPrompt = false; // NEW: Track if we're analyzing the prompt
+	let promptAnalysis: any = null; // NEW: Store analysis results
+	let industryQuestions: any[] = []; // NEW: Industry-specific questions
+	let allQuestions: any[] = []; // NEW: Combined essential + industry questions
+	let hasFetchedIndustryQuestions = false; // NEW: Track if we've already fetched industry questions
+	let collectedInfo: {
+		brandName?: string;
+		industry?: string;
+		style?: string;
+		audience?: string;
+		description?: string;
+		values?: string;
+		industrySpecificInfo?: Record<string, any>;
+	} = {}; // NEW: Collected information
+
+	// Focus input when appropriate
+	$: if ((!waitingForConfirmation && !conversationComplete) && (textInput || textareaInput)) {
+		// Use setTimeout to avoid autofocus conflicts
+		setTimeout(() => {
+			const elementToFocus = textareaInput || textInput;
+			if (elementToFocus && document.activeElement !== elementToFocus) {
+				elementToFocus.focus();
+			}
+		}, 150);
+	}
 
 	// Initialize chat on mount
 	onMount(async () => {
-		// Check if we have saved messages in sessionStorage
-		const savedMessages = sessionStorage.getItem('brandBuilderChatMessages');
-		const savedState = sessionStorage.getItem('brandBuilderChatState');
+		// Check if we have saved messages in sessionStorage (browser only)
+		let savedMessages: string | null = null;
+		let savedState: string | null = null;
+		
+		if (typeof window !== 'undefined' && window.sessionStorage) {
+			savedMessages = sessionStorage.getItem('brandBuilderChatMessages');
+			savedState = sessionStorage.getItem('brandBuilderChatState');
+		}
 		
 		if (savedMessages && savedState) {
 			try {
@@ -87,13 +123,19 @@
 				answers = parsedState.answers ?? {};
 				conversationComplete = parsedState.conversationComplete ?? false;
 				waitingForConfirmation = parsedState.waitingForConfirmation ?? false;
+				waitingForInitialPrompt = parsedState.waitingForInitialPrompt ?? true;
+				isAnalyzingPrompt = parsedState.isAnalyzingPrompt ?? false;
+				allQuestions = parsedState.allQuestions ?? [];
+				collectedInfo = parsedState.collectedInfo ?? {};
+				hasFetchedIndustryQuestions = parsedState.hasFetchedIndustryQuestions ?? false;
 				isGeneratingGuidelines = parsedState.isGeneratingGuidelines ?? false;
 				waitingForStepFeedback = parsedState.waitingForStepFeedback ?? false;
 				currentRegeneratingStepIndex = parsedState.currentRegeneratingStepIndex ?? -1;
 				
 				// Restore UI state
-				if (currentQuestionIndex >= 0 && currentQuestionIndex < questions.length) {
-					const currentQ = questions[currentQuestionIndex];
+				const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
+				if (currentQuestionIndex >= 0 && currentQuestionIndex < questionsToUse.length) {
+					const currentQ = questionsToUse[currentQuestionIndex];
 					isMultiline = currentQ.type === 'textarea';
 					showSuggestions = currentQ.type === 'text-with-suggestions';
 					if (showSuggestions && currentQ.suggestions) {
@@ -112,26 +154,34 @@
 		// Only send initial message if no saved state exists
 		await delay(500);
 		await sendBotMessage(
-			"👋 Hi! I'm your Brand Builder Assistant. I'll help you create comprehensive brand guidelines by asking a few questions. Ready to get started?"
+			"👋 Hi! I'm your Brand Builder Assistant. I'll help you create comprehensive brand guidelines.\n\n**Please describe what you'd like to create.** You can tell me about your brand name, industry, style preferences, or any other details you have in mind. I'll analyze your input and ask any additional questions needed!"
 		);
 	});
 	
 	// Save messages to sessionStorage whenever they change (debounced to avoid too many writes)
+	// Only run in browser (not during SSR)
 	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-	$: if (messages.length >= 0) { // Save even if empty to track state
+	$: if (typeof window !== 'undefined' && messages.length >= 0) { // Save even if empty to track state
 		if (saveTimeout) clearTimeout(saveTimeout);
 		saveTimeout = setTimeout(() => {
 			try {
-				sessionStorage.setItem('brandBuilderChatMessages', JSON.stringify(messages));
-				sessionStorage.setItem('brandBuilderChatState', JSON.stringify({
-					currentQuestionIndex,
-					answers,
-					conversationComplete,
-					waitingForConfirmation,
-					isGeneratingGuidelines,
-					waitingForStepFeedback,
-					currentRegeneratingStepIndex
-				}));
+				if (typeof window !== 'undefined' && window.sessionStorage) {
+					sessionStorage.setItem('brandBuilderChatMessages', JSON.stringify(messages));
+					sessionStorage.setItem('brandBuilderChatState', JSON.stringify({
+						currentQuestionIndex,
+						answers,
+						conversationComplete,
+						waitingForConfirmation,
+						waitingForInitialPrompt,
+						isAnalyzingPrompt,
+						allQuestions,
+						collectedInfo,
+						hasFetchedIndustryQuestions,
+						isGeneratingGuidelines,
+						waitingForStepFeedback,
+						currentRegeneratingStepIndex
+					}));
+				}
 			} catch (error) {
 				console.error('Failed to save chat state:', error);
 			}
@@ -210,27 +260,231 @@
 		// Save where we currently are so we can restore after editing
 		returnToQuestionIndex = currentQuestionIndex;
 		
+		// Use allQuestions if available, otherwise fall back to questions prop
+		const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
+		
+		// Safety check: ensure question exists
+		if (questionIndex < 0 || questionIndex >= questionsToUse.length) {
+			console.error('Invalid question index for editing:', questionIndex);
+			return;
+		}
+		
+		const q = questionsToUse[questionIndex];
+		if (!q) {
+			console.error('Question not found at index:', questionIndex);
+			return;
+		}
+		
 		isEditingMode = true;
 		editingQuestionIndex = questionIndex;
 		currentQuestionIndex = questionIndex;
 		
 		// Pre-fill input with previous answer
-		const q = questions[questionIndex];
 		const previousAnswer = answers[q.id];
 		if (previousAnswer && typeof previousAnswer === 'string') {
 			userInput = previousAnswer;
+		} else {
+			userInput = '';
 		}
 		
 		// Scroll to bottom to show input
 		await scrollToBottom();
 		
-		// Re-show the question
-		const questionText = `${q.icon} **${q.question}**`;
+		// Re-show the question and update UI state
 		showSuggestions = q.type === 'text-with-suggestions';
 		if (showSuggestions && q.suggestions) {
 			currentSuggestions = q.suggestions;
+		} else {
+			currentSuggestions = [];
 		}
 		isMultiline = q.type === 'textarea';
+	}
+
+	// NEW: Analyze user prompt and generate questions
+	async function analyzePromptAndGenerateQuestions(userPrompt: string) {
+		isAnalyzingPrompt = true;
+		await sendBotMessage("🔍 Analyzing your prompt... Let me understand what you need!");
+		
+		try {
+			// If conversation was already complete, reset state for new prompt
+			if (conversationComplete) {
+				// Reset conversation state for new prompt
+				conversationComplete = false;
+				isGeneratingGuidelines = false; // Reset generation state
+				hasFetchedIndustryQuestions = false;
+				answers = {}; // Clear old answers
+				industryQuestions = []; // Clear old industry questions
+				allQuestions = []; // Clear old questions
+				currentQuestionIndex = -1; // Reset question index
+				// Keep collectedInfo but will update it with new analysis
+			}
+			
+			// Analyze the prompt
+			const response = await fetch('/api/brand-builder/analyze-prompt', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ userPrompt })
+			});
+
+			if (!response.ok) {
+				// Try to get error details from response
+				let errorMessage = 'Failed to analyze prompt';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorData.message || errorMessage;
+					console.error('[chatbot] Prompt analysis error:', errorData);
+				} catch (e) {
+					console.error('[chatbot] Failed to parse error response:', e);
+				}
+				throw new Error(errorMessage);
+			}
+
+			const result = await response.json();
+			
+			if (!result.success || !result.analysis) {
+				throw new Error(result.error || 'Invalid response from analysis API');
+			}
+			
+			promptAnalysis = result.analysis;
+
+			// Store extracted info - OVERWRITE with new analysis (don't keep old values)
+			collectedInfo = {}; // Reset collectedInfo first
+			if (promptAnalysis.brandName) collectedInfo.brandName = promptAnalysis.brandName;
+			if (promptAnalysis.industry) collectedInfo.industry = promptAnalysis.industry;
+			if (promptAnalysis.style) collectedInfo.style = promptAnalysis.style;
+			if (promptAnalysis.audience) collectedInfo.audience = promptAnalysis.audience;
+			if (promptAnalysis.description) collectedInfo.description = promptAnalysis.description;
+			if (promptAnalysis.values) collectedInfo.values = promptAnalysis.values;
+
+			await delay(500);
+
+			if (promptAnalysis.hasCompleteInfo) {
+				await sendBotMessage(
+					"✅ Great! I found most of the information in your prompt. Let me confirm a few details and ask some follow-up questions."
+				);
+			} else {
+				await sendBotMessage(
+					`I've analyzed your prompt. I found some information, but I need a few more details to create your brand guidelines. Let me ask you some questions!`
+				);
+			}
+
+			await delay(800);
+
+			// Get essential questions
+			const essentialQuestions = getEssentialQuestions({
+				brandName: promptAnalysis.brandName,
+				industry: promptAnalysis.industry,
+				style: promptAnalysis.style
+			});
+
+			allQuestions = [...essentialQuestions];
+
+			// If industry is known, get industry-specific questions
+			if (promptAnalysis.industry || essentialQuestions.find(q => q.id === 'industry')) {
+				// We'll get industry questions after industry is selected
+			}
+
+			// Start asking questions
+			if (allQuestions.length > 0) {
+				currentQuestionIndex = -1;
+				await askNextQuestion();
+			} else {
+				// No questions needed, proceed to industry questions or generation
+				await handleQuestionsComplete();
+			}
+		} catch (error) {
+			console.error('Error analyzing prompt:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			
+			// Provide more specific error messages
+			let userFriendlyMessage = "⚠️ I encountered an error analyzing your prompt. ";
+			if (errorMessage.includes('API key') || errorMessage.includes('GOOGLE_GEMINI_API')) {
+				userFriendlyMessage += "The AI service is not properly configured. Please contact support.";
+			} else if (errorMessage.includes('Authentication')) {
+				userFriendlyMessage += "Please make sure you're logged in and try again.";
+			} else if (errorMessage.includes('Failed to analyze')) {
+				userFriendlyMessage += "Please try again with a more detailed prompt.";
+			} else {
+				userFriendlyMessage += "Please try again or provide more details.";
+			}
+			
+			await sendBotMessage(userFriendlyMessage);
+		} finally {
+			isAnalyzingPrompt = false;
+		}
+	}
+
+	// NEW: Handle when essential questions are complete
+	async function handleQuestionsComplete() {
+		// Prevent multiple calls
+		if (hasFetchedIndustryQuestions) {
+			await finishConversation();
+			return;
+		}
+		
+		// Check if we have industry, then get industry-specific questions
+		const industry = collectedInfo.industry || answers['industry'];
+		
+		if (industry) {
+			// Mark as fetched immediately to prevent duplicate calls
+			hasFetchedIndustryQuestions = true;
+			
+			await delay(500);
+			await sendBotMessage(`Great! Now let me ask a few ${industry}-specific questions to create more accurate guidelines.`);
+			
+			try {
+				// Get already asked question IDs to prevent duplicates
+				const alreadyAskedIds = allQuestions.map(q => q.id);
+				
+				const response = await fetch('/api/brand-builder/industry-questions', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						industry: industry,
+						existingInfo: {
+							brandName: collectedInfo.brandName || answers['brandName'],
+							style: collectedInfo.style || answers['style'],
+							audience: collectedInfo.audience || answers['audience']
+						},
+						alreadyAskedQuestionIds: alreadyAskedIds // Pass already asked IDs
+					})
+				});
+
+				if (response.ok) {
+					const result = await response.json();
+					const newIndustryQuestions: IndustryQuestion[] = result.questions || [];
+					
+					if (newIndustryQuestions.length > 0) {
+						// Deduplicate: only add questions that don't already exist (by ID)
+						const existingQuestionIds = new Set(allQuestions.map(q => q.id));
+						const uniqueNewQuestions = newIndustryQuestions.filter(q => !existingQuestionIds.has(q.id));
+						
+						if (uniqueNewQuestions.length > 0) {
+							industryQuestions = uniqueNewQuestions;
+							// Add only unique questions to the queue
+							allQuestions = [...allQuestions, ...uniqueNewQuestions];
+							await askNextQuestion();
+						} else {
+							// All questions were duplicates, finish
+							console.log('[chatbot] All industry questions were duplicates, finishing conversation');
+							await finishConversation();
+						}
+					} else {
+						// No industry questions, finish and start generation
+						await finishConversation();
+					}
+				} else {
+					// If industry questions fail, just proceed
+					await finishConversation();
+				}
+			} catch (error) {
+				console.error('Error getting industry questions:', error);
+				await finishConversation();
+			}
+		} else {
+			// No industry yet, finish conversation
+			await finishConversation();
+		}
 	}
 
 	// Update the summary after an edit
@@ -269,12 +523,31 @@
 	async function askNextQuestion() {
 		currentQuestionIndex++;
 
-		if (currentQuestionIndex >= questions.length) {
-			await finishConversation();
+		// Use allQuestions if available, otherwise fall back to questions prop
+		const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
+
+		// Check if we've reached the end of questions
+		if (currentQuestionIndex >= questionsToUse.length) {
+			// Only call handleQuestionsComplete if we haven't already fetched industry questions
+			// This prevents infinite loops
+			if (!hasFetchedIndustryQuestions) {
+				await handleQuestionsComplete();
+			} else {
+				// Already fetched industry questions, just finish
+				await finishConversation();
+			}
 			return;
 		}
 
-		const q = questions[currentQuestionIndex];
+		const q = questionsToUse[currentQuestionIndex];
+		
+		// Safety check: ensure question exists
+		if (!q) {
+			console.error('Question is undefined at index:', currentQuestionIndex);
+			await finishConversation();
+			return;
+		}
+		
 		showSuggestions = false;
 
 		await delay(500);
@@ -307,6 +580,20 @@
 			return;
 		}
 
+		// NEW: Handle initial prompt
+		if (waitingForInitialPrompt) {
+			if (!userInput.trim()) return;
+
+			await sendUserMessage(userInput.trim());
+			const prompt = userInput.trim();
+			userInput = '';
+			waitingForInitialPrompt = false;
+			
+			await delay(500);
+			await analyzePromptAndGenerateQuestions(prompt);
+			return;
+		}
+
 		// Handle initial confirmation
 		if (waitingForConfirmation) {
 			if (!userInput.trim()) return;
@@ -330,80 +617,142 @@
 		}
 
 		// Handle regular question answers
-		if (!userInput.trim() && currentQuestionIndex >= 0) {
-			const q = questions[currentQuestionIndex];
-			if (q.required) {
-				await sendBotMessage("⚠️ This field is required. Please provide an answer.");
-				return;
+		const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
+		
+		// Safety check: if we're in question mode, ensure currentQuestion exists
+		if (currentQuestionIndex >= 0 && currentQuestionIndex < questionsToUse.length) {
+			if (!userInput.trim()) {
+				const q = questionsToUse[currentQuestionIndex];
+				if (q && q.required) {
+					await sendBotMessage("⚠️ This field is required. Please provide an answer.");
+					return;
+				}
 			}
-		}
 
-		if (userInput.trim()) {
-			const currentQuestion = questions[currentQuestionIndex];
-			answers[currentQuestion.id] = userInput.trim();
-
-			// If we were editing, update the existing message
-			if (isEditingMode) {
-				// Find and update the existing message for this question
-				const messageIndex = messages.findIndex(
-					(m) => m.type === 'user' && m.questionIndex === currentQuestionIndex
-				);
-				
-				if (messageIndex !== -1) {
-					// Update the existing message content
-					messages[messageIndex] = {
-						...messages[messageIndex],
-						content: userInput.trim(),
-						edited: true
-					};
-					messages = [...messages]; // Trigger reactivity
+			if (userInput.trim()) {
+				const currentQuestion = questionsToUse[currentQuestionIndex];
+				if (!currentQuestion) {
+					console.error('Current question is undefined at index:', currentQuestionIndex);
+					return;
 				}
 				
-				userInput = '';
-				isMultiline = false;
-				isEditingMode = false;
-				showSuggestions = false;
-				currentSuggestions = [];
-				editingQuestionIndex = -1;
-				
-				// Restore to where we were before editing
-				if (returnToQuestionIndex >= 0) {
-					currentQuestionIndex = returnToQuestionIndex;
-					returnToQuestionIndex = -1;
+				answers[currentQuestion.id] = userInput.trim();
+			
+				// Update collectedInfo for essential fields
+				if (currentQuestion.id === 'brandName') collectedInfo.brandName = userInput.trim();
+				if (currentQuestion.id === 'industry') {
+					collectedInfo.industry = userInput.trim();
+					// Industry changed, we'll get industry questions after this question
+				}
+				if (currentQuestion.id === 'style') collectedInfo.style = userInput.trim();
+
+				// If we were editing, update the existing message
+				if (isEditingMode) {
+					// Find and update the existing message for this question
+					const messageIndex = messages.findIndex(
+						(m) => m.type === 'user' && m.questionIndex === currentQuestionIndex
+					);
 					
-					// Restore the UI state for the current question
-					if (currentQuestionIndex < questions.length) {
-						const currentQ = questions[currentQuestionIndex];
-						isMultiline = currentQ.type === 'textarea';
-						showSuggestions = currentQ.type === 'text-with-suggestions';
-						if (showSuggestions && currentQ.suggestions) {
-							currentSuggestions = currentQ.suggestions;
+					if (messageIndex !== -1) {
+						// Update the existing message content
+						messages[messageIndex] = {
+							...messages[messageIndex],
+							content: userInput.trim(),
+							edited: true
+						};
+						messages = [...messages]; // Trigger reactivity
+					}
+					
+					userInput = '';
+					isMultiline = false;
+					isEditingMode = false;
+					showSuggestions = false;
+					currentSuggestions = [];
+					editingQuestionIndex = -1;
+					
+					// Restore to where we were before editing
+					if (returnToQuestionIndex >= 0) {
+						currentQuestionIndex = returnToQuestionIndex;
+						returnToQuestionIndex = -1;
+						
+						// Restore the UI state for the current question
+						if (currentQuestionIndex < questions.length) {
+							const currentQ = questions[currentQuestionIndex];
+							isMultiline = currentQ.type === 'textarea';
+							showSuggestions = currentQ.type === 'text-with-suggestions';
+							if (showSuggestions && currentQ.suggestions) {
+								currentSuggestions = currentQ.suggestions;
+							}
 						}
+					}
+					
+					// If conversation is complete, update the summary
+					if (conversationComplete) {
+						await updateSummary();
+					}
+					
+					await scrollToBottom();
+				} else {
+					// Normal flow - create new message and move to next question
+					await sendUserMessage(userInput.trim(), currentQuestionIndex);
+					userInput = '';
+					isMultiline = false;
+
+					await delay(500);
+					await askNextQuestion();
+				}
+			}
+		} else if (userInput.trim() && !waitingForInitialPrompt && !waitingForConfirmation) {
+			// Free-form chat mode: allow user to send messages at any time (like a normal chatbot)
+			// This handles cases where user wants to ask questions or provide additional info
+			// OR start a completely new brand guideline generation
+			
+			const prompt = userInput.trim();
+			await sendUserMessage(prompt);
+			userInput = '';
+			
+			// Show typing indicator
+			isTyping = true;
+			await delay(500);
+			
+			// Analyze the prompt and respond accordingly
+			try {
+				// If conversation is complete, treat this as a new brand guideline request
+				if (conversationComplete) {
+					// Clear old messages related to the previous conversation (keep only initial greeting)
+					const initialMessageIndex = messages.findIndex(m => 
+						m.type === 'bot' && m.content.includes("I'm your Brand Builder Assistant")
+					);
+					if (initialMessageIndex >= 0) {
+						// Keep only messages from initial greeting onwards, but remove the old conversation
+						// Actually, let's keep all messages for context, but reset the state
+						messages = messages.slice(0, initialMessageIndex + 1);
 					}
 				}
 				
-				// If conversation is complete, update the summary
-				if (conversationComplete) {
-					await updateSummary();
-				}
-				
-				await scrollToBottom();
-			} else {
-				// Normal flow - create new message and move to next question
-				await sendUserMessage(userInput.trim(), currentQuestionIndex);
-				userInput = '';
-				isMultiline = false;
-
-				await delay(500);
-				await askNextQuestion();
+				await analyzePromptAndGenerateQuestions(prompt);
+			} catch (error) {
+				console.error('Error handling free-form prompt:', error);
+				await sendBotMessage("I'm here to help you create brand guidelines. Please answer the questions above, or describe what you'd like to create!");
+			} finally {
+				isTyping = false;
 			}
 		}
 	}
 
 	// Handle suggestion chip click
 	async function handleSuggestionClick(suggestion: string) {
-		const currentQuestion = questions[currentQuestionIndex];
+		const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
+		const currentQuestion = questionsToUse[currentQuestionIndex];
 		answers[currentQuestion.id] = suggestion;
+		
+		// Update collectedInfo for essential fields
+		if (currentQuestion.id === 'brandName') collectedInfo.brandName = suggestion;
+		if (currentQuestion.id === 'industry') {
+			collectedInfo.industry = suggestion;
+			// Industry changed, we'll get industry questions after this question
+		}
+		if (currentQuestion.id === 'style') collectedInfo.style = suggestion;
 
 		// If we were editing, update the existing message
 		if (isEditingMode) {
@@ -463,7 +812,8 @@
 
 	// Handle skip
 	async function handleSkip() {
-		const currentQuestion = questions[currentQuestionIndex];
+		const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
+		const currentQuestion = questionsToUse[currentQuestionIndex];
 		if (currentQuestion.required) return;
 
 		await sendUserMessage('_[Skipped]_');
@@ -553,9 +903,31 @@
 			"🎉 **All done!** I've collected all the information needed to generate your brand guidelines."
 		);
 		await delay(1000);
+		
+		// Build summary from both collectedInfo and answers
+		const summaryData: Record<string, any> = {};
+		
+		// Add collectedInfo first (from prompt analysis)
+		if (collectedInfo.brandName) summaryData.brandName = collectedInfo.brandName;
+		if (collectedInfo.industry) summaryData.industry = collectedInfo.industry;
+		if (collectedInfo.style) summaryData.style = collectedInfo.style;
+		if (collectedInfo.audience) summaryData.audience = collectedInfo.audience;
+		
+		// Add answers (from questions), but don't overwrite if already in summaryData
+		Object.entries(answers).forEach(([key, value]) => {
+			if (value && key !== 'logo' && !summaryData[key]) {
+				summaryData[key] = value;
+			}
+		});
+		
+		// Also ensure essential fields from answers are included (they might override collectedInfo if user answered)
+		if (answers['brandName']) summaryData.brandName = answers['brandName'];
+		if (answers['industry']) summaryData.industry = answers['industry'];
+		if (answers['style']) summaryData.style = answers['style'];
+		
 		await sendBotMessage(
 			"Here's a quick summary of what you provided:\n\n" +
-				Object.entries(answers)
+				Object.entries(summaryData)
 					.filter(([key, value]) => value && key !== 'logo')
 					.map(([key, value]) => `• **${key}**: ${typeof value === 'string' ? value.substring(0, 50) : value}`)
 					.join('\n') +
@@ -569,20 +941,57 @@
 
 	// Handle generation
 	function handleGenerate() {
+		// Use collectedInfo and answers to build formData
+		const brandName = collectedInfo.brandName || answers['brandName'] || '';
+		const industry = collectedInfo.industry || answers['industry'] || '';
+		const style = collectedInfo.style || answers['style'] || '';
+		const audience = collectedInfo.audience || answers['audience'] || '';
+		const description = collectedInfo.description || answers['shortDescription'] || '';
+		const values = collectedInfo.values || answers['brandValues'] || '';
+		
+		// Build industry-specific info from answers
+		const industrySpecificInfo: Record<string, any> = {};
+		industryQuestions.forEach(q => {
+			if (answers[q.id]) {
+				industrySpecificInfo[q.id] = answers[q.id];
+			}
+		});
+		
+		// Map industry to brandDomain (required by progressive generation)
+		const brandDomain = industry || answers['brandDomain'] || '';
+		
+		// Generate shortDescription if not provided
+		// Combine brand info into a meaningful description
+		let shortDescription = description;
+		if (!shortDescription) {
+			const descriptionParts: string[] = [];
+			if (brandName) descriptionParts.push(brandName);
+			if (industry) descriptionParts.push(`a ${industry} company`);
+			if (style) descriptionParts.push(`with a ${style} aesthetic`);
+			if (audience) {
+				descriptionParts.push(`targeting ${audience}`);
+			}
+			shortDescription = descriptionParts.length > 0 
+				? descriptionParts.join(', ')
+				: `${brandName || 'A brand'} in the ${industry || 'business'} industry`;
+		}
+		
 		// Map answers back to the expected format
 		const formData = {
-			brandName: answers['brandName'] || '',
-			brandDomain: answers['brandDomain'] || '',
-			shortDescription: answers['shortDescription'] || '',
-			brandValues: answers['brandValues'] || '',
-			selectedMood: answers['selectedMood'] || '',
-			selectedAudience: answers['selectedAudience'] || '',
+			brandName: brandName,
+			brandDomain: brandDomain, // Industry is used as brandDomain
+			shortDescription: shortDescription, // Auto-generated if not provided
+			brandValues: values,
+			selectedMood: style || answers['selectedMood'] || '', // Style is used as mood
+			selectedAudience: audience || answers['selectedAudience'] || '',
 			contactName: answers['contactName'] || '',
 			contactEmail: answers['contactEmail'] || '',
 			contactRole: answers['contactRole'] || '',
 			contactCompany: answers['contactCompany'] || '',
-			customPrompt: answers['customPrompt'] || '',
-			logoData: answers['logo'] // Already in correct format from server upload
+			customPrompt: answers['customPrompt'] || collectedInfo.description || '',
+			logoData: answers['logo'], // Already in correct format from server upload
+			// Include industry-specific info so progressive generator can use it
+			industrySpecificInfo: industrySpecificInfo
 		};
 
 		isGeneratingGuidelines = true;
@@ -595,7 +1004,7 @@
 		currentQuestionIndex = -1;
 		answers = {};
 		conversationComplete = false;
-		waitingForConfirmation = true;
+		waitingForConfirmation = false;
 		isGeneratingGuidelines = false;
 		waitingForStepFeedback = false;
 		currentRegeneratingStepIndex = -1;
@@ -607,10 +1016,27 @@
 		showSuggestions = false;
 		currentSuggestions = [];
 		
-		// Clear sessionStorage
+		// Clear new state variables
+		waitingForInitialPrompt = true;
+		isAnalyzingPrompt = false;
+		promptAnalysis = null;
+		industryQuestions = [];
+		allQuestions = [];
+		hasFetchedIndustryQuestions = false;
+		collectedInfo = {};
+		
+		// Clear input element references
+		textInput = null;
+		textareaInput = null;
+		logoPreview = null;
+		logoFile = null;
+		
+		// Clear sessionStorage (browser only)
 		try {
-			sessionStorage.removeItem('brandBuilderChatMessages');
-			sessionStorage.removeItem('brandBuilderChatState');
+			if (typeof window !== 'undefined' && window.sessionStorage) {
+				sessionStorage.removeItem('brandBuilderChatMessages');
+				sessionStorage.removeItem('brandBuilderChatState');
+			}
 		} catch (error) {
 			console.error('Failed to clear chat state:', error);
 		}
@@ -776,15 +1202,58 @@
 		currentQuestionIndex >= 0
 			? Math.round(((currentQuestionIndex + 1) / questions.length) * 100)
 			: 0;
+
+	// Check if we can generate based on collected info and answers
+	$: internalCanGenerate = (() => {
+		const brandName = collectedInfo.brandName || answers['brandName'] || '';
+		const industry = collectedInfo.industry || answers['industry'] || '';
+		const style = collectedInfo.style || answers['style'] || '';
+		const hasLogo = answers['logo'] !== undefined && answers['logo'] !== null;
+		
+		// We can generate if we have brand name, industry, style, and logo
+		return brandName.trim() !== '' && industry.trim() !== '' && style.trim() !== '' && hasLogo;
+	})();
+
+	// Use internal canGenerate if available, otherwise fall back to prop
+	$: effectiveCanGenerate = internalCanGenerate || canGenerate;
+
+	// Clear chat messages only (keeps conversation state)
+	function clearChatMessages() {
+		messages = [];
+		isTyping = false;
+		scrollToBottom();
+		
+		// Clear sessionStorage messages (browser only)
+		try {
+			if (typeof window !== 'undefined' && window.sessionStorage) {
+				sessionStorage.removeItem('brandBuilderChatMessages');
+			}
+		} catch (error) {
+			console.error('Failed to clear chat messages:', error);
+		}
+	}
 </script>
 
 <Card class="border-border/50 shadow-xl border-orange-500/20 bg-card/50 backdrop-blur-sm h-[1000px] flex flex-col w-[580px]">
 	<CardHeader class="space-y-4 pb-4 flex-shrink-0 border-b border-border/50">
 		<!-- Header -->
 		<div class="flex items-center justify-between">
-			<div>
-				<h2 class="text-lg font-bold text-foreground">Brand Builder Assistant</h2>
-				<p class="text-xs text-muted-foreground">AI-powered questionnaire</p>
+			<div class="flex items-center gap-3">
+				<div>
+					<h2 class="text-lg font-bold text-foreground">Brand Builder Assistant</h2>
+					<p class="text-xs text-muted-foreground">AI-powered questionnaire</p>
+				</div>
+				{#if messages.length > 0}
+					<Button
+						onclick={clearChatMessages}
+						variant="ghost"
+						size="sm"
+						class="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+						title="Clear chat messages"
+					>
+						<Trash2 class="h-4 w-4" />
+					</Button>
+				{/if}
 			</div>
 			{#if !waitingForConfirmation && currentQuestionIndex >= 0 && currentQuestionIndex < questions.length}
 				<div class="text-right">
@@ -871,11 +1340,15 @@
 						</div>
 					</div>
 				{:else}
-					{@const shouldShowEdit = !waitingForConfirmation && message.type === 'user' && message.questionIndex !== undefined}
+					{@const shouldShowEdit = !waitingForConfirmation && message.type === 'user' && message.questionIndex !== undefined && message.questionIndex >= 0}
 					<ChatMessage 
 						{message} 
 						canEdit={shouldShowEdit}
-						onEdit={() => message.questionIndex !== undefined && handleEditAnswer(message.questionIndex)}
+						onEdit={() => {
+							if (message.questionIndex !== undefined && message.questionIndex >= 0) {
+								handleEditAnswer(message.questionIndex);
+							}
+						}}
 					/>
 				{/if}
 			{/each}
@@ -897,70 +1370,91 @@
 		<div class="p-4 border-t border-border/50 flex-shrink-0 space-y-3 bg-card/50">
 			<!-- Edit Mode Indicator -->
 			{#if isEditingMode && editingQuestionIndex >= 0}
-				<div class="flex items-center gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
-					<Edit2 class="h-4 w-4 text-orange-500" />
-					<span class="text-sm text-foreground">
-						Editing: <strong>{questions[editingQuestionIndex].question}</strong>
-					</span>
-				</div>
+				{@const questionsToUse = allQuestions.length > 0 ? allQuestions : questions}
+				{@const editingQuestion = questionsToUse[editingQuestionIndex]}
+				{#if editingQuestion}
+					<div class="flex items-center gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+						<Edit2 class="h-4 w-4 text-orange-500" />
+						<span class="text-sm text-foreground">
+							Editing: <strong>{editingQuestion.question}</strong>
+						</span>
+					</div>
+				{/if}
 			{/if}
 			
 			<!-- Logo Options UI -->
-			{#if !waitingForConfirmation && currentQuestionIndex >= 0 && questions[currentQuestionIndex]?.type === 'logo' && !conversationComplete}
-				<div class="space-y-3">
-					<div class="grid grid-cols-2 gap-3">
-						<Button
-							onclick={triggerFileUpload}
-							variant="outline"
-							class="flex-1 border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500/50"
-							size="lg"
-						>
-							<Upload class="mr-2 h-5 w-5" />
-							Upload Logo
-						</Button>
-						<Button
-							onclick={handleGenerateLogo}
-							variant="outline"
-							class="flex-1 border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500/50"
-							size="lg"
-						>
-							<Sparkles class="mr-2 h-5 w-5" />
-							Generate with AI
-						</Button>
+			{#if !waitingForConfirmation && currentQuestionIndex >= 0 && !conversationComplete}
+				{@const questionsToUse = allQuestions.length > 0 ? allQuestions : questions}
+				{#if questionsToUse[currentQuestionIndex]?.type === 'logo'}
+					<div class="space-y-3">
+						<div class="grid grid-cols-2 gap-3">
+							<Button
+								onclick={triggerFileUpload}
+								variant="outline"
+								class="flex-1 border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500/50"
+								size="lg"
+							>
+								<Upload class="mr-2 h-5 w-5" />
+								Upload Logo
+							</Button>
+							<Button
+								onclick={handleGenerateLogo}
+								variant="outline"
+								class="flex-1 border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500/50"
+								size="lg"
+							>
+								<Sparkles class="mr-2 h-5 w-5" />
+								Generate with AI
+							</Button>
+						</div>
+						<!-- Skip button removed for logo - logo is required -->
 					</div>
-					<!-- Skip button removed for logo - logo is required -->
-				</div>
-				<input
-					bind:this={fileInput}
-					type="file"
-					class="hidden"
-					accept="image/*"
-					onchange={handleLogoUpload}
-				/>
-			<!-- Regular Input -->
-			{:else if !conversationComplete || isEditingMode || waitingForStepFeedback}
+					<input
+						bind:this={fileInput}
+						type="file"
+						class="hidden"
+						accept="image/*"
+						onchange={handleLogoUpload}
+					/>
+				{/if}
+			{/if}
+			
+			<!-- Regular Input - Always show input field, even after conversation complete -->
+			{#if !waitingForConfirmation || conversationComplete}
 				<div class="flex items-end gap-2">
 					{#if isMultiline && !waitingForConfirmation}
 						<Textarea
+							bind:ref={textareaInput}
 							bind:value={userInput}
-							placeholder="Type your answer..."
+							placeholder={conversationComplete ? "Add more details or ask questions about your brand..." : "Type your answer..."}
 							rows={3}
 							class="flex-1 resize-none"
 							onkeydown={handleKeyPress}
-							autofocus
 						/>
 					{:else}
 						<Input
+							bind:ref={textInput}
 							bind:value={userInput}
-							placeholder={waitingForConfirmation ? "Type 'yes' to start..." : waitingForStepFeedback ? "Describe what you'd like to change..." : isEditingMode ? "Edit your answer..." : "Type your answer..."}
+							placeholder={
+								waitingForInitialPrompt 
+									? "Describe your brand (e.g., 'Create brand for TechFlow, SaaS company, minimalistic')..." 
+									: waitingForConfirmation 
+										? "Type 'yes' to start..." 
+										: waitingForStepFeedback 
+											? "Describe what you'd like to change..." 
+											: isEditingMode 
+												? "Edit your answer..." 
+												: conversationComplete
+													? "Add more details or ask questions about your brand..."
+													: "Type your answer..."
+							}
 							class="flex-1 text-base"
 							onkeydown={handleKeyPress}
-							autofocus
 						/>
 					{/if}
 					<Button
 						onclick={handleSubmit}
-						disabled={!userInput.trim() && (waitingForStepFeedback || (!waitingForConfirmation && currentQuestionIndex >= 0 && questions[currentQuestionIndex]?.required))}
+						disabled={!userInput.trim() && (waitingForStepFeedback || (!waitingForInitialPrompt && !waitingForConfirmation && !conversationComplete && currentQuestionIndex >= 0 && (allQuestions.length > 0 ? allQuestions[currentQuestionIndex] : questions[currentQuestionIndex])?.required))}
 						class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
 						size="lg"
 					>
@@ -986,8 +1480,9 @@
 									returnToQuestionIndex = -1;
 									
 									// Restore the UI state for the current question
-									if (currentQuestionIndex < questions.length) {
-										const currentQ = questions[currentQuestionIndex];
+									const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
+									if (currentQuestionIndex >= 0 && currentQuestionIndex < questionsToUse.length) {
+										const currentQ = questionsToUse[currentQuestionIndex];
 										isMultiline = currentQ.type === 'textarea';
 										showSuggestions = currentQ.type === 'text-with-suggestions';
 										if (showSuggestions && currentQ.suggestions) {
@@ -1000,7 +1495,7 @@
 						>
 							Cancel
 						</Button>
-					{:else if !waitingForConfirmation && isCurrentQuestionOptional}
+					{:else if !waitingForConfirmation && !conversationComplete && isCurrentQuestionOptional}
 						<Button variant="ghost" onclick={handleSkip} size="lg">Skip</Button>
 					{/if}
 				</div>
@@ -1012,12 +1507,12 @@
 				</div>
 			{/if}
 
-			<!-- Generate Button (shown after conversation complete) -->
-			{#if conversationComplete && !isEditingMode && !waitingForStepFeedback && !isGeneratingGuidelines}
+			<!-- Generate Button (shown after conversation complete, but not when editing) -->
+			{#if conversationComplete && !isEditingMode && !waitingForStepFeedback && !isGeneratingGuidelines && !userInput.trim()}
 				<Button
 					onclick={handleGenerate}
-					disabled={!canGenerate}
-					class="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg"
+					disabled={!effectiveCanGenerate}
+					class="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg mt-2"
 					size="lg"
 				>
 					<Sparkles class="mr-2 h-5 w-5" />

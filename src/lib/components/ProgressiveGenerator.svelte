@@ -14,7 +14,7 @@
 		ThumbsDown
 	} from 'lucide-svelte';
 	import type { BrandGuidelinesInput } from '$lib/types/brand-guidelines';
-	import { GENERATION_STEPS, type GenerationStep } from '$lib/utils/progressive-generation';
+	import { COMMON_GENERATION_STEPS, getAllStepsForIndustry, type GenerationStep } from '$lib/utils/progressive-generation';
 	import { getDomainSpecificStepInfo } from '$lib/utils/domain-specific-steps';
 
 	export let brandInput: BrandGuidelinesInput;
@@ -42,8 +42,8 @@
 	// Navigation state - which step is currently visible
 	let currentStepIndex = 0;
 
-	// Available step definitions (without final-review)
-	let stepDefinitions = [
+	// Common step definitions (always shown)
+	const commonStepDefinitions = [
 		{
 			id: 'brand-positioning',
 			defaultTitle: 'Brand Positioning',
@@ -68,21 +68,61 @@
 			id: 'iconography',
 			defaultTitle: 'Iconography',
 			defaultDescription: 'Icon style and examples'
-		},
-		{
-			id: 'photography',
-			defaultTitle: 'Photography',
-			defaultDescription: 'Photo style guidelines'
-		},
-		{
-			id: 'applications',
-			defaultTitle: 'Applications',
-			defaultDescription: 'Brand applications'
 		}
 	];
 
+	// Dynamic step definitions (industry-specific, loaded dynamically)
+	let stepDefinitions = [...commonStepDefinitions];
+
 	// Store AI-generated titles
 	let aiGeneratedTitles: Array<{ id: string; title: string; description: string }> = [];
+
+	// Load industry-specific steps dynamically
+	async function loadIndustrySteps() {
+		if (!brandInput.brand_domain) {
+			// No industry specified, use only common steps
+			stepDefinitions = [...commonStepDefinitions];
+			return;
+		}
+
+		try {
+			// Get industry-specific steps from the utility function
+			const industry = brandInput.brand_domain;
+			const industrySpecificInfo = brandInput.industrySpecificInfo || {};
+			const allStepIds = await getAllStepsForIndustry(industry, Object.keys(industrySpecificInfo).length > 0 ? industrySpecificInfo : undefined);
+			
+			// Build step definitions from step IDs
+			// Common steps first
+			const newStepDefinitions = [...commonStepDefinitions];
+			
+			// Add industry-specific steps
+			const industryStepIds = allStepIds.slice(commonStepDefinitions.length);
+			for (const stepId of industryStepIds) {
+				// Generate default title/description for industry-specific steps
+				const stepName = stepId.split('-').map(word => 
+					word.charAt(0).toUpperCase() + word.slice(1)
+				).join(' ');
+				newStepDefinitions.push({
+					id: stepId,
+					defaultTitle: stepName,
+					defaultDescription: `Industry-specific guidelines for ${stepName.toLowerCase()}`
+				});
+			}
+			
+			stepDefinitions = newStepDefinitions;
+			console.log('Loaded industry-specific steps:', {
+				industry,
+				totalSteps: stepDefinitions.length,
+				commonSteps: commonStepDefinitions.length,
+				industrySteps: industryStepIds.length,
+				stepIds: allStepIds
+			});
+		} catch (error) {
+			console.error('Failed to load industry-specific steps:', error);
+			// Fallback to common steps only
+			stepDefinitions = [...commonStepDefinitions];
+		}
+	}
 
 	// Function to generate dynamic step titles via AI
 	async function generateStepTitles() {
@@ -101,16 +141,24 @@
 
 			if (response.ok) {
 				const generatedSteps = await response.json();
-				// Filter out final-review from AI generated titles
-				aiGeneratedTitles = generatedSteps.filter((s: any) => s.id !== 'final-review');
+				aiGeneratedTitles = generatedSteps;
 			}
 		} catch (error) {
 			console.error('Failed to generate step titles:', error);
 		}
 	}
 
-	// Generate step titles when component mounts or input changes
-	$: if (brandInput.brand_name && brandInput.brand_domain && !hasStarted) {
+	// Track if steps are loaded
+	let stepsLoaded = false;
+	let isLoadingSteps = false;
+
+	// Load industry steps and generate titles when component mounts or input changes
+	$: if (brandInput.brand_name && brandInput.brand_domain && !hasStarted && !isLoadingSteps) {
+		isLoadingSteps = true;
+		loadIndustrySteps().then(() => {
+			stepsLoaded = true;
+			isLoadingSteps = false;
+		});
 		generateStepTitles();
 	}
 
@@ -126,6 +174,22 @@
 	}
 
 	async function startProgressiveGeneration() {
+		// Ensure steps are loaded before starting generation
+		if (!stepsLoaded && brandInput.brand_domain) {
+			console.log('[ProgressiveGenerator] Waiting for industry steps to load...');
+			await loadIndustrySteps();
+			stepsLoaded = true;
+		}
+		
+		// Validate stepDefinitions before starting
+		if (stepDefinitions.length === 0) {
+			console.error('[ProgressiveGenerator] No step definitions available!');
+			alert('Failed to load step definitions. Please refresh and try again.');
+			return;
+		}
+		
+		console.log('[ProgressiveGenerator] Starting generation with steps:', stepDefinitions.map(s => s.id));
+		
 		hasStarted = true;
 		generatedSteps = [];
 		currentStepIndex = 0;
@@ -149,6 +213,13 @@
 	}
 
 	async function generateNextStep() {
+		// Ensure steps are loaded before generating
+		if (!stepsLoaded && brandInput.brand_domain) {
+			console.log('[ProgressiveGenerator] Steps not loaded yet, loading now...');
+			await loadIndustrySteps();
+			stepsLoaded = true;
+		}
+		
 		// Check if all steps are generated
 		if (generatedSteps.length >= stepDefinitions.length) {
 			// All steps complete - trigger completion
@@ -156,9 +227,31 @@
 			return;
 		}
 
+		// Validate we have a valid step definition
+		if (generatedSteps.length >= stepDefinitions.length) {
+			console.error('[ProgressiveGenerator] No more steps to generate!');
+			await completeGeneration();
+			return;
+		}
+
 		isGeneratingNewStep = true;
 		const nextStepDef = stepDefinitions[generatedSteps.length];
+		
+		// Validate step definition exists
+		if (!nextStepDef || !nextStepDef.id) {
+			console.error('[ProgressiveGenerator] Invalid step definition at index:', generatedSteps.length);
+			console.error('[ProgressiveGenerator] Available stepDefinitions:', stepDefinitions);
+			throw new Error(`Invalid step definition at index ${generatedSteps.length}`);
+		}
+		
 		const stepInfo = getStepInfo(nextStepDef.id);
+		
+		console.log('[ProgressiveGenerator] Generating step:', {
+			stepId: nextStepDef.id,
+			stepIndex: generatedSteps.length,
+			totalSteps: stepDefinitions.length,
+			allStepIds: stepDefinitions.map(s => s.id)
+		});
 
 		// Add a placeholder for the new step
 		const newStepIndex = generatedSteps.length;
@@ -258,12 +351,66 @@
 					});
 				}
 			} else {
+				// Check if error is due to invalid step - reload steps and retry
+				if (result.error && result.error.includes('Invalid generation step')) {
+					console.warn('[ProgressiveGenerator] Step mismatch detected, reloading steps...');
+					// Remove the invalid step placeholder
+					generatedSteps = generatedSteps.slice(0, -1);
+					
+					// Reload steps from server
+					stepsLoaded = false;
+					await loadIndustrySteps();
+					stepsLoaded = true;
+					
+					// Check if we still have steps to generate
+					if (generatedSteps.length >= stepDefinitions.length) {
+						// No more steps
+						await completeGeneration();
+						return;
+					}
+					
+					// Get the correct step for this index
+					const correctStepDef = stepDefinitions[generatedSteps.length];
+					if (correctStepDef && correctStepDef.id !== nextStepDef.id) {
+						// Different step - retry with correct step
+						console.log('[ProgressiveGenerator] Step corrected after reload, retrying:', {
+							old: nextStepDef.id,
+							new: correctStepDef.id
+						});
+						// Retry with correct step (this will create a new step with the correct ID)
+						return await generateNextStep();
+					} else if (!correctStepDef) {
+						// No more steps
+						await completeGeneration();
+						return;
+					} else {
+						// Same step ID but server rejected it - this is unexpected
+						throw new Error(`Step ${nextStepDef.id} is invalid according to server. Please refresh and try again.`);
+					}
+				}
 				throw new Error(result.error || 'Failed to generate step');
 			}
 		} catch (error) {
 			console.error('Error generating step:', error);
 			// Remove the failed step
 			generatedSteps = generatedSteps.slice(0, -1);
+			
+			// If it's an invalid step error, try to recover
+			if (error instanceof Error && error.message.includes('Invalid generation step')) {
+				console.warn('[ProgressiveGenerator] Attempting to recover from invalid step error...');
+				// Reload steps and try again
+				stepsLoaded = false;
+				try {
+					await loadIndustrySteps();
+					stepsLoaded = true;
+					// Retry generation
+					await generateNextStep();
+					return;
+				} catch (reloadError) {
+					console.error('[ProgressiveGenerator] Failed to reload steps:', reloadError);
+				}
+			}
+			
 			alert('Failed to generate this step. Please try again.');
 		} finally {
 			isGeneratingNewStep = false;

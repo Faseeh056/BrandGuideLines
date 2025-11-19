@@ -6,8 +6,44 @@ import type {
 	BrandGuidelinesResponse
 } from '$lib/types/brand-guidelines';
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(env.GOOGLE_GEMINI_API);
+// Safety check: ensure env is defined
+if (!env) {
+	console.error('[gemini.ts] ERROR: env is undefined! Environment variables may not be loaded.');
+}
+
+// Initialize Gemini AI (lazy initialization to avoid errors if env is not loaded)
+let genAI: GoogleGenerativeAI | null = null;
+
+function getGenAI(): GoogleGenerativeAI {
+	if (!genAI) {
+		// Get API key - check env object first, then process.env directly as fallback
+		let apiKey = env?.GOOGLE_GEMINI_API || '';
+		
+		// If not found in env object, try process.env directly (in case .env wasn't loaded yet)
+		if (!apiKey || apiKey.trim() === '') {
+			if (typeof process !== 'undefined' && process.env) {
+				// Try Google_Gemini_Api first (user's variable name)
+				apiKey = process.env.Google_Gemini_Api || 
+				         process.env.GOOGLE_GEMINI_API || 
+				         process.env.GOOGLE_AI_API_KEY || '';
+				
+				if (apiKey) {
+					// Clean the value (remove quotes and trim)
+					apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+					console.log('[gemini] ✓ Found API key in process.env directly');
+				}
+			}
+		}
+		
+		if (!apiKey || apiKey.trim() === '') {
+			console.error('[gemini] API key not found. env.GOOGLE_GEMINI_API:', env?.GOOGLE_GEMINI_API || 'undefined/empty');
+			console.error('[gemini] process.env.Google_Gemini_Api:', typeof process !== 'undefined' && process.env ? process.env.Google_Gemini_Api || 'NOT FOUND' : 'process not available');
+			throw new Error('GOOGLE_GEMINI_API is not configured. Please check your .env file and ensure Google_Gemini_Api is set correctly, then restart the dev server.');
+		}
+		genAI = new GoogleGenerativeAI(apiKey);
+	}
+	return genAI;
+}
 
 export interface BrandGuidelineRequest {
 	brandName: string;
@@ -33,12 +69,12 @@ export async function optimizeSlideLayoutWithGemini(
 	slideType: string
 ): Promise<any> {
 	try {
-		if (!env.GOOGLE_GEMINI_API) {
+		if (!env?.GOOGLE_GEMINI_API) {
 			console.warn('Gemini API not available, using template as-is');
 			return template;
 		}
 
-		const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 		// Create layout optimization prompt
 		const prompt = createLayoutOptimizationPrompt(template, stepData, slideType);
@@ -130,12 +166,12 @@ export async function splitContentWithHeadings(
 	maxChars: number = 800
 ): Promise<Array<{title: string, content: string}>> {
 	try {
-		if (!env.GOOGLE_GEMINI_API) {
+		if (!env?.GOOGLE_GEMINI_API) {
 			// Fallback: simple split without Gemini
 			return splitContentSimple(content, title, maxChars);
 		}
 
-		const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 		const prompt = `
 You are a STRICT content organization expert. Split content with ZERO duplication and perfect placement.
@@ -246,11 +282,11 @@ export async function generateBrandGuidelines(request: BrandGuidelineRequest): P
 	
 	try {
 		// Check if API key is available
-		if (!env.GOOGLE_GEMINI_API) {
+		if (!env?.GOOGLE_GEMINI_API) {
 			throw new Error('Google Gemini API key is not configured. Please check your environment variables.');
 		}
 
-		const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 		// Create a comprehensive prompt for brand guideline generation
 		const prompt = createBrandGuidelinePrompt(request);
@@ -277,11 +313,11 @@ export async function generateBrandGuidelines(request: BrandGuidelineRequest): P
 export async function generateComprehensiveBrandGuidelines(input: BrandGuidelinesInput): Promise<BrandGuidelinesSpec> {
 	try {
 		// Check if API key is available
-		if (!env.GOOGLE_GEMINI_API) {
+		if (!env?.GOOGLE_GEMINI_API) {
 			throw new Error('Google Gemini API key is not configured. Please check your environment variables.');
 		}
 
-		const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 		// Create a comprehensive prompt for structured brand guideline generation
 		const prompt = createComprehensiveBrandGuidelinePrompt(input);
@@ -541,11 +577,11 @@ export async function generateStepTitles(input: {
 	selectedAudience?: string;
 }): Promise<Array<{ id: string; title: string; description: string }>> {
 	try {
-		if (!env.GOOGLE_GEMINI_API) {
+		if (!env?.GOOGLE_GEMINI_API) {
 			throw new Error('Google Gemini API key is not configured');
 		}
 
-		const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 		const prompt = `Generate 8 easy-to-understand step titles and descriptions for a brand guideline creation process for "${input.brand_name}" in the ${input.brand_domain} industry.
 
@@ -600,11 +636,6 @@ Return as JSON array with this exact structure:
     "id": "applications",
     "title": "Dynamic title based on brand and industry",
     "description": "Dynamic description based on brand context"
-  },
-  {
-    "id": "final-review",
-    "title": "Dynamic title based on brand and industry", 
-    "description": "Dynamic description based on brand context"
   }
 ]
 
@@ -632,8 +663,7 @@ Return ONLY the JSON array, no additional text.`;
 			{ id: 'typography', title: `Selecting ${input.brand_name}'s Fonts`, description: `Picking fonts that represent your brand perfectly` },
 			{ id: 'iconography', title: `Designing ${input.brand_name}'s Icons`, description: `Creating consistent icon style guidelines` },
 			{ id: 'photography', title: `Shaping ${input.brand_name}'s Visual Style`, description: `Defining your brand's photography mood and style` },
-			{ id: 'applications', title: `Applying ${input.brand_name}'s Brand`, description: `Using your brand across different materials and platforms` },
-			{ id: 'final-review', title: `Reviewing ${input.brand_name}'s Guidelines`, description: `Final review of your complete brand guidelines` }
+			{ id: 'applications', title: `Applying ${input.brand_name}'s Brand`, description: `Using your brand across different materials and platforms` }
 		];
 	} catch (error) {
 		console.error('Error generating step titles:', error);
@@ -659,7 +689,7 @@ export async function generateProgressiveBrandGuidelines(request: {
 	for (let attempt = 1; attempt <= maxRetries; attempt++) {
 		try {
 			// Check if API key is available
-			if (!env.GOOGLE_GEMINI_API) {
+			if (!env?.GOOGLE_GEMINI_API) {
 				throw new Error('Google Gemini API key is not configured. Please check your environment variables.');
 			}
 
@@ -668,8 +698,8 @@ export async function generateProgressiveBrandGuidelines(request: {
 			const temperature = request.step === 'typography' ? 0.75 : 0.3;
 			const topP = request.step === 'typography' ? 0.95 : 0.9;
 			const topK = request.step === 'typography' ? 50 : 40;
-			const model = genAI.getGenerativeModel({ 
-				model: 'gemini-2.0-flash-exp',
+			const model = getGenAI().getGenerativeModel({ 
+				model: 'gemini-2.0-flash',
 				generationConfig: {
 					temperature: temperature,
 					topP: topP,
@@ -685,103 +715,7 @@ export async function generateProgressiveBrandGuidelines(request: {
 			const response = await result.response;
 			const text = response.text();
 
-			// For final step, build complete brand guidelines object
-			if (request.step === 'final-review') {
-				// Build complete brand guidelines from previous steps
-				const completeGuidelines: BrandGuidelinesSpec = {
-					brand_name: request.previousSteps.brand_name || 'Your Brand',
-					brand_domain: request.previousSteps.brand_domain || 'General Business',
-					short_description: request.previousSteps.short_description || '',
-					positioning_statement: '',
-					vision: '',
-					mission: '',
-					values: [],
-					target_audience: '',
-					differentiation: '',
-					voice_and_tone: {
-						adjectives: [],
-						guidelines: '',
-						sample_lines: []
-					},
-					brand_personality: {
-						identity: '',
-						language: '',
-						voice: '',
-						characteristics: [],
-						motivation: '',
-						fear: ''
-					},
-					logo: {
-						primary: '',
-						variants: [],
-						color_versions: [],
-						clear_space_method: '',
-						minimum_sizes: [],
-						correct_usage: [],
-						incorrect_usage: []
-					},
-					colors: {
-						core_palette: [],
-						secondary_palette: []
-					},
-					typography: {
-						primary: {
-							name: '',
-							weights: [],
-							usage: '',
-							fallback_suggestions: [],
-							web_link: ''
-						},
-						supporting: {
-							name: '',
-							weights: [],
-							usage: '',
-							fallback_suggestions: [],
-							web_link: ''
-						},
-						secondary: []
-					},
-					iconography: {
-						style: '',
-						grid: '',
-						stroke: '',
-						color_usage: '',
-						specific_icons: [],
-						notes: ''
-					},
-					patterns_gradients: [],
-					photography: {
-						mood: [],
-						guidelines: '',
-						examples: []
-					},
-					applications: [],
-					dos_and_donts: [],
-					legal_contact: {
-						contact_name: '',
-						title: '',
-						email: '',
-						company: '',
-						address: '',
-						website: ''
-					},
-					export_files: {
-						pptx: '',
-						assets_zip: '',
-						json: ''
-					},
-					created_at: new Date().toISOString(),
-					version: '1.0'
-				};
-
-				return {
-					content: text,
-					brandGuidelines: completeGuidelines,
-					message: 'Final brand guidelines generated successfully!'
-				};
-			}
-
-			// For other steps, return text content
+			// Return text content for all steps
 			return {
 				content: text,
 				message: getStepMessage(request.step)
@@ -1369,31 +1303,6 @@ ${feedback ? `- REMEMBER: User feedback is MANDATORY - implement their exact req
 
 Return ONLY the formatted text with dynamic headings relevant to the industry.`;
 
-		case 'final-review':
-			return `${baseInfo}
-
-Generate brief final review content (1-2 lines per section) summarizing all brand guidelines for ${previousSteps.brand_domain || 'General Business'} industry.
-
-CRITICAL REQUIREMENTS:
-- Keep all descriptions brief - maximum 1-2 lines each
-- Summarize all previous steps in concise format
-- Make content actionable and clear
-- Include visual references where applicable
-
-FORMAT AS:
-**Brand Summary**: [1-2 line brand overview based on user input]
-**Key Guidelines**: [1-2 line key guidelines summary based on user input]
-**Implementation**: [1-2 line implementation notes based on user input]
-**Next Steps**: [1-2 line next steps based on user input]
-
-IMPORTANT: 
-- Use **bold** formatting for ALL headings
-- Summarize content based on user's brand name, description, mood, and audience
-- Keep descriptions brief - maximum 1-2 lines each
-- Summarize only the sections that were actually generated for this industry
-
-Return ONLY the formatted text above.`;
-
 		default:
 			throw new Error(`Unknown step: ${step}`);
 	}
@@ -1415,8 +1324,6 @@ function getStepMessage(step: string): string {
 			return '✅ Photography style defined! Review the visual guidelines and approve to proceed.';
 		case 'applications':
 			return '✅ Brand applications mapped! Review the usage guidelines and approve to continue.';
-		case 'final-review':
-			return '🎉 Brand guidelines complete! Review everything and approve to finalize your brand guide.';
 		default:
 			return 'Step completed! Please review and approve to continue.';
 	}

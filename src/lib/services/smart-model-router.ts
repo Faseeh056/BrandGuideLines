@@ -47,8 +47,26 @@ export class SmartModelRouter {
 			}
 
 			// Initialize Gemini if API key exists
-			if (env.GOOGLE_GEMINI_API) {
-				this.gemini = new GoogleGenerativeAI(env.GOOGLE_GEMINI_API);
+			// Get API key - check env object first, then process.env directly as fallback
+			let geminiApiKey = env?.GOOGLE_GEMINI_API || '';
+			
+			// If not found in env object, try process.env directly (prioritize Google_Gemini_Api)
+			if (!geminiApiKey || geminiApiKey.trim() === '') {
+				if (typeof process !== 'undefined' && process.env) {
+					// Try Google_Gemini_Api first (user's variable name)
+					geminiApiKey = process.env.Google_Gemini_Api || 
+					               process.env.GOOGLE_GEMINI_API || 
+					               process.env.GOOGLE_AI_API_KEY || '';
+					
+					if (geminiApiKey) {
+						// Clean the value (remove quotes and trim)
+						geminiApiKey = geminiApiKey.trim().replace(/^["']|["']$/g, '');
+					}
+				}
+			}
+			
+			if (geminiApiKey && geminiApiKey.trim() !== '') {
+				this.gemini = new GoogleGenerativeAI(geminiApiKey);
 				if (LOGGING.ENABLED) {
 					console.log('✅ Gemini client initialized');
 				}

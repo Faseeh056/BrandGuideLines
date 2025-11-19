@@ -2,21 +2,23 @@ import { json } from '@sveltejs/kit';
 import { db } from '$lib/db';
 import { brandGuidelines } from '$lib/db/schema';
 import { generateProgressiveBrandGuidelines } from '$lib/services/gemini';
+import { generateEnhancedProgressiveStep } from '$lib/services/enhanced-progressive-generator';
 import { 
 	extractColorsFromLogo, 
 	convertExtractedColorsToProgressiveFormat
 } from '$lib/services/color-extraction';
 import {
-	GENERATION_STEPS,
+	COMMON_GENERATION_STEPS,
 	type GenerationStep,
 	type ProgressiveGenerationRequest,
 	getNextStep,
-	getProgress
+	getProgress,
+	getAllStepsForIndustry
 } from '$lib/utils/progressive-generation';
 import type { RequestHandler } from './$types';
 import type { BrandGuidelinesInput } from '$lib/types/brand-guidelines';
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 	try {
 		const session = await locals.auth();
 
@@ -40,140 +42,41 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				stepHistory?: Array<{ step: string; content: string; approved: boolean }>;
 			};
 
-		// Validate step
-		const validSteps = [...GENERATION_STEPS, 'final-review'] as const;
-		if (!validSteps.includes(step as any)) {
-			console.error('Invalid step provided:', step);
+		// Extract industry for dynamic step validation
+		const industry = previousSteps?.brand_domain || previousSteps?.industry || '';
+		const industrySpecificInfo: Record<string, any> = {};
+		if (previousSteps) {
+			const standardFields = ['brand_name', 'brandName', 'brand_domain', 'industry', 'short_description', 'description', 'selectedMood', 'style', 'selectedAudience', 'audience', 'brandValues', 'values', 'customPrompt', 'logo_files', 'contact'];
+			Object.keys(previousSteps).forEach(key => {
+				if (!standardFields.includes(key) && previousSteps[key] !== undefined && previousSteps[key] !== null) {
+					industrySpecificInfo[key] = previousSteps[key];
+				}
+			});
+		}
+
+		// Validate step - be lenient for industry-specific steps
+		// Since Gemini is non-deterministic, the client and server might generate different step IDs
+		// So we accept any step that is either:
+		// 1. One of the common 5 steps, OR
+		// 2. An industry-specific step (not in common steps)
+		const isCommonStep = COMMON_GENERATION_STEPS.includes(step as any);
+		const isValidStep = isCommonStep || (industry && step && typeof step === 'string' && step.trim() !== '');
+		
+		if (!isValidStep) {
+			console.error('[progressive API] Invalid step provided:', step);
+			console.error('[progressive API] Industry:', industry);
 			return json(
 				{
-					error: 'Invalid generation step'
+					error: 'Invalid generation step',
+					details: `Step "${step}" is not valid. Must be one of the common steps or a valid industry-specific step.`,
 				},
 				{ status: 400 }
 			);
 		}
-
-		// For final review with step history, build complete guidelines from accumulated content
-		if (step === 'final-review' && userApproval && stepHistory) {
-			console.log(
-				'Processing final review with step history, steps:',
-				stepHistory.map((s) => s.step)
-			);
-			// Build complete brand guidelines from step history
-			const completeGuidelines = {
-				brand_name: previousSteps.brand_name || 'Your Brand',
-				brand_domain: previousSteps.brand_domain || 'General Business',
-				short_description: previousSteps.short_description || '',
-				positioning_statement: '',
-				vision: '',
-				mission: '',
-				values: [],
-				target_audience: '',
-				differentiation: '',
-				voice_and_tone: {
-					adjectives: [],
-					guidelines: '',
-					sample_lines: []
-				},
-				brand_personality: {
-					identity: '',
-					language: '',
-					voice: '',
-					characteristics: [],
-					motivation: '',
-					fear: ''
-				},
-				logo: {
-					primary: '',
-					variants: [],
-					color_versions: [],
-					clear_space_method: '',
-					minimum_sizes: [],
-					correct_usage: [],
-					incorrect_usage: []
-				},
-				colors: {
-					core_palette: [],
-					secondary_palette: []
-				},
-				typography: {
-					primary: {
-						name: '',
-						weights: [],
-						usage: '',
-						fallback_suggestions: [],
-						web_link: ''
-					},
-					supporting: {
-						name: '',
-						weights: [],
-						usage: '',
-						fallback_suggestions: [],
-						web_link: ''
-					},
-					secondary: []
-				},
-				iconography: {
-					style: '',
-					grid: '',
-					stroke: '',
-					color_usage: '',
-					specific_icons: [],
-					notes: ''
-				},
-				patterns_gradients: [],
-				photography: {
-					mood: [],
-					guidelines: '',
-					examples: []
-				},
-				applications: [],
-				dos_and_donts: [],
-				legal_contact: {
-					contact_name: '',
-					title: '',
-					email: '',
-					company: '',
-					address: '',
-					website: ''
-				},
-				export_files: {
-					pptx: '',
-					assets_zip: '',
-					json: ''
-				},
-				created_at: new Date().toISOString(),
-				version: '1.0'
-			};
-
-			console.log('Saving guidelines to database...');
-			const savedGuidelines = await db
-				.insert(brandGuidelines)
-				.values({
-					userId: session.user.id,
-					brandName: completeGuidelines.brand_name,
-					content: JSON.stringify(completeGuidelines),
-					structuredData: JSON.stringify(completeGuidelines),
-					brandDomain: completeGuidelines.brand_domain,
-					shortDescription: completeGuidelines.short_description
-					// Add other fields as needed
-				})
-				.returning();
-
-			console.log('Guidelines saved successfully:', savedGuidelines[0]?.id);
-
-			const response = {
-				success: true,
-				step: 'completed',
-				brandGuidelines: completeGuidelines,
-				savedGuidelines: savedGuidelines[0],
-				message: 'Brand guidelines generated and saved successfully!'
-			};
-
-			console.log('Returning response:', {
-				success: response.success,
-				hasGuidelines: !!response.brandGuidelines
-			});
-			return json(response);
+		
+		// Log validation (but don't reject industry-specific steps)
+		if (!isCommonStep) {
+			console.log('[progressive API] Accepting industry-specific step:', step, 'for industry:', industry);
 		}
 
 		// Extract colors and typography from logo if available and needed
@@ -272,17 +175,54 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		}
 
-		// Generate content for the current step (non-final-review steps)
-		const stepResult = await generateProgressiveBrandGuidelines({
-			step,
-			previousSteps: previousSteps || {},
-			userApproval,
-			feedback,
-			extractedColors,
-			extractedTypography
-		});
+		// Extract fields from previousSteps for enhanced generation
+		// Map brand_domain to industry, selectedMood to style, etc.
+		// Note: industry and industrySpecificInfo already extracted above for step validation
+		const brandName = previousSteps?.brand_name || previousSteps?.brandName || '';
+		const style = previousSteps?.selectedMood || previousSteps?.style || '';
+		const audience = previousSteps?.selectedAudience || previousSteps?.audience || '';
+		const description = previousSteps?.short_description || previousSteps?.description || '';
+		const values = previousSteps?.brandValues || previousSteps?.values || '';
+		
+		// Use enhanced progressive generator if we have the required fields
+		let stepResult;
+		if (brandName && industry && style) {
+			console.log('Using enhanced progressive generator with:', {
+				brandName,
+				industry,
+				style,
+				audience,
+				hasIndustrySpecificInfo: Object.keys(industrySpecificInfo).length > 0
+			});
+			
+			stepResult = await generateEnhancedProgressiveStep({
+				step,
+				brandName,
+				industry,
+				style,
+				audience: audience || undefined,
+				description: description || undefined,
+				values: values || undefined,
+				industrySpecificInfo: Object.keys(industrySpecificInfo).length > 0 ? industrySpecificInfo : undefined,
+				previousSteps: previousSteps || {},
+				feedback: feedback || undefined,
+				extractedColors: extractedColors || undefined,
+				extractedTypography: extractedTypography || undefined
+			});
+		} else {
+			// Fallback to old generator if required fields are missing
+			console.log('Using legacy progressive generator (missing required fields)');
+			stepResult = await generateProgressiveBrandGuidelines({
+				step,
+				previousSteps: previousSteps || {},
+				userApproval,
+				feedback,
+				extractedColors,
+				extractedTypography
+			});
+		}
 
-		console.log('Step result from generateProgressiveBrandGuidelines:', {
+		console.log('Step result:', {
 			step,
 			hasContent: !!stepResult.content,
 			contentType: typeof stepResult.content,
@@ -291,12 +231,35 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			hasExtractedTypography: !!extractedTypography
 		});
 
+		// Get next step and progress dynamically based on industry
+		// Note: For industry-specific steps, we don't need to regenerate steps
+		// The client has already determined the steps, so we just calculate next/progress
+		// If it's a common step, we can use the utility functions
+		// If it's an industry-specific step, we return null for nextStep (client will handle progression)
+		let nextStep: string | null = null;
+		let progress = 0;
+		
+		if (COMMON_GENERATION_STEPS.includes(step as any)) {
+			// For common steps, use the utility functions
+			nextStep = await getNextStep(step, industry, Object.keys(industrySpecificInfo).length > 0 ? industrySpecificInfo : undefined, fetch);
+			progress = await getProgress(step, industry, Object.keys(industrySpecificInfo).length > 0 ? industrySpecificInfo : undefined, fetch);
+		} else {
+			// For industry-specific steps, we can't reliably determine the next step
+			// because Gemini is non-deterministic. The client will handle progression.
+			// Just return a progress estimate (assuming we're past the common 5 steps)
+			const commonStepsCount = COMMON_GENERATION_STEPS.length;
+			// Estimate: if this is an industry step, we're at least past the common steps
+			// Use a conservative estimate (e.g., 60% if we're on first industry step)
+			progress = Math.min(95, Math.round(((commonStepsCount + 1) / (commonStepsCount + 3)) * 100));
+			console.log('[progressive API] Industry-specific step, using estimated progress:', progress);
+		}
+
 		const response = {
 			success: true,
 			step,
 			content: stepResult.content,
-			nextStep: step !== 'final-review' ? getNextStep(step as GenerationStep) : null,
-			progress: step !== 'final-review' ? getProgress(step as GenerationStep) : 100,
+			nextStep,
+			progress,
 			requiresApproval: true,
 			message: stepResult.message
 		};

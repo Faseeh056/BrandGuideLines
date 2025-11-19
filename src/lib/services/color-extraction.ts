@@ -59,10 +59,28 @@ export async function extractColorsFromLogo(
 	colorCount: number = 5
 ): Promise<ColorExtractionResponse> {
 	try {
+		// Get API key - check env object first, then process.env directly as fallback
+		let apiKey = env?.GOOGLE_GEMINI_API || '';
+		
+		// If not found in env object, try process.env directly (prioritize Google_Gemini_Api)
+		if (!apiKey || apiKey.trim() === '') {
+			if (typeof process !== 'undefined' && process.env) {
+				// Try Google_Gemini_Api first (user's variable name)
+				apiKey = process.env.Google_Gemini_Api || 
+				         process.env.GOOGLE_GEMINI_API || 
+				         process.env.GOOGLE_AI_API_KEY || '';
+				
+				if (apiKey) {
+					// Clean the value (remove quotes and trim)
+					apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+				}
+			}
+		}
+		
 		const formData = new FormData();
 		formData.append('file', logoFile);
 		formData.append('color_count', colorCount.toString());
-		formData.append('api_key', env.GOOGLE_GEMINI_API);
+		formData.append('api_key', apiKey || '');
 
 		const response = await fetch(`${COLOR_SERVICE_URL}/extract-colors`, {
 			method: 'POST',
@@ -87,9 +105,27 @@ export async function extractColorsFromLogo(
  */
 export async function detectFontFromLogo(logoFile: File): Promise<{ detected_font: string | null; has_text: boolean }> {
 	try {
+		// Get API key - check env object first, then process.env directly as fallback
+		let apiKey = env?.GOOGLE_GEMINI_API || '';
+		
+		// If not found in env object, try process.env directly (prioritize Google_Gemini_Api)
+		if (!apiKey || apiKey.trim() === '') {
+			if (typeof process !== 'undefined' && process.env) {
+				// Try Google_Gemini_Api first (user's variable name)
+				apiKey = process.env.Google_Gemini_Api || 
+				         process.env.GOOGLE_GEMINI_API || 
+				         process.env.GOOGLE_AI_API_KEY || '';
+				
+				if (apiKey) {
+					// Clean the value (remove quotes and trim)
+					apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+				}
+			}
+		}
+		
 		const formData = new FormData();
 		formData.append('file', logoFile);
-		formData.append('api_key', env.GOOGLE_GEMINI_API);
+		formData.append('api_key', apiKey || '');
 
 		const response = await fetch(`${COLOR_SERVICE_URL}/detect-font`, {
 			method: 'POST',
@@ -136,7 +172,25 @@ export async function extractTypographyFromLogo(
 		formData.append('short_description', brandInfo.shortDescription || '');
 		formData.append('mood', brandInfo.mood || 'Professional');
 		formData.append('audience', brandInfo.audience || 'General audience');
-		formData.append('api_key', env.GOOGLE_GEMINI_API);
+		// Get API key - check env object first, then process.env directly as fallback
+		let apiKey = env?.GOOGLE_GEMINI_API || '';
+		
+		// If not found in env object, try process.env directly (prioritize Google_Gemini_Api)
+		if (!apiKey || apiKey.trim() === '') {
+			if (typeof process !== 'undefined' && process.env) {
+				// Try Google_Gemini_Api first (user's variable name)
+				apiKey = process.env.Google_Gemini_Api || 
+				         process.env.GOOGLE_GEMINI_API || 
+				         process.env.GOOGLE_AI_API_KEY || '';
+				
+				if (apiKey) {
+					// Clean the value (remove quotes and trim)
+					apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+				}
+			}
+		}
+		
+		formData.append('api_key', apiKey || '');
 		
 		// Pass detected font to typography analysis
 		if (fontDetection.detected_font) {

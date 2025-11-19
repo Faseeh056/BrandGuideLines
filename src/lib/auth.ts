@@ -10,10 +10,15 @@ import { compare } from 'bcryptjs';
 import type { User, Account, Profile } from '@auth/core/types';
 import { env } from './env';
 
+// Safety check: ensure env is defined
+if (!env) {
+	console.error('[auth.ts] ERROR: env is undefined! Environment variables may not be loaded.');
+}
+
 export const authOptions = {
 	adapter: DrizzleAdapter(db, { user, account, session, verificationToken } as any),
-	trustHost: env.AUTH_TRUST_HOST,
-	secret: env.AUTH_SECRET,
+	trustHost: env?.AUTH_TRUST_HOST ?? false,
+	secret: env?.AUTH_SECRET || 'fallback-secret-key',
 	allowDangerousEmailAccountLinking: true, // Allow linking accounts with same email
 	session: {
 		strategy: 'database' as const,
@@ -27,7 +32,7 @@ export const authOptions = {
 				httpOnly: true,
 				sameSite: 'lax' as const,
 				path: '/',
-				secure: env.NODE_ENV === 'production'
+				secure: env?.NODE_ENV === 'production'
 			}
 		},
 		callbackUrl: {
@@ -35,7 +40,7 @@ export const authOptions = {
 			options: {
 				sameSite: 'lax' as const,
 				path: '/',
-				secure: env.NODE_ENV === 'production'
+				secure: env?.NODE_ENV === 'production'
 			}
 		},
 		csrfToken: {
@@ -44,14 +49,14 @@ export const authOptions = {
 				httpOnly: true,
 				sameSite: 'lax' as const,
 				path: '/',
-				secure: env.NODE_ENV === 'production'
+				secure: env?.NODE_ENV === 'production'
 			}
 		}
 	},
 	providers: [
 		Google({
-			clientId: env.AUTH_GOOGLE_ID,
-			clientSecret: env.AUTH_GOOGLE_SECRET,
+			clientId: env?.AUTH_GOOGLE_ID || '',
+			clientSecret: env?.AUTH_GOOGLE_SECRET || '',
 			authorization: {
 				params: {
 					prompt: 'select_account',
@@ -61,8 +66,8 @@ export const authOptions = {
 			}
 		}),
 		GitHub({
-			clientId: env.AUTH_GITHUB_ID,
-			clientSecret: env.AUTH_GITHUB_SECRET
+			clientId: env?.AUTH_GITHUB_ID || '',
+			clientSecret: env?.AUTH_GITHUB_SECRET || ''
 		}),
 		Credentials({
 			credentials: {

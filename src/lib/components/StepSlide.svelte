@@ -405,26 +405,57 @@
 		for (const line of lines) {
 			// Try different patterns to match various AI-generated formats
 			
-			// New markdown format: [Color name] - #hexcode
-			let colorMatch = line.match(/^\s*\[([^\]]+)\]\s*-\s*(#[0-9A-Fa-f]{6})\s*$/);
+			// Pattern 1: - Color Name: #HEXCODE (rgb: r, g, b) - description
+			let colorMatch = line.match(/^[\s\-*]*(.+?):\s*(#[0-9A-Fa-f]{6})\s*\(/i);
 			
-			// Original format: [Color Name] - #HEXCODE - [description]
+			// Pattern 2: - Color Name: #HEXCODE - description
 			if (!colorMatch) {
-				colorMatch = line.match(/([^-]+)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)/);
+				colorMatch = line.match(/^[\s\-*]*(.+?):\s*(#[0-9A-Fa-f]{6})\s*[-–]/i);
 			}
+			
+			// Pattern 3: Color Name - #HEXCODE (rgb: ...)
 			if (!colorMatch) {
-				colorMatch = line.match(/^\s*([^-]+)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)$/); // With line start/end
+				colorMatch = line.match(/^[\s\-*]*(.+?)\s*-\s*(#[0-9A-Fa-f]{6})\s*\(/i);
 			}
+			
+			// Pattern 4: Color Name - #HEXCODE - description
 			if (!colorMatch) {
-				colorMatch = line.match(/^\s*(.+?)\s*-\s*(#[0-9A-Fa-f]{6})\s*-\s*(.+)$/); // More flexible name matching
+				colorMatch = line.match(/^[\s\-*]*(.+?)\s*-\s*(#[0-9A-Fa-f]{6})\s*[-–]/i);
+			}
+			
+			// Pattern 5: [Color name] - #hexcode
+			if (!colorMatch) {
+				colorMatch = line.match(/^\s*\[([^\]]+)\]\s*-\s*(#[0-9A-Fa-f]{6})\s*$/i);
+			}
+			
+			// Pattern 6: Just hex code with name before it (more flexible)
+			if (!colorMatch) {
+				colorMatch = line.match(/^[\s\-*]*(.+?)\s*-\s*(#[0-9A-Fa-f]{6})\s*$/i);
+			}
+			
+			// Pattern 7: Find hex code anywhere in line, extract name from before it
+			if (!colorMatch) {
+				const hexMatch = line.match(/#[0-9A-Fa-f]{6}/i);
+				if (hexMatch) {
+					const hex = hexMatch[0];
+					const beforeHex = line.substring(0, hexMatch.index).trim();
+					// Extract name (take last word or phrase before hex)
+					const nameMatch = beforeHex.match(/([A-Za-z][A-Za-z\s]+?)(?:\s*[-–]|\s*\(|\s*$)/);
+					if (nameMatch) {
+						colorMatch = [null, nameMatch[1].trim(), hex];
+					} else if (beforeHex) {
+						// Use everything before hex as name
+						colorMatch = [null, beforeHex.replace(/^[\s\-*]+/, ''), hex];
+					}
+				}
 			}
 
-			if (colorMatch) {
-				const name = colorMatch[1].trim();
-				const hex = colorMatch[2].trim();
-				// Avoid duplicates
-				if (!colors.find((c) => c.hex === hex)) {
-					colors.push({ name, hex });
+			if (colorMatch && colorMatch[1] && colorMatch[2]) {
+				const name = colorMatch[1].trim().replace(/^[\s\-*]+/, '').replace(/[\s\-*]+$/, '');
+				const hex = colorMatch[2].trim().toUpperCase();
+				// Avoid duplicates and validate hex
+				if (hex.match(/^#[0-9A-Fa-f]{6}$/i) && !colors.find((c) => c.hex.toUpperCase() === hex.toUpperCase())) {
+					colors.push({ name: name || 'Color', hex });
 				}
 			}
 		}
@@ -1274,643 +1305,8 @@
 							</div>
 						</div>
 					</div>
-				{:else if stepId === 'final-review'}
-					<div class="final-review-slide">
-						<div class="final-review-header">
-							<h3 class="final-review-title">Complete Brand Guidelines</h3>
-							<p class="final-review-subtitle">Review all approved content from previous steps</p>
-						</div>
-
-						<div class="guidelines-summary">
-							<div class="summary-item">
-								<h4 class="summary-label">Brand Name</h4>
-								<p class="summary-value">{stepData.brand_name || 'Your Brand'}</p>
-							</div>
-							<div class="summary-item">
-								<h4 class="summary-label">Domain</h4>
-								<p class="summary-value">{stepData.brand_domain || 'General Business'}</p>
-							</div>
-							<div class="summary-item">
-								<h4 class="summary-label">Description</h4>
-								<p class="summary-value">{stepData.short_description || 'Professional brand'}</p>
-							</div>
-						</div>
-
-						<!-- Show each step exactly as it was displayed -->
-						{#if stepData.stepHistory}
-							<!-- Debug: Show step history info -->
-							<div class="debug-info" style="display: none;">
-								<p>Step History Length: {stepData.stepHistory.length}</p>
-								{#each stepData.stepHistory as stepItem, index}
-									<p>
-										Step {index}: {stepItem.step} - Approved: {stepItem.approved} - Has Content: {!!stepItem.content}
-									</p>
-								{/each}
-							</div>
-
-							{#each stepData.stepHistory as stepItem}
-								{#if stepItem.approved && stepItem.content}
-									<!-- Color Palette Step -->
-									{#if stepItem.step === 'color-palette'}
-										{@const extractedColors = extractColorsFromText(stepItem.content)}
-										<h3 class="section-title">Brand Colors</h3>
-										<div class="colors-grid">
-											{#each extractedColors as color}
-												<div class="color-swatch">
-													<div class="color-preview" style="background-color: {color.hex}"></div>
-													<div class="color-info">
-														<div class="color-name">{color.name}</div>
-														<div class="color-hex">{color.hex}</div>
-													</div>
-												</div>
-											{/each}
-										</div>
-										<!-- Iconography Step -->
-									{:else if stepItem.step === 'iconography'}
-										{@const extractedIcons = extractIconsFromText(stepItem.content)}
-										<h3 class="section-title">Icon System</h3>
-										<div class="icon-examples">
-											<h4 class="section-subtitle">Brand Icons</h4>
-											<div class="icon-list">
-												{#each extractedIcons as iconData}
-													<div class="icon-item">
-														<div class="icon-display">
-															<div class="icon-symbol">
-																<DynamicIcon name={iconData.name} size={32} strokeWidth={2} />
-															</div>
-															<div class="icon-name">{iconData.name}</div>
-														</div>
-													</div>
-												{/each}
-											</div>
-										</div>
-										<!-- Logo Guidelines Step -->
-									{:else if stepItem.step === 'logo-guidelines'}
-										<h3 class="section-title">Logo Guidelines</h3>
-										{#if stepData.visualElements?.logoFiles && stepData.visualElements.logoFiles.length > 0}
-											<div class="logo-examples">
-												<h4 class="section-subtitle">Primary Logo</h4>
-												<div class="logo-display">
-													{#each stepData.visualElements.logoFiles as logoFile}
-														<div class="logo-example">
-															<img
-																src={logoFile.fileData || `/uploads/logos/${logoFile.filename}`}
-																alt="Brand Logo"
-																class="logo-example-image"
-															/>
-														</div>
-													{/each}
-												</div>
-											</div>
-
-											<!-- Logo Usage Guidelines -->
-											<div class="logo-usage-guidelines">
-												<!-- Do's Section -->
-												<div class="usage-section dos-section">
-													<h4 class="usage-title dos-title">✅ DO's</h4>
-													<div class="usage-examples">
-														{#each stepData.visualElements.logoFiles as logoFile}
-															<div class="usage-example">
-																<div class="example-label">Correct Usage</div>
-																<div class="logo-example correct">
-																	<img
-																		src={logoFile.fileData || `/uploads/logos/${logoFile.filename}`}
-																		alt="Correct Logo Usage"
-																		class="logo-example-image"
-																	/>
-																</div>
-															</div>
-														{/each}
-													</div>
-												</div>
-
-												<!-- Don'ts Section -->
-												<div class="usage-section donts-section">
-													<h4 class="usage-title donts-title">❌ DON'Ts</h4>
-													<div class="usage-examples">
-														{#each stepData.visualElements.logoFiles as logoFile}
-															<div class="usage-example">
-																<div class="example-label">Don't Stretch</div>
-																<div class="logo-example incorrect">
-																	<img
-																		src={logoFile.fileData || `/uploads/logos/${logoFile.filename}`}
-																		alt="Incorrect Logo Usage"
-																		class="logo-example-image stretched"
-																	/>
-																	<div class="x-mark">✕</div>
-																</div>
-															</div>
-															<div class="usage-example">
-																<div class="example-label">Don't Distort</div>
-																<div class="logo-example incorrect">
-																	<img
-																		src={logoFile.fileData || `/uploads/logos/${logoFile.filename}`}
-																		alt="Incorrect Logo Usage"
-																		class="logo-example-image distorted"
-																	/>
-																	<div class="x-mark">✕</div>
-																</div>
-															</div>
-															<div class="usage-example">
-																<div class="example-label">Don't Use on Busy Background</div>
-																<div class="logo-example incorrect busy-bg">
-																	<img
-																		src={logoFile.fileData || `/uploads/logos/${logoFile.filename}`}
-																		alt="Incorrect Logo Usage"
-																		class="logo-example-image"
-																	/>
-																	<div class="x-mark">✕</div>
-																</div>
-															</div>
-														{/each}
-													</div>
-												</div>
-											</div>
-										{:else}
-											<div class="no-logo-message">
-												<p>Upload a logo to see usage guidelines</p>
-											</div>
-										{/if}
-										<!-- Typography Step -->
-									{:else if stepItem.step === 'typography'}
-										{@const fontInfo = extractFontInfo(stepItem.content)}
-										<h3 class="section-title">Typography</h3>
-										{#if fontInfo.primary || fontInfo.supporting}
-											<!-- Visual typography display like professional examples -->
-											{#if fontInfo.primary}
-												<div class="typography-section">
-													<h4 class="section-subtitle">Primary Typeface</h4>
-													<div class="font-display">
-														<div
-															class="font-name-large"
-															style="font-family: '{fontInfo.primary.name}', serif;"
-														>
-															{fontInfo.primary.name}
-														</div>
-														<div
-															class="character-set"
-															style="font-family: '{fontInfo.primary.name}', serif;"
-														>
-															Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww
-															Xx Yy Zz<br />
-															0123456789
-														</div>
-														<div class="font-weights-grid">
-															{#each fontInfo.weights as weight}
-																<div
-																	class="weight-sample"
-																	style="font-family: '{fontInfo.primary
-																		.name}', serif; font-weight: {weight === 'bold'
-																		? 'bold'
-																		: weight === 'light'
-																			? '300'
-																			: 'normal'};"
-																>
-																	{weight.charAt(0).toUpperCase() + weight.slice(1)}
-																</div>
-															{/each}
-														</div>
-													</div>
-												</div>
-											{/if}
-
-											{#if fontInfo.supporting}
-												<div class="typography-section">
-													<h4 class="section-subtitle">Secondary Typeface</h4>
-													<div class="font-display">
-														<div
-															class="font-name-large"
-															style="font-family: '{fontInfo.supporting.name}', sans-serif;"
-														>
-															{fontInfo.supporting.name}
-														</div>
-														<div
-															class="character-set"
-															style="font-family: '{fontInfo.supporting.name}', sans-serif;"
-														>
-															Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww
-															Xx Yy Zz<br />
-															0123456789
-														</div>
-													</div>
-												</div>
-											{/if}
-										{:else}
-											<!-- Fallback: Show placeholder typography with generic names -->
-											<div class="typography-section">
-												<h4 class="section-subtitle">Primary Typeface</h4>
-												<div class="font-display">
-													<div class="font-name-large" style="font-family: 'Georgia', serif;">
-														Georgia
-													</div>
-													<div class="character-set" style="font-family: 'Georgia', serif;">
-														Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx
-														Yy Zz<br />
-														0123456789
-													</div>
-													<div class="font-weights-grid">
-														<div
-															class="weight-sample"
-															style="font-family: 'Georgia', serif; font-weight: normal;"
-														>
-															Regular
-														</div>
-														<div
-															class="weight-sample"
-															style="font-family: 'Georgia', serif; font-weight: bold;"
-														>
-															Bold
-														</div>
-														<div
-															class="weight-sample"
-															style="font-family: 'Georgia', serif; font-style: italic;"
-														>
-															Italic
-														</div>
-													</div>
-												</div>
-											</div>
-
-											<div class="typography-section">
-												<h4 class="section-subtitle">Secondary Typeface</h4>
-												<div class="font-display">
-													<div class="font-name-large" style="font-family: 'Arial', sans-serif;">
-														Arial
-													</div>
-													<div class="character-set" style="font-family: 'Arial', sans-serif;">
-														Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx
-														Yy Zz<br />
-														0123456789
-													</div>
-												</div>
-											</div>
-										{/if}
-										<!-- Photography Step -->
-									{:else if stepItem.step === 'photography'}
-										<h3 class="section-title">Photography</h3>
-										<div class="photo-grid">
-											<div class="photo-example">
-												<div class="photo-placeholder team">
-													<div class="photo-icon">📸</div>
-													<span class="photo-label">Photography</span>
-												</div>
-											</div>
-										</div>
-										<!-- Applications Step -->
-									{:else if stepItem.step === 'applications'}
-										<h3 class="section-title">Applications</h3>
-										<div class="applications-grid">
-											<div class="application-item">
-												<div class="app-icon">📄</div>
-												<h4 class="app-name">Brand Applications</h4>
-											</div>
-										</div>
-										<!-- Brand Positioning Step -->
-									{:else if stepItem.step === 'brand-positioning'}
-										<h3 class="section-title">Brand Positioning</h3>
-										<div class="brand-positioning-content">
-											<div class="positioning-summary">
-												<p>Brand positioning statement</p>
-											</div>
-										</div>
-										<!-- Other steps - show content as markdown -->
-									{:else}
-										<div class="step-content-text">
-											<h3 class="section-title">
-												{stepItem.step.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-											</h3>
-											{@html renderMarkdown(stepItem.content)}
-										</div>
-									{/if}
-								{/if}
-							{/each}
-						{:else}
-							<!-- Fallback: Show message if no step history available -->
-							<div class="no-content-message">
-								<h3 class="section-title">Brand Guidelines Summary</h3>
-								<p>
-									Complete brand guidelines will be displayed here after all steps are approved.
-								</p>
-							</div>
-						{/if}
-
-						<div class="guidelines-sections">
-							<!-- Brand Positioning Section -->
-							{#if stepData.positioning_statement || stepData.mission || stepData.vision}
-								<div class="guideline-section">
-									<h4 class="section-header">📍 Brand Positioning</h4>
-									{#if stepData.positioning_statement}
-										<div class="positioning-statement-review">
-											<p class="statement-text">"{stepData.positioning_statement}"</p>
-										</div>
-									{/if}
-									{#if stepData.mission}
-										<div class="mission-vision-item">
-											<strong>Mission:</strong>
-											{stepData.mission}
-										</div>
-									{/if}
-									{#if stepData.vision}
-										<div class="mission-vision-item">
-											<strong>Vision:</strong>
-											{stepData.vision}
-										</div>
-									{/if}
-									{#if stepData.voice_and_tone}
-										<div class="voice-tone-review">
-											<strong>Voice & Tone:</strong>
-											<div class="voice-adjectives">
-												{#each stepData.voice_and_tone.adjectives || [] as adjective}
-													<span class="voice-tag">{adjective}</span>
-												{/each}
-											</div>
-											<p class="voice-guidelines">{stepData.voice_and_tone.guidelines}</p>
-										</div>
-									{/if}
-								</div>
-							{/if}
-
-							<!-- Color Palette Section -->
-							{#if stepData.colors && stepData.colors.core_palette}
-								<div class="guideline-section">
-									<h4 class="section-header">🎨 Color Palette</h4>
-									<div class="colors-review-grid">
-										{#each stepData.colors.core_palette as color}
-											<div class="color-review-item">
-												<div
-													class="color-swatch-review"
-													style="background-color: {color.hex}"
-												></div>
-												<div class="color-details">
-													<div class="color-name-review">{color.name}</div>
-													<div class="color-hex-review">{color.hex}</div>
-													<div class="color-usage-review">{color.usage}</div>
-												</div>
-											</div>
-										{/each}
-									</div>
-								</div>
-							{/if}
-
-							<!-- Typography Section -->
-							{#if stepData.typography}
-								<div class="guideline-section">
-									<h4 class="section-header">📝 Typography</h4>
-									<div class="typography-review">
-										{#if stepData.typography.primary}
-											<div class="typography-section">
-												<h3 class="section-title">Primary Typeface</h3>
-												<div class="font-display">
-													<div
-														class="font-name-large"
-														style="font-family: '{stepData.typography.primary.name}', serif;"
-													>
-														{stepData.typography.primary.name}
-													</div>
-													<div
-														class="character-set"
-														style="font-family: '{stepData.typography.primary.name}', serif;"
-													>
-														Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx
-														Yy Zz<br />
-														0123456789
-													</div>
-													<div class="font-weights-grid">
-														<div
-															class="weight-sample"
-															style="font-family: '{stepData.typography.primary
-																.name}', serif; font-weight: normal;"
-														>
-															Regular
-														</div>
-														<div
-															class="weight-sample"
-															style="font-family: '{stepData.typography.primary
-																.name}', serif; font-weight: bold;"
-														>
-															Bold
-														</div>
-														<div
-															class="weight-sample"
-															style="font-family: '{stepData.typography.primary
-																.name}', serif; font-style: italic;"
-														>
-															Italic
-														</div>
-													</div>
-													{#if stepData.typography.primary.usage}
-														<div class="font-usage-text">{stepData.typography.primary.usage}</div>
-													{/if}
-												</div>
-											</div>
-										{/if}
-
-										{#if stepData.typography.supporting}
-											<div class="typography-section">
-												<h3 class="section-title">Secondary Typeface</h3>
-												<div class="font-display">
-													<div
-														class="font-name-large"
-														style="font-family: '{stepData.typography.supporting
-															.name}', sans-serif;"
-													>
-														{stepData.typography.supporting.name}
-													</div>
-													<div
-														class="character-set"
-														style="font-family: '{stepData.typography.supporting
-															.name}', sans-serif;"
-													>
-														Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx
-														Yy Zz<br />
-														0123456789
-													</div>
-													{#if stepData.typography.supporting.usage}
-														<div class="font-usage-text">
-															{stepData.typography.supporting.usage}
-														</div>
-													{/if}
-												</div>
-											</div>
-										{/if}
-									</div>
-								</div>
-							{:else if stepData.stepHistory}
-								<!-- Check if there's typography data in step history -->
-								{@const typographyStep = stepData.stepHistory.find((s) => s.step === 'typography')}
-								{#if typographyStep}
-									{@const fontInfo = extractFontInfo(typographyStep.content)}
-									<!-- Debug: Log final review typography -->
-									{console.log('Final review typographyStep:', typographyStep)}
-									{console.log('Final review fontInfo:', fontInfo)}
-									<div class="guideline-section">
-										<h4 class="section-header">📝 Typography</h4>
-										<div class="typography-review">
-											{#if fontInfo.primary}
-												<div class="typography-section">
-													<h3 class="section-title">Primary Typeface</h3>
-													<div class="font-display">
-														<div
-															class="font-name-large"
-															style="font-family: '{fontInfo.primary.name}', serif;"
-														>
-															{fontInfo.primary.name}
-														</div>
-														<div
-															class="character-set"
-															style="font-family: '{fontInfo.primary.name}', serif;"
-														>
-															Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww
-															Xx Yy Zz<br />
-															0123456789
-														</div>
-														<div class="font-weights-grid">
-															{#each fontInfo.weights as weight}
-																<div
-																	class="weight-sample"
-																	style="font-family: '{fontInfo.primary
-																		.name}', serif; font-weight: {weight === 'bold'
-																		? 'bold'
-																		: weight === 'light'
-																			? '300'
-																			: 'normal'};"
-																>
-																	{weight.charAt(0).toUpperCase() + weight.slice(1)}
-																</div>
-															{/each}
-														</div>
-														{#if fontInfo.primary.description}
-															<div class="font-usage-text">{fontInfo.primary.description}</div>
-														{/if}
-													</div>
-												</div>
-											{/if}
-
-											{#if fontInfo.supporting}
-												<div class="typography-section">
-													<h3 class="section-title">Secondary Typeface</h3>
-													<div class="font-display">
-														<div
-															class="font-name-large"
-															style="font-family: '{fontInfo.supporting.name}', sans-serif;"
-														>
-															{fontInfo.supporting.name}
-														</div>
-														<div
-															class="character-set"
-															style="font-family: '{fontInfo.supporting.name}', sans-serif;"
-														>
-															Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww
-															Xx Yy Zz<br />
-															0123456789
-														</div>
-														{#if fontInfo.supporting.description}
-															<div class="font-usage-text">{fontInfo.supporting.description}</div>
-														{/if}
-													</div>
-												</div>
-											{/if}
-										</div>
-									</div>
-								{/if}
-							{/if}
-
-							<!-- Iconography Section -->
-							{#if stepData.iconography}
-								<div class="guideline-section">
-									<h4 class="section-header">🔧 Iconography</h4>
-									<div class="iconography-review">
-										<div class="icon-spec-item">
-											<strong>Style:</strong>
-											{stepData.iconography.style}
-										</div>
-										<div class="icon-spec-item">
-											<strong>Grid:</strong>
-											{stepData.iconography.grid}
-										</div>
-										<div class="icon-spec-item">
-											<strong>Stroke:</strong>
-											{stepData.iconography.stroke}
-										</div>
-										{#if stepData.iconography.specific_icons && stepData.iconography.specific_icons.length > 0}
-											<div class="icon-spec-item">
-												<strong>Icons:</strong>
-												{stepData.iconography.specific_icons.join(', ')}
-											</div>
-										{/if}
-									</div>
-								</div>
-							{/if}
-
-							<!-- Photography Section -->
-							{#if stepData.photography}
-								<div class="guideline-section">
-									<h4 class="section-header">📸 Photography</h4>
-									<div class="photography-review">
-										{#if stepData.photography.mood && stepData.photography.mood.length > 0}
-											<div class="mood-tags-review">
-												{#each stepData.photography.mood as mood}
-													<span class="mood-tag-review">{mood}</span>
-												{/each}
-											</div>
-										{/if}
-										{#if stepData.photography.guidelines}
-											<p class="photo-guidelines">{stepData.photography.guidelines}</p>
-										{/if}
-									</div>
-								</div>
-							{/if}
-
-							<!-- Applications Section -->
-							{#if stepData.applications && stepData.applications.length > 0}
-								<div class="guideline-section">
-									<h4 class="section-header">📱 Applications</h4>
-									<div class="applications-review">
-										{#each stepData.applications as app}
-											<div class="app-review-item">
-												<h5 class="app-context">{app.context}</h5>
-												<p class="app-description-review">{app.description}</p>
-												{#if app.layout_notes && app.layout_notes.length > 0}
-													<ul class="layout-notes">
-														{#each app.layout_notes as note}
-															<li class="layout-note">{note}</li>
-														{/each}
-													</ul>
-												{/if}
-											</div>
-										{/each}
-									</div>
-								</div>
-							{/if}
-
-							<!-- Legal Contact Section -->
-							{#if stepData.legal_contact}
-								<div class="guideline-section">
-									<h4 class="section-header">📞 Legal Contact</h4>
-									<div class="legal-contact-review">
-										<div class="contact-item">
-											<strong>Name:</strong>
-											{stepData.legal_contact.contact_name}
-										</div>
-										<div class="contact-item">
-											<strong>Title:</strong>
-											{stepData.legal_contact.title}
-										</div>
-										<div class="contact-item">
-											<strong>Email:</strong>
-											{stepData.legal_contact.email}
-										</div>
-										<div class="contact-item">
-											<strong>Company:</strong>
-											{stepData.legal_contact.company}
-										</div>
-									</div>
-								</div>
-							{/if}
-						</div>
-					</div>
 				{:else}
-					<!-- Default content display -->
+					<!-- Default content display for other step types -->
 					<div class="default-content">
 						<div class="content-preview">
 							{#if typeof stepData === 'string'}
@@ -3173,36 +2569,6 @@
 		}
 	}
 
-	/* Final Review Slide Styles */
-	.final-review-slide {
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-		overflow-y: auto;
-		max-height: 100%;
-		padding: 1rem;
-	}
-
-	.final-review-header {
-		text-align: center;
-		background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-		color: white;
-		padding: 2rem;
-		border-radius: 12px;
-		margin-bottom: 1rem;
-	}
-
-	.final-review-title {
-		font-size: 1.5rem;
-		font-weight: 600;
-		margin-bottom: 0.5rem;
-	}
-
-	.final-review-subtitle {
-		font-size: 1rem;
-		opacity: 0.9;
-		margin: 0;
-	}
 
 	.guidelines-summary {
 		display: grid;
@@ -3555,8 +2921,7 @@
 		.typography-slide,
 		.iconography-slide,
 		.photography-slide,
-		.applications-slide,
-		.final-review-slide {
+		.applications-slide {
 			padding: 0.5rem;
 			gap: 0.75rem;
 		}

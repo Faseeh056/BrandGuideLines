@@ -12,15 +12,33 @@ let model: any = null;
 
 // Initialize Gemini client
 function initializeGemini() {
-	if (!env.GOOGLE_GEMINI_API) {
+	// Get API key - check env object first, then process.env directly as fallback
+	let apiKey = env?.GOOGLE_GEMINI_API || '';
+	
+	// If not found in env object, try process.env directly (prioritize Google_Gemini_Api)
+	if (!apiKey || apiKey.trim() === '') {
+		if (typeof process !== 'undefined' && process.env) {
+			// Try Google_Gemini_Api first (user's variable name)
+			apiKey = process.env.Google_Gemini_Api || 
+			         process.env.GOOGLE_GEMINI_API || 
+			         process.env.GOOGLE_AI_API_KEY || '';
+			
+			if (apiKey) {
+				// Clean the value (remove quotes and trim)
+				apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+			}
+		}
+	}
+	
+	if (!apiKey || apiKey.trim() === '') {
 		console.warn('⚠️ Gemini API key not found - icon generation will use fallback');
 		return false;
 	}
 
 	try {
-		genAI = new GoogleGenerativeAI(env.GOOGLE_GEMINI_API);
+		genAI = new GoogleGenerativeAI(apiKey);
 		model = genAI.getGenerativeModel({ 
-			model: 'gemini-2.0-flash-exp',
+			model: 'gemini-2.0-flash',
 			generationConfig: {
 				temperature: 0.2, // Very low temperature for consistent, accurate professional icons
 				topP: 0.85,

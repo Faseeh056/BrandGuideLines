@@ -54,6 +54,7 @@
 	let showGuidelines = false;
 	let comprehensiveGuidelines: BrandGuidelinesSpec | null = null;
 	let errorMessage = '';
+	let chatData: any = null; // Store chatbot data for progressive generator
 	
 	// Component references
 	let progressiveGeneratorRef: ProgressiveGenerator;
@@ -520,27 +521,30 @@ ${customPrompt}`;
 		}
 	}
 
-	function handleProgressiveGeneration(chatData?: any) {
+	function handleProgressiveGeneration(data?: any) {
+		// Store chatData for later use
+		chatData = data;
+		
 		// If called from chatbot, populate form fields
-		if (chatData) {
-			brandName = chatData.brandName || brandName;
-			brandDomain = chatData.brandDomain || brandDomain;
-			shortDescription = chatData.shortDescription || shortDescription;
-			brandValues = chatData.brandValues || brandValues;
-			selectedMood = chatData.selectedMood || selectedMood;
-			selectedAudience = chatData.selectedAudience || selectedAudience;
-			customPrompt = chatData.customPrompt || customPrompt;
+		if (data) {
+			brandName = data.brandName || brandName;
+			brandDomain = data.brandDomain || brandDomain;
+			shortDescription = data.shortDescription || shortDescription;
+			brandValues = data.brandValues || brandValues;
+			selectedMood = data.selectedMood || selectedMood;
+			selectedAudience = data.selectedAudience || selectedAudience;
+			customPrompt = data.customPrompt || customPrompt;
 			
 			// Handle individual contact info fields
-			contactName = chatData.contactName || contactName;
-			contactEmail = chatData.contactEmail || contactEmail;
-			contactRole = chatData.contactRole || contactRole;
-			contactCompany = chatData.contactCompany || contactCompany;
+			contactName = data.contactName || contactName;
+			contactEmail = data.contactEmail || contactEmail;
+			contactRole = data.contactRole || contactRole;
+			contactCompany = data.contactCompany || contactCompany;
 			
 			// Handle logo
-			if (chatData.logoData) {
+			if (data.logoData) {
 				// Check if it's an uploaded logo or AI-generated
-				if (chatData.logoData.type === 'ai-generated') {
+				if (data.logoData.type === 'ai-generated') {
 					// AI-generated logo - pass the flag to backend
 					logoFiles = [{
 						filename: 'ai-generated-logo.png',
@@ -551,11 +555,11 @@ ${customPrompt}`;
 					}];
 				} else {
 					// Uploaded logo
-					logoPreview = chatData.logoData.fileData;
+					logoPreview = data.logoData.fileData;
 					logoFiles = [{
-						filename: chatData.logoData.filename,
-						filePath: chatData.logoData.filePath,
-						fileData: chatData.logoData.fileData,
+						filename: data.logoData.filename,
+						filePath: data.logoData.filePath,
+						fileData: data.logoData.fileData,
 						usageTag: 'primary'
 					}];
 				}
@@ -636,6 +640,11 @@ ${customPrompt}`;
 				guidelineId: data.savedGuidelines?.id
 			};
 			sessionStorage.setItem('preview_brand_data', JSON.stringify(minimalData));
+		}
+		
+		// Clear chatbot state before redirecting
+		if (chatbotRef) {
+			chatbotRef.clearChatState();
 		}
 		
         // Redirect to new HTML-based preview page
@@ -1313,8 +1322,10 @@ ${customPrompt}`;
 							email: contactEmail || '',
 							role: contactRole || '',
 							company: contactCompany || brandName
-						}
-					}}
+						},
+						// Include industry-specific info if available (from chatbot)
+						...(chatData?.industrySpecificInfo ? { industrySpecificInfo: chatData.industrySpecificInfo } : {})
+					} as any}
 					{logoFiles}
 					onComplete={handleProgressiveComplete}
 					chatbotControlled={true}
