@@ -774,112 +774,14 @@
 		padding: 0;
 	}
 
-	.progress-header {
-		margin-bottom: 2rem;
-	}
-
-	.progress-info {
-		margin-bottom: 1rem;
-	}
-
-	.progress-bar {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.progress-track {
-		flex: 1;
-		height: 8px;
-		background: oklch(var(--muted));
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.progress-fill {
-		height: 100%;
-		background: linear-gradient(90deg, oklch(var(--primary)), oklch(var(--primary) / 0.8));
-		border-radius: 4px;
-		transition: width 0.3s ease;
-	}
-
-	.progress-text {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: oklch(var(--muted-foreground));
-		min-width: 10rem;
-	}
-
-	.generated-steps-stack {
-		display: flex;
-		flex-direction: column;
-		gap: 2rem;
-	}
-
-	.step-container {
-		animation: slideIn 0.4s ease-out;
-	}
-
-	@keyframes slideIn {
-		from {
-			opacity: 0;
-			transform: translateY(20px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	.completion-section {
-		margin-top: 2rem;
-		animation: fadeIn 0.5s ease-out;
-	}
-
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-		}
-		to {
-			opacity: 1;
-		}
-	}
-
-	.complete-btn {
-		background: oklch(var(--primary));
-		border-color: oklch(var(--primary));
-		padding: 0.75rem 2rem;
-	}
-
-	.complete-btn:hover {
-		background: oklch(var(--primary) / 0.9);
-		border-color: oklch(var(--primary) / 0.9);
-	}
-
 	.start-generation {
 		text-align: center;
 		padding: 2rem;
 	}
 
-	.start-btn {
-		background: oklch(var(--primary));
-		border-color: oklch(var(--primary));
-		padding: 0.75rem 2rem;
-	}
-
-	.start-btn:hover {
-		background: oklch(var(--primary) / 0.9);
-		border-color: oklch(var(--primary) / 0.9);
-	}
-
 	@media (max-width: 768px) {
 		.progressive-generator {
 			padding: 1rem;
-		}
-
-		.progress-text {
-			font-size: 0.75rem;
-			min-width: 8rem;
 		}
 	}
 </style>

@@ -13,6 +13,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { Eye, EyeOff } from 'lucide-svelte';
+	import type { SubmitFunction } from '@sveltejs/kit';
 
 	let showPassword = $state(false);
 	let showConfirmPassword = $state(false);
@@ -26,18 +27,17 @@
 		goto('/auth/forgot-password');
 	}
 
-	async function handleSubmit(event: SubmitEvent) {
+	const handleSubmit: SubmitFunction = async ({ formData, cancel }) => {
 		isLoading = true;
 		error = '';
 
-		const formData = new FormData(event.target as HTMLFormElement);
 		const password = formData.get('password') as string;
 		const confirmPassword = formData.get('confirmPassword') as string;
 
 		if (password !== confirmPassword) {
 			error = 'Passwords do not match';
 			isLoading = false;
-			event.preventDefault();
+			cancel();
 			return;
 		}
 
@@ -60,12 +60,13 @@
 			}
 
 			success = true;
+			cancel();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
 			isLoading = false;
-			event.preventDefault();
+			cancel();
 		}
-	}
+	};
 </script>
 
 <Card>
@@ -108,7 +109,7 @@
 								type={showPassword ? 'text' : 'password'}
 								required
 								placeholder="Enter new password"
-								minlength="8"
+								minlength={8}
 							/>
 							<button
 								type="button"
@@ -133,7 +134,7 @@
 								type={showConfirmPassword ? 'text' : 'password'}
 								required
 								placeholder="Confirm new password"
-								minlength="8"
+								minlength={8}
 							/>
 							<button
 								type="button"

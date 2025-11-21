@@ -405,7 +405,7 @@
     
     return {
       id: 'logo-guidelines',
-      type: 'logo',
+      type: 'logo-guidelines',
       layout: {
         width: 10,
         height: 5.625,

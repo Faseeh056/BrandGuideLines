@@ -38,7 +38,7 @@ function initializeGemini() {
 	try {
 		genAI = new GoogleGenerativeAI(apiKey);
 		model = genAI.getGenerativeModel({ 
-			model: 'gemini-2.0-flash',
+			model: 'gemini-2.5-flash',
 			generationConfig: {
 				temperature: 0.2, // Very low temperature for consistent, accurate professional icons
 				topP: 0.85,

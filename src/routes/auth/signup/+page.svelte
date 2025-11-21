@@ -121,7 +121,7 @@
 					type={showPassword ? 'text' : 'password'}
 					required
 					placeholder="Create a password"
-					minlength="8"
+					minlength={8}
 				/>
 				<button
 					type="button"

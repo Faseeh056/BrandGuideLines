@@ -11,16 +11,15 @@
 	} from '$lib/components/ui/card';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
+	import type { SubmitFunction } from '@sveltejs/kit';
 
 	let isLoading = $state(false);
 	let error = $state('');
 	let success = $state(false);
 
-	async function handleSubmit(event: SubmitEvent) {
+	const handleSubmit: SubmitFunction = async ({ formData, cancel }) => {
 		isLoading = true;
 		error = '';
-
-		const formData = new FormData(event.target as HTMLFormElement);
 
 		try {
 			const response = await fetch('/auth/forgot-password', {
@@ -40,12 +39,13 @@
 			}
 
 			success = true;
+			cancel();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
 			isLoading = false;
-			event.preventDefault();
+			cancel();
 		}
-	}
+	};
 </script>
 
 <Card>

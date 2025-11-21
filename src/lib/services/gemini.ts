@@ -61,7 +61,7 @@ export interface BrandGuidelineResponse {
 }
 
 /**
- * Use Gemini 2.0 Flash to optimize slide layout and prevent overflow
+ * Use Gemini 2.5 Flash to optimize slide layout and prevent overflow
  */
 export async function optimizeSlideLayoutWithGemini(
 	template: any, 
@@ -74,7 +74,7 @@ export async function optimizeSlideLayoutWithGemini(
 			return template;
 		}
 
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 		// Create layout optimization prompt
 		const prompt = createLayoutOptimizationPrompt(template, stepData, slideType);
@@ -171,7 +171,7 @@ export async function splitContentWithHeadings(
 			return splitContentSimple(content, title, maxChars);
 		}
 
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 		const prompt = `
 You are a STRICT content organization expert. Split content with ZERO duplication and perfect placement.
@@ -286,7 +286,7 @@ export async function generateBrandGuidelines(request: BrandGuidelineRequest): P
 			throw new Error('Google Gemini API key is not configured. Please check your environment variables.');
 		}
 
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 		// Create a comprehensive prompt for brand guideline generation
 		const prompt = createBrandGuidelinePrompt(request);
@@ -324,7 +324,7 @@ export async function generateComprehensiveBrandGuidelines(
 			throw new Error('Google Gemini API key is not configured. Please check your environment variables.');
 		}
 
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 		// Create a comprehensive prompt for structured brand guideline generation
 		const prompt = createComprehensiveBrandGuidelinePrompt(input, groundingData);
@@ -613,7 +613,7 @@ export async function generateStepTitles(input: {
 			throw new Error('Google Gemini API key is not configured');
 		}
 
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 		const prompt = `Generate 8 easy-to-understand step titles and descriptions for a brand guideline creation process for "${input.brand_name}" in the ${input.brand_domain} industry.
 
@@ -736,7 +736,7 @@ export async function generateProgressiveBrandGuidelines(request: {
 			const topP = request.step === 'typography' ? 0.95 : 0.9;
 			const topK = request.step === 'typography' ? 50 : 40;
 			const model = getGenAI().getGenerativeModel({ 
-				model: 'gemini-2.0-flash',
+				model: 'gemini-2.5-flash',
 				generationConfig: {
 					temperature: temperature,
 					topP: topP,

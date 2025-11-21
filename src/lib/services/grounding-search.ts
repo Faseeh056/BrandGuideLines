@@ -52,7 +52,7 @@ export interface ScrapedIndustryData {
  */
 export async function findIndustryWebsites(industry: string, limit: number = 5): Promise<IndustryWebsite[]> {
 	try {
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 		
 		const prompt = `You are a research assistant. Find ${limit} well-known, reputable websites in the "${industry}" industry that would be good examples for brand guidelines.
 
@@ -177,7 +177,7 @@ async function extractRelevantFacts(
 	websiteTitle: string
 ): Promise<string[]> {
 	try {
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 		
 		// Optimize: Limit data sent to AI for faster processing while maintaining accuracy
 		const colors = (scrapedData.colors?.palette || scrapedData.colors || []).slice(0, 8);
@@ -221,7 +221,7 @@ async function generateIndustrySummary(
 	industry: string
 ): Promise<string> {
 	try {
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 		
 		const allFacts = scrapedResults.flatMap(result => result.extractedFacts);
 		const websitesList = scrapedResults.map(r => r.title).join(', ');

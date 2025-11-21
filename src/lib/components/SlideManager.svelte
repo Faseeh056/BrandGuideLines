@@ -2128,7 +2128,6 @@
           color3Lighter={color3Lighter}
           color4Lighter={color4Lighter}
           color1Rgba10={color1Rgba10}
-          color2Rgba10={color2Rgba10}
           color3Rgba10={color3Rgba10}
           background={currentSlideIndex === 4 ? currentSlideBackground : getDefaultBackground(4)}
           {isEditable}
@@ -2145,9 +2144,8 @@
           color3Lighter={color3Lighter}
           color4Lighter={color4Lighter}
           color5Lighter={color5Lighter}
-          color1Rgba10={color1Rgba10}
-          color2Rgba10={color2Rgba10}
-          color3Rgba10={color3Rgba10}
+          color2Rgba12={color2Rgba12}
+          color4Rgba12={color4Rgba12}
           background={currentSlideIndex === 5 ? currentSlideBackground : getDefaultBackground(5)}
           {isEditable}
         />
@@ -2248,7 +2246,6 @@
       <div class="slide-wrapper" class:hidden={currentSlideIndex !== 11}>
         <ThankYouSlide
           bind:this={thankYouRef}
-          bind:brandName
           bind:thankYouText
           bind:subtitleText
           bind:contactName

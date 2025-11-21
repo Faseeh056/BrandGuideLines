@@ -156,6 +156,7 @@ export interface BrandGuidelinesInput {
 		keyFindings: string[];
 		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
 	};
+	industrySpecificInfo?: Record<string, any>; // Additional info from industry questions
 	// Brand positioning fields from builder form
 	selectedMood?: string;
 	selectedAudience?: string;

@@ -454,7 +454,6 @@
   bind:isOpen={showFullscreenModal}
   screenshot={visualData?.originalScreenshot}
   annotatedScreenshot={visualData?.annotatedScreenshot}
-  showHighlights={showAllHighlights}
   issues={auditData?.issues || []}
   elementPositions={visualData?.elementPositions || []}
   on:close={closeFullscreenModal}

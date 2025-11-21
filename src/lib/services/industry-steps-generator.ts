@@ -61,7 +61,7 @@ export async function generateIndustrySpecificSteps(
 			return [];
 		}
 
-		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 		// Build context from industry-specific info
 		const contextInfo = industrySpecificInfo && Object.keys(industrySpecificInfo).length > 0

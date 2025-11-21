@@ -517,7 +517,7 @@
     
     return {
       id: 'logo-dos',
-      type: 'logo',
+      type: 'logo-dos',
       layout: {
         width: 10,
         height: 5.625,

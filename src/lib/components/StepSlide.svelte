@@ -1521,24 +1521,25 @@ function getIconAccent(index: number): string {
 									</div>
 								{/if}
 							{:else}
+								{@const iconData = stepData as any}
 								<div class="icon-style-section">
 									<h4 class="section-subtitle">Style Guidelines</h4>
 									<div class="icon-specs">
 										<div class="spec-item">
 											<span class="spec-label">Grid:</span>
-											<span class="spec-value">{stepData.grid || ''}</span>
+											<span class="spec-value">{iconData.grid || ''}</span>
 										</div>
 										<div class="spec-item">
 											<span class="spec-label">Stroke:</span>
-											<span class="spec-value">{stepData.stroke || ''}</span>
+											<span class="spec-value">{iconData.stroke || ''}</span>
 										</div>
 									</div>
 								</div>
 								<div class="icon-examples">
 									<h4 class="section-subtitle">Specific Icons</h4>
 									<div class="icon-list">
-										{#if stepData.specific_icons && stepData.specific_icons.length > 0}
-											{#each stepData.specific_icons as icon}
+										{#if iconData.specific_icons && iconData.specific_icons.length > 0}
+											{#each iconData.specific_icons as icon}
 												<div class="icon-item">
 													<div class="icon-display">
 														<div class="icon-name">{icon}</div>
@@ -1547,17 +1548,18 @@ function getIconAccent(index: number): string {
 											{/each}
 										{:else}
 											<div class="no-icons-message">
-												<p>AI will generate domain-specific icons based on your brand inputs</p>
+												<p>{'AI will generate domain-specific icons based on your brand inputs'}</p>
 											</div>
 										{/if}
 									</div>
 								</div>
 							{:else}
+								{@const iconDataAlt = stepData as any}
 								<div class="icon-examples">
 									<h4 class="section-subtitle">Specific Icons</h4>
-									{#if stepData.specific_icons && stepData.specific_icons.length > 0}
+									{#if iconDataAlt.specific_icons && iconDataAlt.specific_icons.length > 0}
 										<div class="icon-list">
-											{#each stepData.specific_icons as icon}
+											{#each iconDataAlt.specific_icons as icon}
 												<div class="icon-item">
 													<div class="icon-display">
 														<div class="icon-name">{icon}</div>
@@ -1567,7 +1569,7 @@ function getIconAccent(index: number): string {
 										</div>
 									{:else}
 										<div class="no-icons-message">
-											<p>AI will generate domain-specific icons based on your brand inputs</p>
+											<p>{'AI will generate domain-specific icons based on your brand inputs'}</p>
 										</div>
 									{/if}
 								</div>

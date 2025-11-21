@@ -110,7 +110,6 @@
 		{id}
 		{name}
 		{disabled}
-		{required}
 		onclick={toggleDropdown}
 		onkeydown={handleKeydown}
 		class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20"

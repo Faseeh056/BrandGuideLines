@@ -176,7 +176,7 @@
 											type={showNewPassword ? 'text' : 'password'}
 											required
 											placeholder="Enter new password"
-											minlength="6"
+											minlength={6}
 										/>
 										<button
 											type="button"
@@ -201,7 +201,7 @@
 											type={showConfirmPassword ? 'text' : 'password'}
 											required
 											placeholder="Confirm new password"
-											minlength="6"
+											minlength={6}
 										/>
 										<button
 											type="button"

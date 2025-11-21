@@ -26,9 +26,9 @@
 	let isScraping = false;
 	let scrapingMessage = '';
 	let scrapingError = '';
-	let selectedBrand = null;
-	let scrapedData = null;
-	let complianceAnalysis = null;
+	let selectedBrand: any = null;
+	let scrapedData: any = null;
+	let complianceAnalysis: any = null;
 	let companyName = '';
 	let uploadingMessage = '';
 	let useVisualAudit = true;
@@ -164,7 +164,7 @@
 			console.log('🏢 Using company name:', companyName);
 			
 			// Extract brand guidelines
-			const guidelines = await convertAPIClient.extractBrandGuidelines(text, companyName);
+			const guidelines: any = await convertAPIClient.extractBrandGuidelines(text, companyName);
 			console.log('✅ Brand guidelines extracted:', guidelines);
 
 			// Ensure brandName is set at root level (required by /api/brands)

@@ -63,14 +63,8 @@ export async function analyzeBrandPrompt(userPrompt: string): Promise<PromptAnal
 		}
 		
 		// Use the API key directly instead of env object
-		// Try gemini-2.0-flash-exp first, fallback to gemini-2.0-flash
-		let model;
-		try {
-			model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-		} catch (e) {
-			console.warn('[brand-builder-analyzer] gemini-2.0-flash-exp not available, using gemini-2.0-flash');
-			model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: 'gemini-2.0-flash' });
-		}
+		// Use gemini-2.5-flash
+		const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 		const prompt = createAnalysisPrompt(userPrompt);
 

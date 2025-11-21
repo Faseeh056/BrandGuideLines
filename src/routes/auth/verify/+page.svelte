@@ -137,13 +137,14 @@
 					type="text"
 					bind:value={otp}
 					placeholder="Enter 6-digit code"
-					maxlength="6"
+					maxlength={6}
 					required
 					class="mt-1 text-center text-lg tracking-widest"
 					disabled={isLoading}
 					oninput={(e) => {
 						// Only allow digits
-						const value = e.target.value.replace(/\D/g, '');
+						const target = e.target as HTMLInputElement;
+						const value = target.value.replace(/\D/g, '');
 						if (value.length <= 6) {
 							otp = value;
 						}

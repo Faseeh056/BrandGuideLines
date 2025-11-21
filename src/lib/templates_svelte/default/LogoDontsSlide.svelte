@@ -553,7 +553,7 @@
     
     return {
       id: 'logo-donts',
-      type: 'logo',
+      type: 'logo-donts',
       layout: {
         width: 10,
         height: 5.625,
