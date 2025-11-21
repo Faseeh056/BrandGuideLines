@@ -109,7 +109,9 @@ function getIconAccent(index: number): string {
 			'raleway', 'nunito', 'work sans', 'dm sans', 'space grotesk', 'ibm plex sans',
 			'fira sans', 'noto sans', 'rubik', 'ubuntu', 'oswald', 'bebas neue', 'helvetica',
 			'arial', 'georgia', 'times new roman', 'merriweather', 'libre baskerville',
-			'crimson text', 'playfair display', 'futura', 'gotham', 'proxima nova'
+			'crimson text', 'playfair display', 'futura', 'gotham', 'proxima nova',
+			'permanent marker', 'comic sans', 'brush script', 'pacifico', 'lobster',
+			'caveat', 'dancing script', 'satisfy', 'kalam', 'indie flower'
 		];
 		
 		// If it matches a common font name (case-insensitive), it's valid
@@ -177,6 +179,154 @@ function getIconAccent(index: number): string {
 		return `"${fontName}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
 	}
 
+	// Extract typography hierarchy with visual examples
+	function extractTypographyHierarchy(text: string): {
+		h1?: any;
+		h2?: any;
+		h3?: any;
+		body?: any;
+		subtext?: any;
+		ui?: any;
+		primary?: any;
+		supporting?: any;
+	} {
+		if (!text) return {};
+		
+		const hierarchy: any = {};
+		const lines = text.split('\n');
+		let currentLevel: string | null = null;
+		let currentData: any = {};
+		
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+			
+			// Detect heading level - more flexible matching
+			if (line.match(/^\*\*Heading\s+1\s*\(H1\)/i) || line.match(/^\*\*H1\s*-/i) || line.match(/^Heading\s+1\s*\(H1\)/i) || line.match(/^\*\*H1\s*\(/i)) {
+				if (currentLevel && Object.keys(currentData).length > 0) hierarchy[currentLevel] = currentData;
+				currentLevel = 'h1';
+				currentData = {};
+			} else if (line.match(/^\*\*Heading\s+2\s*\(H2\)/i) || line.match(/^\*\*H2\s*-/i) || line.match(/^Heading\s+2\s*\(H2\)/i) || line.match(/^\*\*H2\s*\(/i)) {
+				if (currentLevel && Object.keys(currentData).length > 0) hierarchy[currentLevel] = currentData;
+				currentLevel = 'h2';
+				currentData = {};
+			} else if (line.match(/^\*\*Heading\s+3\s*\(H3\)/i) || line.match(/^\*\*H3\s*-/i) || line.match(/^Heading\s+3\s*\(H3\)/i) || line.match(/^\*\*H3\s*\(/i)) {
+				if (currentLevel && Object.keys(currentData).length > 0) hierarchy[currentLevel] = currentData;
+				currentLevel = 'h3';
+				currentData = {};
+			} else if (line.match(/^\*\*Body\s+Text/i) || line.match(/^Body\s+Text:/i) || line.match(/^\*\*Body/i)) {
+				if (currentLevel && Object.keys(currentData).length > 0) hierarchy[currentLevel] = currentData;
+				currentLevel = 'body';
+				currentData = {};
+			} else if (line.match(/^\*\*Subtext/i) || line.match(/^\*\*Caption/i) || line.match(/^Subtext/i) || line.match(/^\*\*Subtext\/Captions/i)) {
+				if (currentLevel && Object.keys(currentData).length > 0) hierarchy[currentLevel] = currentData;
+				currentLevel = 'subtext';
+				currentData = {};
+			} else if (line.match(/^\*\*UI\s+Elements/i) || line.match(/^UI\s+Elements/i) || line.match(/^\*\*UI/i)) {
+				if (currentLevel && Object.keys(currentData).length > 0) hierarchy[currentLevel] = currentData;
+				currentLevel = 'ui';
+				currentData = {};
+			}
+			
+			// Extract properties - more flexible matching
+			if (currentLevel) {
+				// Font - match various formats
+				const fontMatch = line.match(/^[-*•]\s*Font:\s*(.+)/i) || line.match(/Font:\s*(.+?)(?:\s*$|\s*Size|\s*Weight|\s*Line)/i);
+				if (fontMatch) {
+					const fontText = fontMatch[1].trim();
+					// Extract font name (remove weight info, brackets, etc.)
+					// Try to match font name before weight keywords
+					let fontNameMatch = fontText.match(/([A-Za-z0-9\s\-]+?)(?:\s+(?:Bold|Regular|Medium|SemiBold|Light|ExtraBold|Thin|Black|Heavy|Italic))?/i);
+					if (!fontNameMatch) {
+						fontNameMatch = fontText.match(/\[([^\]]+)\]/);
+					}
+					if (fontNameMatch) {
+						const name = (fontNameMatch[1] || fontNameMatch[0]).trim();
+						// Clean up the name - remove common words that aren't part of font name
+						const cleanName = name.replace(/\s+(Bold|Regular|Medium|SemiBold|Light|ExtraBold|Thin|Black|Heavy|Italic)$/i, '').trim();
+						if (cleanName && isValidFontName(cleanName)) {
+							currentData.fontName = cleanName;
+						}
+					}
+					// Extract weight name
+					const weightNameMatch = fontText.match(/(Bold|Regular|Medium|SemiBold|Light|ExtraBold|Thin|Black|Heavy|Italic)/i);
+					if (weightNameMatch) {
+						currentData.weightName = weightNameMatch[1];
+					}
+				}
+				
+				// Size - match various formats (be more flexible)
+				const sizeMatch = line.match(/^[-*•]\s*Size:\s*(\d+)\s*px/i) || 
+					line.match(/Size:\s*(\d+)\s*px/i) || 
+					line.match(/^[-*•]\s*Size:\s*(\d+)/i) ||
+					line.match(/Size:\s*(\d+)/i);
+				if (sizeMatch) {
+					currentData.size = parseInt(sizeMatch[1]);
+				}
+				
+				// Weight number - be more flexible
+				const weightMatch = line.match(/^[-*•]\s*Weight:\s*(\d+)/i) || 
+					line.match(/Weight:\s*(\d+)/i) ||
+					line.match(/weight:\s*(\d+)/i);
+				if (weightMatch) {
+					currentData.weight = parseInt(weightMatch[1]);
+				}
+				
+				// Line Height
+				const lineHeightMatch = line.match(/^[-*•]\s*Line\s+Height:\s*([\d.]+)/i) || 
+					line.match(/Line\s+Height:\s*([\d.]+)/i) ||
+					line.match(/line\s+height:\s*([\d.]+)/i);
+				if (lineHeightMatch) {
+					currentData.lineHeight = parseFloat(lineHeightMatch[1]);
+				}
+				
+				// Usage
+				const usageMatch = line.match(/^[-*•]\s*Usage:\s*(.+)/i) || 
+					line.match(/Usage:\s*(.+?)(?:\s*Visual|$)/i) ||
+					line.match(/usage:\s*(.+?)(?:\s*Visual|$)/i);
+				if (usageMatch) {
+					currentData.usage = usageMatch[1].trim();
+				}
+				
+				// Visual Example - match various formats, including the format shown in user's example
+				const exampleMatch = line.match(/Visual\s+Example:\s*"([^"]+)"|Visual\s+Example:\s*\[([^\]]+)\]|Visual\s+Example:\s*([^\(]+?)(?:\s*\(shown|$)/i);
+				if (exampleMatch) {
+					const exampleText = (exampleMatch[1] || exampleMatch[2] || exampleMatch[3] || '').trim();
+					// Clean up the example text - remove quotes and brackets
+					currentData.exampleText = exampleText.replace(/^["\[]|["\]]$/g, '').trim();
+				}
+			}
+		}
+		
+		// Save last level
+		if (currentLevel && Object.keys(currentData).length > 0) {
+			hierarchy[currentLevel] = currentData;
+		}
+		
+		// Infer primary and supporting fonts from hierarchy if not explicitly found
+		// Primary font is typically used in H1, H2
+		if (!hierarchy.primary) {
+			const primaryFromHierarchy = hierarchy.h1?.fontName || hierarchy.h2?.fontName;
+			if (primaryFromHierarchy && isValidFontName(primaryFromHierarchy)) {
+				hierarchy.primary = { name: primaryFromHierarchy };
+			}
+		}
+		
+		// Supporting font is typically used in Body, Subtext, UI, or H3
+		if (!hierarchy.supporting) {
+			const supportingFromHierarchy = hierarchy.body?.fontName || hierarchy.subtext?.fontName || hierarchy.ui?.fontName || hierarchy.h3?.fontName;
+			if (supportingFromHierarchy && isValidFontName(supportingFromHierarchy)) {
+				hierarchy.supporting = { name: supportingFromHierarchy };
+			}
+		}
+		
+		// Also extract primary and supporting fonts from text
+		const fontInfo = extractFontInfo(text);
+		if (fontInfo.primary) hierarchy.primary = fontInfo.primary;
+		if (fontInfo.supporting) hierarchy.supporting = fontInfo.supporting;
+		
+		return hierarchy;
+	}
+
 	// Extract font information for visual typography display
 	// Parses typography text generated by Gemini API based on user requirements
 	function extractFontInfo(text: string): { primary: any; supporting: any; weights: string[] } {
@@ -208,10 +358,10 @@ function getIconAccent(index: number): string {
 		const weights = [];
 
 		for (const line of lines) {
-			// Look for primary font - STRICT pattern matching
+			// Look for primary font - more flexible pattern matching for multi-word fonts
 			if (line.toLowerCase().includes('primary')) {
-				// Pattern 1: "**Primary Font**: FontName - description" (STRICT - font name before dash)
-				let fontMatch = line.match(/\*\*primary\s+font\*\*[:\s]*([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)?)\s*-\s*(.+)/i);
+				// Pattern 1: "**Primary Font**: FontName - description" (capture up to dash, allow multi-word)
+				let fontMatch = line.match(/\*\*primary\s+font\*\*[:\s]*([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)*?)\s*-\s*(.+)/i);
 				if (fontMatch) {
 					const fontName = fontMatch[1].trim();
 					if (isValidFontName(fontName)) {
@@ -223,8 +373,8 @@ function getIconAccent(index: number): string {
 					}
 				}
 				
-				// Pattern 2: "**Primary Font**: FontName" (STRICT - stop at first space or end)
-				fontMatch = line.match(/\*\*primary\s+font\*\*[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)(?:\s|$|,|\.)/i);
+				// Pattern 2: "**Primary Font**: FontName" (capture until end of line or description starts)
+				fontMatch = line.match(/\*\*primary\s+font\*\*[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)*?)(?:\s*-\s*[A-Za-z]|\s*$)/i);
 				if (fontMatch) {
 					const fontName = fontMatch[1].trim();
 					if (isValidFontName(fontName)) {
@@ -236,8 +386,8 @@ function getIconAccent(index: number): string {
 					}
 				}
 				
-				// Pattern 3: "Primary Font: FontName" (STRICT)
-				fontMatch = line.match(/primary\s+font[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)(?:\s|$|,|\.)/i);
+				// Pattern 3: "Primary Font: FontName" (more flexible)
+				fontMatch = line.match(/primary\s+font[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)*?)(?:\s*-\s*[A-Za-z]|\s*$)/i);
 				if (fontMatch) {
 					const fontName = fontMatch[1].trim();
 					if (isValidFontName(fontName)) {
@@ -250,10 +400,10 @@ function getIconAccent(index: number): string {
 				}
 			}
 
-			// Look for supporting/secondary font - STRICT pattern matching
+			// Look for supporting/secondary font - more flexible pattern matching for multi-word fonts
 			if (line.toLowerCase().includes('supporting') || line.toLowerCase().includes('secondary')) {
-				// Pattern 1: "**Supporting Font**: FontName - description" (STRICT)
-				let fontMatch = line.match(/\*\*(?:supporting|secondary)\s+font\*\*[:\s]*([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)?)\s*-\s*(.+)/i);
+				// Pattern 1: "**Supporting Font**: FontName - description" (capture up to dash, allow multi-word)
+				let fontMatch = line.match(/\*\*(?:supporting|secondary)\s+font\*\*[:\s]*([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)*?)\s*-\s*(.+)/i);
 				if (fontMatch) {
 					const fontName = fontMatch[1].trim();
 					if (isValidFontName(fontName)) {
@@ -265,8 +415,8 @@ function getIconAccent(index: number): string {
 					}
 				}
 				
-				// Pattern 2: "**Supporting Font**: FontName" (STRICT)
-				fontMatch = line.match(/\*\*(?:supporting|secondary)\s+font\*\*[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)(?:\s|$|,|\.)/i);
+				// Pattern 2: "**Supporting Font**: FontName" (capture until end of line or description starts)
+				fontMatch = line.match(/\*\*(?:supporting|secondary)\s+font\*\*[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)*?)(?:\s*-\s*[A-Za-z]|\s*$)/i);
 				if (fontMatch) {
 					const fontName = fontMatch[1].trim();
 					if (isValidFontName(fontName)) {
@@ -278,8 +428,8 @@ function getIconAccent(index: number): string {
 					}
 				}
 				
-				// Pattern 3: "Supporting Font: FontName" (STRICT)
-				fontMatch = line.match(/(?:supporting|secondary)\s+font[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)?)(?:\s|$|,|\.)/i);
+				// Pattern 3: "Supporting Font: FontName" (more flexible)
+				fontMatch = line.match(/(?:supporting|secondary)\s+font[:\s]+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)*?)(?:\s*-\s*[A-Za-z]|\s*$)/i);
 				if (fontMatch) {
 					const fontName = fontMatch[1].trim();
 					if (isValidFontName(fontName)) {
@@ -386,6 +536,18 @@ function getIconAccent(index: number): string {
 		if (!browser || stepId !== 'typography' || typeof stepData !== 'string') return;
 		
 		try {
+			// First, extract hierarchy to get all fonts used
+			const hierarchy = extractTypographyHierarchy(stepData);
+			
+			// Load fonts from hierarchy
+			if (hierarchy.h1?.fontName) loadGoogleFont(hierarchy.h1.fontName);
+			if (hierarchy.h2?.fontName) loadGoogleFont(hierarchy.h2.fontName);
+			if (hierarchy.h3?.fontName) loadGoogleFont(hierarchy.h3.fontName);
+			if (hierarchy.body?.fontName) loadGoogleFont(hierarchy.body.fontName);
+			if (hierarchy.subtext?.fontName) loadGoogleFont(hierarchy.subtext.fontName);
+			if (hierarchy.ui?.fontName) loadGoogleFont(hierarchy.ui.fontName);
+			
+			// Also load primary and supporting fonts
 			const fontInfo = extractFontInfo(stepData);
 			if (fontInfo.primary?.name) {
 				loadGoogleFont(fontInfo.primary.name);
@@ -395,7 +557,7 @@ function getIconAccent(index: number): string {
 			}
 			
 			// Also handle fallback fonts if main extraction failed
-			if (!fontInfo.primary && !fontInfo.supporting) {
+			if (!fontInfo.primary && !fontInfo.supporting && !hierarchy.h1) {
 				const fallbackFonts = extractFallbackFonts(stepData);
 				if (fallbackFonts.primary) {
 					loadGoogleFont(fallbackFonts.primary);
@@ -1012,235 +1174,255 @@ function getIconAccent(index: number): string {
 				{:else if stepId === 'typography'}
 					<div class="typography-slide">
 						{#if typeof stepData === 'string'}
+							{@const hierarchy = extractTypographyHierarchy(stepData)}
 							{@const fontInfo = extractFontInfo(stepData)}
-							<!-- Debug: Log font extraction results -->
-							{console.log('Typography stepData:', stepData)}
-							{console.log('Extracted fontInfo:', fontInfo)}
-							{#if fontInfo.primary || fontInfo.supporting}
-								<!-- Compute font families for display -->
-								{@const primaryFontName = fontInfo.primary?.name}
-								{@const supportingFontName = fontInfo.supporting?.name}
-								{@const primaryFontFamily = primaryFontName ? getFontFamily(primaryFontName) : 'sans-serif'}
-								{@const supportingFontFamily = supportingFontName ? getFontFamily(supportingFontName) : 'sans-serif'}
-								
-								<!-- Visual typography display like professional examples -->
-								{#if fontInfo.primary}
-									<div class="typography-section">
-										<h3 class="section-title">Primary Typeface</h3>
-										<div class="font-display">
-											<div
-												class="font-name-large"
-												style="font-family: {primaryFontFamily};"
-											>
-												{fontInfo.primary.name}
-											</div>
-											<div
-												class="character-set"
-												style="font-family: {primaryFontFamily};"
-											>
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz<br />
-												0123456789
-											</div>
-											<div class="font-weights-grid">
-												{#each fontInfo.weights as weight}
+							
+							<!-- Load fonts for all hierarchy levels -->
+							{#if hierarchy.h1?.fontName} {loadGoogleFont(hierarchy.h1.fontName)} {/if}
+							{#if hierarchy.h2?.fontName} {loadGoogleFont(hierarchy.h2.fontName)} {/if}
+							{#if hierarchy.h3?.fontName} {loadGoogleFont(hierarchy.h3.fontName)} {/if}
+							{#if hierarchy.body?.fontName} {loadGoogleFont(hierarchy.body.fontName)} {/if}
+							{#if hierarchy.subtext?.fontName} {loadGoogleFont(hierarchy.subtext.fontName)} {/if}
+							{#if hierarchy.ui?.fontName} {loadGoogleFont(hierarchy.ui.fontName)} {/if}
+							{#if fontInfo.primary?.name} {loadGoogleFont(fontInfo.primary.name)} {/if}
+							{#if fontInfo.supporting?.name} {loadGoogleFont(fontInfo.supporting.name)} {/if}
+							
+							<!-- Typography Hierarchy integrated with typeface display -->
+							{@const primaryFontName = fontInfo.primary?.name || hierarchy.primary?.name || (hierarchy.h1?.fontName || hierarchy.h2?.fontName)}
+							{@const supportingFontName = fontInfo.supporting?.name || hierarchy.supporting?.name || (hierarchy.body?.fontName || hierarchy.subtext?.fontName || hierarchy.ui?.fontName || hierarchy.h3?.fontName)}
+							{@const primaryFontFamily = primaryFontName ? getFontFamily(primaryFontName) : 'sans-serif'}
+							{@const supportingFontFamily = supportingFontName ? getFontFamily(supportingFontName) : 'sans-serif'}
+							
+							{#if hierarchy.h1 || hierarchy.h2 || hierarchy.h3 || hierarchy.body || hierarchy.subtext || hierarchy.ui || primaryFontName || supportingFontName}
+									
+									<div class="typography-sections-compact">
+										{#if primaryFontName}
+											<div class="typography-section-compact">
+												<h3 class="section-title-compact">Primary Typeface</h3>
+												<div class="font-display-compact">
 													<div
-														class="weight-sample"
-														style="font-family: {primaryFontFamily}; font-weight: {weight === 'bold'
-															? 'bold'
-															: weight === 'light'
-																? '300'
-																: weight === 'medium'
-																	? '500'
-																	: weight === 'semibold'
-																		? '600'
-																		: 'normal'};"
+														class="font-name-compact"
+														style="font-family: {primaryFontFamily};"
 													>
-														{weight.charAt(0).toUpperCase() + weight.slice(1)}
+														{primaryFontName}
 													</div>
-												{/each}
+													<div
+														class="character-set-compact"
+														style="font-family: {primaryFontFamily};"
+													>
+														Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz 0123456789
+													</div>
+													
+													<!-- Hierarchy examples inside the box -->
+													<div class="hierarchy-examples-compact">
+														{#if hierarchy.h1}
+															{@const h1Font = hierarchy.h1.fontName || primaryFontName || 'sans-serif'}
+															{@const h1Family = getFontFamily(h1Font)}
+															<div class="hierarchy-item-compact">
+																<div class="hierarchy-label">H1</div>
+																<div 
+																	class="hierarchy-preview"
+																	style="font-family: {h1Family}; font-size: {Math.min(hierarchy.h1.size || 48, 32)}px; font-weight: {hierarchy.h1.weight || 700};"
+																>
+																	{hierarchy.h1.exampleText || 'Heading 1'}
+																</div>
+																<div class="hierarchy-specs-compact">{hierarchy.h1.size || '48'}px / {hierarchy.h1.weight || '700'}</div>
+															</div>
+														{/if}
+														{#if hierarchy.h2}
+															{@const h2Font = hierarchy.h2.fontName || primaryFontName || 'sans-serif'}
+															{@const h2Family = getFontFamily(h2Font)}
+															<div class="hierarchy-item-compact">
+																<div class="hierarchy-label">H2</div>
+																<div 
+																	class="hierarchy-preview"
+																	style="font-family: {h2Family}; font-size: {Math.min(hierarchy.h2.size || 32, 24)}px; font-weight: {hierarchy.h2.weight || 600};"
+																>
+																	{hierarchy.h2.exampleText || 'Heading 2'}
+																</div>
+																<div class="hierarchy-specs-compact">{hierarchy.h2.size || '32'}px / {hierarchy.h2.weight || '600'}</div>
+															</div>
+														{/if}
+														{#if hierarchy.h3}
+															{@const h3Font = hierarchy.h3.fontName || primaryFontName || 'sans-serif'}
+															{@const h3Family = getFontFamily(h3Font)}
+															<div class="hierarchy-item-compact">
+																<div class="hierarchy-label">H3</div>
+																<div 
+																	class="hierarchy-preview"
+																	style="font-family: {h3Family}; font-size: {Math.min(hierarchy.h3.size || 24, 20)}px; font-weight: {hierarchy.h3.weight || 500};"
+																>
+																	{hierarchy.h3.exampleText || 'Heading 3'}
+																</div>
+																<div class="hierarchy-specs-compact">{hierarchy.h3.size || '24'}px / {hierarchy.h3.weight || '500'}</div>
+															</div>
+														{/if}
+													</div>
+												</div>
 											</div>
+										{/if}
+
+										{#if supportingFontName}
+											<div class="typography-section-compact">
+												<h3 class="section-title-compact">Secondary Typeface</h3>
+												<div class="font-display-compact">
+													<div
+														class="font-name-compact"
+														style="font-family: {supportingFontFamily};"
+													>
+														{supportingFontName}
+													</div>
+													<div
+														class="character-set-compact"
+														style="font-family: {supportingFontFamily};"
+													>
+														Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz 0123456789
+													</div>
+													
+													<!-- Hierarchy examples inside the box -->
+													<div class="hierarchy-examples-compact">
+														{#if hierarchy.body}
+															{@const bodyFont = hierarchy.body.fontName || supportingFontName || 'sans-serif'}
+															{@const bodyFamily = getFontFamily(bodyFont)}
+															<div class="hierarchy-item-compact">
+																<div class="hierarchy-label">Body</div>
+																<div 
+																	class="hierarchy-preview body-preview-compact"
+																	style="font-family: {bodyFamily}; font-size: {hierarchy.body.size || 16}px; font-weight: {hierarchy.body.weight || 400}; line-height: {hierarchy.body.lineHeight || 1.6};"
+																>
+																	{(hierarchy.body.exampleText || 'Body text example').substring(0, 60)}...
+																</div>
+																<div class="hierarchy-specs-compact">{hierarchy.body.size || '16'}px / {hierarchy.body.weight || '400'}</div>
+															</div>
+														{/if}
+														{#if hierarchy.subtext}
+															{@const subtextFont = hierarchy.subtext.fontName || supportingFontName || 'sans-serif'}
+															{@const subtextFamily = getFontFamily(subtextFont)}
+															<div class="hierarchy-item-compact">
+																<div class="hierarchy-label">Subtext</div>
+																<div 
+																	class="hierarchy-preview subtext-preview-compact"
+																	style="font-family: {subtextFamily}; font-size: {hierarchy.subtext.size || 14}px; font-weight: {hierarchy.subtext.weight || 400};"
+																>
+																	{hierarchy.subtext.exampleText || 'Subtext example'}
+																</div>
+																<div class="hierarchy-specs-compact">{hierarchy.subtext.size || '14'}px / {hierarchy.subtext.weight || '400'}</div>
+															</div>
+														{/if}
+														{#if hierarchy.ui}
+															{@const uiFont = hierarchy.ui.fontName || supportingFontName || 'sans-serif'}
+															{@const uiFamily = getFontFamily(uiFont)}
+															<div class="hierarchy-item-compact">
+																<div class="hierarchy-label">UI</div>
+																<div 
+																	class="hierarchy-preview ui-preview-compact"
+																	style="font-family: {uiFamily}; font-size: {hierarchy.ui.size || 14}px; font-weight: {hierarchy.ui.weight || 500};"
+																>
+																	{hierarchy.ui.exampleText || 'Button Text'}
+																</div>
+																<div class="hierarchy-specs-compact">{hierarchy.ui.size || '14'}px / {hierarchy.ui.weight || '500'}</div>
+															</div>
+														{/if}
+													</div>
+												</div>
+											</div>
+										{/if}
+									</div>
+								{:else}
+									<!-- Fallback if no fonts extracted but hierarchy exists -->
+									<div class="typography-hierarchy-fallback">
+										<h3 class="section-title">Typography Hierarchy</h3>
+										<div class="hierarchy-grid-compact">
+											{#if hierarchy.h1}
+												{@const h1Font = hierarchy.h1.fontName || 'sans-serif'}
+												{@const h1Family = getFontFamily(h1Font)}
+												<div class="hierarchy-item-compact">
+													<div class="hierarchy-label">H1</div>
+													<div 
+														class="hierarchy-preview"
+														style="font-family: {h1Family}; font-size: {Math.min(hierarchy.h1.size || 48, 32)}px; font-weight: {hierarchy.h1.weight || 700};"
+													>
+														{hierarchy.h1.exampleText || 'Heading 1'}
+													</div>
+													<div class="hierarchy-specs-compact">{hierarchy.h1.size || '48'}px / {hierarchy.h1.weight || '700'}</div>
+												</div>
+											{/if}
+											{#if hierarchy.h2}
+												{@const h2Font = hierarchy.h2.fontName || 'sans-serif'}
+												{@const h2Family = getFontFamily(h2Font)}
+												<div class="hierarchy-item-compact">
+													<div class="hierarchy-label">H2</div>
+													<div 
+														class="hierarchy-preview"
+														style="font-family: {h2Family}; font-size: {Math.min(hierarchy.h2.size || 32, 24)}px; font-weight: {hierarchy.h2.weight || 600};"
+													>
+														{hierarchy.h2.exampleText || 'Heading 2'}
+													</div>
+													<div class="hierarchy-specs-compact">{hierarchy.h2.size || '32'}px / {hierarchy.h2.weight || '600'}</div>
+												</div>
+											{/if}
+											{#if hierarchy.h3}
+												{@const h3Font = hierarchy.h3.fontName || 'sans-serif'}
+												{@const h3Family = getFontFamily(h3Font)}
+												<div class="hierarchy-item-compact">
+													<div class="hierarchy-label">H3</div>
+													<div 
+														class="hierarchy-preview"
+														style="font-family: {h3Family}; font-size: {Math.min(hierarchy.h3.size || 24, 20)}px; font-weight: {hierarchy.h3.weight || 500};"
+													>
+														{hierarchy.h3.exampleText || 'Heading 3'}
+													</div>
+													<div class="hierarchy-specs-compact">{hierarchy.h3.size || '24'}px / {hierarchy.h3.weight || '500'}</div>
+												</div>
+											{/if}
+											{#if hierarchy.body}
+												{@const bodyFont = hierarchy.body.fontName || 'sans-serif'}
+												{@const bodyFamily = getFontFamily(bodyFont)}
+												<div class="hierarchy-item-compact">
+													<div class="hierarchy-label">Body</div>
+													<div 
+														class="hierarchy-preview body-preview-compact"
+														style="font-family: {bodyFamily}; font-size: {hierarchy.body.size || 16}px; font-weight: {hierarchy.body.weight || 400};"
+													>
+														{(hierarchy.body.exampleText || 'Body text').substring(0, 50)}...
+													</div>
+													<div class="hierarchy-specs-compact">{hierarchy.body.size || '16'}px / {hierarchy.body.weight || '400'}</div>
+												</div>
+											{/if}
 										</div>
 									</div>
 								{/if}
-
-								{#if fontInfo.supporting}
-									<div class="typography-section">
-										<h3 class="section-title">Secondary Typeface</h3>
-										<div class="font-display">
-											<div
-												class="font-name-large"
-												style="font-family: {supportingFontFamily};"
-											>
-												{fontInfo.supporting.name}
-											</div>
-											<div
-												class="character-set"
-												style="font-family: {supportingFontFamily};"
-											>
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz<br />
-												0123456789
-											</div>
-										</div>
-									</div>
-								{/if}
-							{:else}
-								{@const fallbackFonts = extractFallbackFonts(stepData)}
-								<!-- Show raw typography content for debugging -->
-								<div class="typography-section">
-									<h3 class="section-title">Typography Content (Debug)</h3>
-									<div class="font-display">
-										<pre
-											style="background: #f5f5f5; padding: 1rem; border-radius: 8px; font-size: 12px; overflow-x: auto;">{stepData}</pre>
-									</div>
-								</div>
-
-								<!-- Try to show extracted fonts even if main extraction failed -->
-								{#if fallbackFonts.primary}
-									{@const fallbackPrimaryFamily = getFontFamily(fallbackFonts.primary)}
-									<div class="typography-section">
-										<h3 class="section-title">Primary Typeface</h3>
-										<div class="font-display">
-											<div
-												class="font-name-large"
-												style="font-family: {fallbackPrimaryFamily};"
-											>
-												{fallbackFonts.primary}
-											</div>
-											<div
-												class="character-set"
-												style="font-family: {fallbackPrimaryFamily};"
-											>
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz<br />
-												0123456789
-											</div>
-											<div class="font-weights-grid">
-												<div
-													class="weight-sample"
-													style="font-family: {fallbackPrimaryFamily}; font-weight: normal;"
-												>
-													Regular
-												</div>
-												<div
-													class="weight-sample"
-													style="font-family: {fallbackPrimaryFamily}; font-weight: bold;"
-												>
-													Bold
-												</div>
-												<div
-													class="weight-sample"
-													style="font-family: {fallbackPrimaryFamily}; font-style: italic;"
-												>
-													Italic
-												</div>
-											</div>
-										</div>
-									</div>
-								{/if}
-
-								{#if fallbackFonts.supporting}
-									{@const fallbackSupportingFamily = getFontFamily(fallbackFonts.supporting)}
-									<div class="typography-section">
-										<h3 class="section-title">Secondary Typeface</h3>
-										<div class="font-display">
-											<div
-												class="font-name-large"
-												style="font-family: {fallbackSupportingFamily};"
-											>
-												{fallbackFonts.supporting}
-											</div>
-											<div
-												class="character-set"
-												style="font-family: {fallbackSupportingFamily};"
-											>
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz<br />
-												0123456789
-											</div>
-										</div>
-									</div>
-								{/if}
-
-								<!-- Final fallback: Show placeholder typography with generic names -->
-								{#if !fallbackFonts.primary && !fallbackFonts.supporting}
-									<div class="typography-section">
-										<h3 class="section-title">Primary Typeface (Fallback)</h3>
-										<div class="font-display">
-											<div class="font-name-large" style="font-family: 'Georgia', serif;">
-												Georgia
-											</div>
-											<div class="character-set" style="font-family: 'Georgia', serif;">
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy
-												Zz<br />
-												0123456789
-											</div>
-											<div class="font-weights-grid">
-												<div
-													class="weight-sample"
-													style="font-family: 'Georgia', serif; font-weight: normal;"
-												>
-													Regular
-												</div>
-												<div
-													class="weight-sample"
-													style="font-family: 'Georgia', serif; font-weight: bold;"
-												>
-													Bold
-												</div>
-												<div
-													class="weight-sample"
-													style="font-family: 'Georgia', serif; font-style: italic;"
-												>
-													Italic
-												</div>
-											</div>
-										</div>
-									</div>
-
-									<div class="typography-section">
-										<h3 class="section-title">Secondary Typeface (Fallback)</h3>
-										<div class="font-display">
-											<div class="font-name-large" style="font-family: 'Arial', sans-serif;">
-												Arial
-											</div>
-											<div class="character-set" style="font-family: 'Arial', sans-serif;">
-												Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy
-												Zz<br />
-												0123456789
-											</div>
-										</div>
-									</div>
-								{/if}
-							{/if}
-						{:else}
-							<h3 class="section-title">Font System</h3>
-							<div class="font-sections">
-								<div class="font-section">
-									<h4 class="font-title">Primary Font</h4>
-									<div
-										class="font-display"
-										style="font-family: {stepData.primary_font || 'Inter, sans-serif'}"
-									>
-										<div class="font-name">{stepData.primary_font || 'Inter'}</div>
-										<div class="font-sample">The quick brown fox jumps over the lazy dog</div>
-										<div class="font-usage">
-											{stepData.primary_usage || 'Headings and important text'}
-										</div>
-									</div>
-								</div>
-								<div class="font-section">
-									<h4 class="font-title">Secondary Font</h4>
-									<div
-										class="font-display"
-										style="font-family: {stepData.secondary_font || 'Roboto, sans-serif'}"
-									>
-										<div class="font-name">{stepData.secondary_font || 'Roboto'}</div>
-										<div class="font-sample">The quick brown fox jumps over the lazy dog</div>
-										<div class="font-usage">
-											{stepData.secondary_usage || 'Body text and descriptions'}
-										</div>
+					{:else}
+						<h3 class="section-title">Font System</h3>
+						<div class="font-sections">
+							<div class="font-section">
+								<h4 class="font-title">Primary Font</h4>
+								<div
+									class="font-display"
+									style="font-family: {stepData.primary_font || 'Inter, sans-serif'}"
+								>
+									<div class="font-name">{stepData.primary_font || 'Inter'}</div>
+									<div class="font-sample">The quick brown fox jumps over the lazy dog</div>
+									<div class="font-usage">
+										{stepData.primary_usage || 'Headings and important text'}
 									</div>
 								</div>
 							</div>
-						{/if}
+							<div class="font-section">
+								<h4 class="font-title">Secondary Font</h4>
+								<div
+									class="font-display"
+									style="font-family: {stepData.secondary_font || 'Roboto, sans-serif'}"
+								>
+									<div class="font-name">{stepData.secondary_font || 'Roboto'}</div>
+									<div class="font-sample">The quick brown fox jumps over the lazy dog</div>
+									<div class="font-usage">
+										{stepData.secondary_usage || 'Body text and descriptions'}
+									</div>
+								</div>
+							</div>
+						</div>
+					{/if}
 					</div>
 				{:else if stepId === 'iconography'}
 					<div class="iconography-slide">
@@ -3216,5 +3398,140 @@ function getIconAccent(index: number): string {
 	.weight-sample:hover {
 		transform: translateY(-2px);
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	}
+
+	/* Compact Typography Styles */
+	.typography-sections-compact {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 1.5rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.typography-section-compact {
+		background: oklch(var(--card));
+		border: 1px solid oklch(var(--border));
+		border-radius: 12px;
+		padding: 1.25rem;
+		transition: box-shadow 0.2s ease;
+	}
+
+	.typography-section-compact:hover {
+		box-shadow: 0 4px 12px oklch(var(--foreground) / 0.08);
+	}
+
+	.section-title-compact {
+		font-size: 1rem;
+		font-weight: 600;
+		color: oklch(var(--foreground));
+		margin-bottom: 1rem;
+		padding-bottom: 0.5rem;
+		border-bottom: 1px solid oklch(var(--border));
+	}
+
+	.font-display-compact {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.font-name-compact {
+		font-size: 1.75rem;
+		font-weight: 700;
+		color: oklch(var(--foreground));
+		letter-spacing: 0.02em;
+	}
+
+	.character-set-compact {
+		font-size: 0.875rem;
+		color: oklch(var(--muted-foreground));
+		line-height: 1.8;
+		word-break: break-all;
+	}
+
+	.hierarchy-examples-compact {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-top: 0.5rem;
+		padding-top: 1rem;
+		border-top: 1px solid oklch(var(--border));
+	}
+
+	.hierarchy-item-compact {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem;
+		background: oklch(var(--muted) / 0.3);
+		border-radius: 6px;
+	}
+
+	.hierarchy-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: oklch(var(--muted-foreground));
+		min-width: 32px;
+		text-align: center;
+		background: oklch(var(--muted));
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+	}
+
+	.hierarchy-preview {
+		flex: 1;
+		color: oklch(var(--foreground));
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.body-preview-compact {
+		white-space: normal;
+		line-height: 1.5;
+		max-height: 3em;
+		overflow: hidden;
+	}
+
+	.subtext-preview-compact {
+		color: oklch(var(--muted-foreground));
+		font-size: 0.875em;
+	}
+
+	.ui-preview-compact {
+		display: inline-block;
+		padding: 0.25rem 0.5rem;
+		background: oklch(var(--accent) / 0.2);
+		color: oklch(var(--accent));
+		border-radius: 4px;
+		font-weight: 600;
+	}
+
+	.hierarchy-specs-compact {
+		font-size: 0.7rem;
+		color: oklch(var(--muted-foreground));
+		font-family: monospace;
+		min-width: 60px;
+		text-align: right;
+	}
+
+	.typography-hierarchy-fallback {
+		margin-bottom: 1.5rem;
+	}
+
+	.hierarchy-grid-compact {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 1rem;
+	}
+
+	.typography-content-fallback {
+		color: oklch(var(--foreground));
+		line-height: 1.6;
+	}
+
+	.typography-content-fallback :global(strong) {
+		color: oklch(var(--foreground));
+		font-weight: 600;
 	}
 </style>

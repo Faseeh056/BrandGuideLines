@@ -38,6 +38,7 @@
 	let generatedSteps: GeneratedStep[] = [];
 	let isGeneratingNewStep = false;
 	let hasStarted = false;
+	let generationAbortController: AbortController | null = null; // For aborting fetch requests
 	
 	// Navigation state - which step is currently visible
 	let currentStepIndex = 0;
@@ -89,7 +90,13 @@
 			// Get industry-specific steps from the utility function
 			const industry = brandInput.brand_domain;
 			const industrySpecificInfo = brandInput.industrySpecificInfo || {};
-			const allStepIds = await getAllStepsForIndustry(industry, Object.keys(industrySpecificInfo).length > 0 ? industrySpecificInfo : undefined);
+			const groundingData = (brandInput as any).groundingData; // Get grounding data from brandInput
+			const allStepIds = await getAllStepsForIndustry(
+				industry, 
+				Object.keys(industrySpecificInfo).length > 0 ? industrySpecificInfo : undefined,
+				undefined, // fetchFn
+				groundingData // Pass grounding data
+			);
 			
 			// Build step definitions from step IDs
 			// Common steps first
@@ -174,6 +181,9 @@
 	}
 
 	async function startProgressiveGeneration() {
+		// Reset stop state
+		generationAbortController = new AbortController();
+		
 		// Ensure steps are loaded before starting generation
 		if (!stepsLoaded && brandInput.brand_domain) {
 			console.log('[ProgressiveGenerator] Waiting for industry steps to load...');
@@ -285,7 +295,9 @@
 			});
 		}
 
+		
 		try {
+			generationAbortController = new AbortController();
 			const response = await fetch('/api/brand-guidelines/progressive', {
 				method: 'POST',
 				headers: {
@@ -308,8 +320,10 @@
 						}))
 					},
 					userApproval: false
-				})
+				}),
+				signal: generationAbortController.signal
 			});
+			
 
 			const result = await response.json();
 
@@ -391,6 +405,15 @@
 				throw new Error(result.error || 'Failed to generate step');
 			}
 		} catch (error) {
+			// Check if error is due to abort (stop requested)
+			if (error instanceof Error && error.name === 'AbortError') {
+				console.log('[ProgressiveGenerator] Step generation aborted by user');
+				// Remove the step that was being generated
+				generatedSteps = generatedSteps.slice(0, -1);
+				isGeneratingNewStep = false;
+				return;
+			}
+			
 			console.error('Error generating step:', error);
 			// Remove the failed step
 			generatedSteps = generatedSteps.slice(0, -1);
@@ -464,7 +487,20 @@
 			idx === stepIndex ? { ...s, isGenerating: true, previousContent: currentContent, hasBeenEdited: true } : s
 		);
 
+		
 		try {
+			generationAbortController = new AbortController();
+			
+			// Build stepHistory from generatedSteps for context
+			const stepHistory = generatedSteps
+				.filter(s => s.content && !s.isGenerating)
+				.map(s => ({
+					step: s.stepId,
+					content: s.content,
+					approved: s.isApproved,
+					title: s.stepTitle
+				}));
+			
 			const response = await fetch('/api/brand-guidelines/progressive', {
 				method: 'POST',
 				headers: {
@@ -484,12 +520,17 @@
 							usage_tag: logo.usageTag,
 							fileData: logo.fileData,
 							file_size: 0
-						}))
+						})),
+						// Include stepHistory so the API can access current step content for partial modifications
+						stepHistory: stepHistory
 					},
 					userApproval: false,
-					feedback: feedback
-				})
+					feedback: feedback,
+					stepHistory: stepHistory // Also pass directly for API compatibility
+				}),
+				signal: generationAbortController.signal
 			});
+			
 
 			const result = await response.json();
 
@@ -516,6 +557,15 @@
 				throw new Error(result.error || 'Failed to regenerate step');
 			}
 		} catch (error) {
+			// Check if error is due to abort (stop requested)
+			if (error instanceof Error && error.name === 'AbortError') {
+				console.log('[ProgressiveGenerator] Step regeneration aborted by user');
+				generatedSteps = generatedSteps.map((s, idx) =>
+					idx === stepIndex ? { ...s, isGenerating: false } : s
+				);
+				return;
+			}
+			
 			console.error('Error regenerating step:', error);
 			alert('Failed to regenerate this step. Please try again.');
 			// Reset generating state and restore previous content

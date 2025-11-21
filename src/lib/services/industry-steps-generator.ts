@@ -44,10 +44,16 @@ export interface IndustryStep {
 /**
  * Generate industry-specific steps using Gemini API
  * Returns array of step IDs that should be included after the common 5 steps
+ * Now uses grounding data to create steps based on actual industry practices
  */
 export async function generateIndustrySpecificSteps(
 	industry: string,
-	industrySpecificInfo?: Record<string, any>
+	industrySpecificInfo?: Record<string, any>,
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	}
 ): Promise<string[]> {
 	try {
 		if (!industry || industry.trim() === '') {
@@ -62,7 +68,28 @@ export async function generateIndustrySpecificSteps(
 			? `\n\nAdditional Context:\n${JSON.stringify(industrySpecificInfo, null, 2)}`
 			: '';
 
-		const prompt = `You are a brand guidelines expert. Generate industry-specific brand guideline steps for the "${industry}" industry.
+		// Build grounding data section
+		const groundingSection = groundingData ? `
+		
+🔍 REAL-WORLD INDUSTRY ANALYSIS:
+Based on analysis of ${groundingData.websites.length} leading ${industry} brands:
+
+INDUSTRY SUMMARY:
+${groundingData.summary}
+
+KEY FINDINGS FROM ACTUAL BRANDS:
+${groundingData.keyFindings.slice(0, 8).map((finding, i) => `${i + 1}. ${finding}`).join('\n')}
+
+ANALYZED BRANDS AND THEIR PRACTICES:
+${groundingData.websites.map((site, idx) => `
+${idx + 1}. ${site.title}:
+   - ${site.extractedFacts.slice(0, 4).join('\n   - ')}
+`).join('\n')}
+
+CRITICAL: The steps you generate MUST be based on actual patterns, elements, and practices found in these real brands. Each step should reflect what successful ${industry} brands actually use in their brand guidelines.
+` : '';
+
+		const prompt = `You are a senior brand guidelines expert with deep knowledge of the "${industry}" industry. Your task is to generate industry-specific brand guideline steps that are based on ACTUAL practices from successful brands in this industry.
 
 COMMON STEPS (ALREADY INCLUDED - DO NOT INCLUDE THESE):
 1. brand-positioning
@@ -72,14 +99,22 @@ COMMON STEPS (ALREADY INCLUDED - DO NOT INCLUDE THESE):
 5. iconography
 
 TASK:
-Generate 2-3 additional brand guideline steps that are SPECIFIC to the "${industry}" industry. These steps should be relevant ONLY to this industry and help create comprehensive brand guidelines.
+Generate 2-4 additional brand guideline steps that are SPECIFIC to the "${industry}" industry. These steps MUST be based on actual patterns, elements, and practices found in real ${industry} brands (see REAL-WORLD INDUSTRY ANALYSIS above).
 
-REQUIREMENTS:
-- Generate step IDs in kebab-case (e.g., "medical-imagery", "product-photography", "ui-ux-patterns")
-- Each step should be unique to the "${industry}" industry
-- Steps should be practical and actionable
-- Do NOT include generic steps like "photography" or "applications" unless they are truly industry-specific
-- Focus on what makes this industry unique in terms of brand guidelines
+CRITICAL REQUIREMENTS:
+1. GROUNDED IN REALITY: Each step must be based on actual practices from the analyzed brands. Reference specific patterns, elements, or guidelines that these brands actually use.
+
+2. STEP ID FORMAT: Generate step IDs in kebab-case (e.g., "medical-imagery", "product-photography", "ui-ux-patterns", "regulatory-compliance")
+
+3. INDUSTRY-SPECIFIC: Each step should be unique to the "${industry}" industry and reflect what successful brands in this industry actually include in their brand guidelines.
+
+4. PRACTICAL & ACTIONABLE: Steps should be practical, implementable, and reflect real-world brand guideline structures used by industry leaders.
+
+5. BASED ON SCRAPED DATA: ${groundingData ? 'Use the REAL-WORLD INDUSTRY ANALYSIS to identify what actual brand elements, patterns, or guidelines these brands use. Generate steps that mirror these real practices.' : 'Focus on industry-standard brand guideline elements.'}
+
+6. AVOID GENERIC: Do NOT include generic steps like "photography" or "applications" unless they are truly industry-specific and based on actual brand practices.
+
+7. QUALITY OVER QUANTITY: Generate 2-4 high-quality steps that reflect real industry practices, not generic suggestions.
 
 EXAMPLES (3-shot learning):
 
@@ -109,7 +144,13 @@ Output (JSON array of step IDs):
 ["food-photography", "menu-design", "packaging"]
 
 NOW GENERATE FOR:
-Industry: "${industry}"${contextInfo}
+Industry: "${industry}"${contextInfo}${groundingSection}
+
+ANALYSIS PROCESS:
+1. Review the REAL-WORLD INDUSTRY ANALYSIS above
+2. Identify common patterns, elements, or brand guideline sections that appear across multiple brands
+3. Identify industry-specific elements that are unique to ${industry} brands
+4. Generate step IDs that represent these actual brand guideline elements
 
 Return ONLY a JSON array of step IDs (kebab-case strings), no additional text or explanation.
 Example format: ["step-id-1", "step-id-2", "step-id-3"]
@@ -118,8 +159,10 @@ IMPORTANT:
 - Return ONLY the JSON array
 - Use kebab-case for step IDs
 - Make steps specific to "${industry}" industry
-- Generate 2-3 steps (aim for 2-3, prioritize quality over quantity)
-- Do NOT include the common 5 steps`;
+- Base steps on ACTUAL practices from analyzed brands
+- Generate 2-4 steps (prioritize quality and real-world relevance)
+- Do NOT include the common 5 steps
+- Each step should represent a real brand guideline element used by successful ${industry} brands`;
 
 		const result = await model.generateContent(prompt);
 		const response = await result.response;

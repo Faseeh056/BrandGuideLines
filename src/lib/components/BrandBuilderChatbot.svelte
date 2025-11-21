@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -68,6 +68,9 @@
 	let isGeneratingGuidelines = false; // Track if we're in generation phase
 	let waitingForStepFeedback = false; // Track if we're waiting for user feedback for regeneration
 	let currentRegeneratingStepIndex = -1; // Track which step is being regenerated
+	let autoApproveTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map(); // Auto-approve timeouts for steps
+	const AUTO_APPROVE_DELAY = 10000; // Auto-approve after 10 seconds if no feedback
+	let generationAbortController: AbortController | null = null; // For aborting fetch requests
 	
 	// New state for enhanced flow
 	let waitingForInitialPrompt = true; // NEW: Wait for user's initial prompt
@@ -102,13 +105,29 @@ let hasAnnouncedGrounding = false;
 		}, 150);
 	}
 
+	// Cleanup timeouts on destroy
+	onDestroy(() => {
+		autoApproveTimeouts.forEach(timeout => clearTimeout(timeout));
+		autoApproveTimeouts.clear();
+	});
+	
 	// Initialize chat on mount
 	onMount(async () => {
+		// Only run in browser (not during SSR)
+		if (typeof window === 'undefined') {
+			return;
+		}
+		
+		// Always reset processing states on mount to prevent stuck states
+		isAnalyzingPrompt = false;
+		isFetchingGroundingData = false;
+		isTyping = false;
+		
 		// Check if we have saved messages in sessionStorage (browser only)
 		let savedMessages: string | null = null;
 		let savedState: string | null = null;
 		
-		if (typeof window !== 'undefined' && window.sessionStorage) {
+		if (window.sessionStorage) {
 			savedMessages = sessionStorage.getItem('brandBuilderChatMessages');
 			savedState = sessionStorage.getItem('brandBuilderChatState');
 		}
@@ -128,8 +147,16 @@ let hasAnnouncedGrounding = false;
 				answers = parsedState.answers ?? {};
 				conversationComplete = parsedState.conversationComplete ?? false;
 				waitingForConfirmation = parsedState.waitingForConfirmation ?? false;
-				waitingForInitialPrompt = parsedState.waitingForInitialPrompt ?? true;
-				isAnalyzingPrompt = parsedState.isAnalyzingPrompt ?? false;
+				
+				// Check if we have any user messages - if not, we're waiting for initial prompt
+				const hasUserMessages = messages.some(m => m.type === 'user');
+				const hasBotWelcome = messages.some(m => m.type === 'bot' && m.content.includes("👋 Hi! I'm your Brand Builder Assistant"));
+				
+				// Always reset processing states on reload to prevent stuck states
+				isAnalyzingPrompt = false;
+				isFetchingGroundingData = false;
+				isTyping = false;
+				
 				allQuestions = parsedState.allQuestions ?? [];
 				collectedInfo = parsedState.collectedInfo ?? {};
 				hasFetchedIndustryQuestions = parsedState.hasFetchedIndustryQuestions ?? false;
@@ -139,6 +166,22 @@ let hasAnnouncedGrounding = false;
 				groundingData = parsedState.groundingData ?? null;
 				groundingIndustry = parsedState.groundingIndustry ?? null;
 				hasAnnouncedGrounding = parsedState.hasAnnouncedGrounding ?? false;
+				
+				// Determine if we should wait for initial prompt
+				// If no user messages, we're waiting for initial prompt
+				if (!hasUserMessages) {
+					waitingForInitialPrompt = true;
+					// If we also don't have a welcome message, send it
+					if (!hasBotWelcome) {
+						await delay(300);
+						await sendBotMessage(
+							"👋 Hi! I'm your Brand Builder Assistant. I'll help you create comprehensive brand guidelines.\n\n**Please describe what you'd like to create.** You can tell me about your brand name, industry, style preferences, or any other details you have in mind. I'll analyze your input and ask any additional questions needed!"
+						);
+					}
+				} else {
+					// We have user messages, so we're not waiting for initial prompt
+					waitingForInitialPrompt = false;
+				}
 				
 				// Restore UI state
 				const questionsToUse = allQuestions.length > 0 ? allQuestions : questions;
@@ -152,18 +195,43 @@ let hasAnnouncedGrounding = false;
 				}
 				
 				await scrollToBottom();
-				return; // Don't send initial message if we restored state
+				return;
 			} catch (error) {
 				console.error('Failed to restore chat state:', error);
+				// Clear corrupted state
+				if (window.sessionStorage) {
+					sessionStorage.removeItem('brandBuilderChatMessages');
+					sessionStorage.removeItem('brandBuilderChatState');
+				}
+				// Reset all state
+				messages = [];
+				currentQuestionIndex = -1;
+				answers = {};
+				conversationComplete = false;
+				waitingForConfirmation = false;
+				waitingForInitialPrompt = true;
+				isAnalyzingPrompt = false;
+				allQuestions = [];
+				collectedInfo = {};
+				hasFetchedIndustryQuestions = false;
+				isGeneratingGuidelines = false;
+				waitingForStepFeedback = false;
+				currentRegeneratingStepIndex = -1;
+				groundingData = null;
+				groundingIndustry = null;
+				hasAnnouncedGrounding = false;
+				isFetchingGroundingData = false;
 				// Fall through to send initial message
 			}
 		}
 		
 		// Only send initial message if no saved state exists
+		waitingForInitialPrompt = true;
 		await delay(500);
 		await sendBotMessage(
 			"👋 Hi! I'm your Brand Builder Assistant. I'll help you create comprehensive brand guidelines.\n\n**Please describe what you'd like to create.** You can tell me about your brand name, industry, style preferences, or any other details you have in mind. I'll analyze your input and ask any additional questions needed!"
 		);
+		await scrollToBottom();
 	});
 	
 	// Save messages to sessionStorage whenever they change (debounced to avoid too many writes)
@@ -229,12 +297,14 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 			hasAnnouncedGrounding = true;
 		}
 
+		generationAbortController = new AbortController();
 		const response = await fetch('/api/grounding-search', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ industry: normalizedIndustry })
+			body: JSON.stringify({ industry: normalizedIndustry }),
+			signal: generationAbortController.signal
 		});
-
+		
 		if (!response.ok) {
 			throw new Error('Failed to fetch grounding search data');
 		}
@@ -390,12 +460,14 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 			}
 			
 			// Analyze the prompt
+			generationAbortController = new AbortController();
 			const response = await fetch('/api/brand-builder/analyze-prompt', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ userPrompt })
+				body: JSON.stringify({ userPrompt }),
+				signal: generationAbortController.signal
 			});
-
+			
 			if (!response.ok) {
 				// Try to get error details from response
 				let errorMessage = 'Failed to analyze prompt';
@@ -432,16 +504,43 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 
 			await delay(500);
 
-			if (promptAnalysis.hasCompleteInfo) {
-				await sendBotMessage(
-					"✅ Great! I found most of the information in your prompt. Let me confirm a few details and ask some follow-up questions."
-				);
-			} else {
-				await sendBotMessage(
-					`I've analyzed your prompt. I found some information, but I need a few more details to create your brand guidelines. Let me ask you some questions!`
-				);
+			// Create detailed feedback message based on analysis
+			let feedbackMessage = "🔍 **Analysis Complete!**\n\n";
+			
+			// What we found
+			const foundItems: string[] = [];
+			if (promptAnalysis.brandName) foundItems.push(`✅ Brand name: **${promptAnalysis.brandName}**`);
+			if (promptAnalysis.industry) foundItems.push(`✅ Industry: **${promptAnalysis.industry}**`);
+			if (promptAnalysis.style) foundItems.push(`✅ Style: **${promptAnalysis.style}**`);
+			if (promptAnalysis.audience) foundItems.push(`✅ Target audience: **${promptAnalysis.audience}**`);
+			if (promptAnalysis.description) foundItems.push(`✅ Description: **${promptAnalysis.description.substring(0, 50)}${promptAnalysis.description.length > 50 ? '...' : ''}**`);
+			if (promptAnalysis.values) foundItems.push(`✅ Brand values: **${promptAnalysis.values.substring(0, 50)}${promptAnalysis.values.length > 50 ? '...' : ''}**`);
+			
+			if (foundItems.length > 0) {
+				feedbackMessage += "**What I found in your prompt:**\n" + foundItems.join('\n') + "\n\n";
 			}
-
+			
+			// What's missing
+			if (promptAnalysis.missingFields && promptAnalysis.missingFields.length > 0) {
+				feedbackMessage += `**I need a bit more information:**\n`;
+				feedbackMessage += promptAnalysis.missingFields.map(field => {
+					const fieldNames: Record<string, string> = {
+						'brandName': 'Brand name',
+						'industry': 'Industry',
+						'style': 'Visual style'
+					};
+					return `• ${fieldNames[field] || field}`;
+				}).join('\n');
+				feedbackMessage += "\n\n";
+			}
+			
+			if (promptAnalysis.hasCompleteInfo) {
+				feedbackMessage += "Let me confirm a few details and ask some follow-up questions to make sure everything is perfect!";
+			} else {
+				feedbackMessage += "I'll ask you a few quick questions to fill in the gaps.";
+			}
+			
+			await sendBotMessage(feedbackMessage);
 			await delay(800);
 
 			// Get essential questions
@@ -467,6 +566,13 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 				await handleQuestionsComplete();
 			}
 		} catch (error) {
+			// Check if error is due to abort (stop requested)
+			if (error instanceof Error && error.name === 'AbortError') {
+				console.log('[chatbot] Prompt analysis aborted by user');
+				isAnalyzingPrompt = false;
+				return;
+			}
+			
 			console.error('Error analyzing prompt:', error);
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			
@@ -648,14 +754,141 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 	// Handle user input submission
 	async function handleSubmit() {
 		const input = userInput.trim().toLowerCase();
+		const userMessage = userInput.trim();
 		
-		// Handle step regeneration feedback
+		// Cancel all auto-approvals when user types (they're actively engaging)
+		if (userMessage && isGeneratingGuidelines) {
+			// Cancel auto-approval for all unapproved steps
+			messages.forEach(m => {
+				if (m.type === 'step' && m.stepData && !m.stepData.isApproved && !m.stepData.isGenerating) {
+					cancelAutoApprove(m.stepData.stepIndex);
+				}
+			});
+		}
+		
+			// Check if we're in generation phase and user is providing step-related feedback
+		if (isGeneratingGuidelines && userMessage) {
+			const command = parseStepCommand(userMessage);
+			
+			if (command.action && command.stepIndex !== null) {
+				// Cancel auto-approval since user is interacting
+				cancelAutoApprove(command.stepIndex);
+				
+				// User is giving feedback about a step
+				await sendUserMessage(userMessage);
+				userInput = '';
+				
+				if (command.action === 'approve') {
+					await handleApproveStep(command.stepIndex);
+					return;
+				} else if (command.action === 'change' || command.action === 'modify' || command.action === 'update' || command.action === 'regenerate' || command.action === 'add' || command.action === 'remove') {
+					// User wants to modify a step
+					const feedback = command.feedback || userMessage;
+					if (feedback && feedback.length > 3) {
+						await handleRegenerateStep(command.stepIndex, feedback, command.isCompleteReplacement);
+					} else {
+						await sendBotMessage("What specific changes would you like me to make to this step?");
+					}
+					return;
+				}
+			} else if (command.stepIndex !== null && !command.action) {
+				// Cancel auto-approval since user is interacting
+				cancelAutoApprove(command.stepIndex);
+				
+				// User mentioned a step but no clear action - ask for clarification
+				await sendUserMessage(userMessage);
+				userInput = '';
+				await sendBotMessage("What would you like me to do with this step? You can approve it, or ask me to change, add, or remove something.");
+				return;
+			} else if (command.stepIndex === null && (command.action === 'approve' || command.action === 'change' || command.action === 'modify')) {
+				// User wants to approve/change but didn't specify which step - use most recent unapproved step
+				const unapprovedSteps = messages
+					.filter(m => m.type === 'step' && m.stepData && !m.stepData.isApproved && !m.stepData.isGenerating)
+					.map(m => m.stepData!.stepIndex);
+				
+				if (unapprovedSteps.length > 0) {
+					const mostRecentStep = unapprovedSteps[unapprovedSteps.length - 1];
+					cancelAutoApprove(mostRecentStep);
+					await sendUserMessage(userMessage);
+					userInput = '';
+					
+					if (command.action === 'approve') {
+						await handleApproveStep(mostRecentStep);
+					} else {
+						const feedback = command.feedback || userMessage;
+						if (feedback && feedback.length > 3) {
+							await handleRegenerateStep(mostRecentStep, feedback, command.isCompleteReplacement);
+						} else {
+							await sendBotMessage("What specific changes would you like me to make?");
+						}
+					}
+					return;
+				}
+			} else if (!command.action && !command.stepIndex) {
+				// User provided a general prompt during generation - analyze it deeply
+				// This could be a request to modify something, add something, or change direction
+				await sendUserMessage(userMessage);
+				userInput = '';
+				
+				// Try to understand the intent
+				const lowerPrompt = userMessage.toLowerCase();
+				if (lowerPrompt.includes('add') || lowerPrompt.includes('include') || lowerPrompt.includes('also')) {
+					await sendBotMessage("I understand you want to add something. Could you specify which step you'd like to modify, or should I add this to the current step?");
+				} else if (lowerPrompt.includes('change') || lowerPrompt.includes('modify') || lowerPrompt.includes('update')) {
+					await sendBotMessage("I understand you want to make changes. Which step would you like me to modify, and what specific changes should I make?");
+				} else {
+					// Deep analysis of the prompt
+					await sendBotMessage("Let me analyze your request and see how I can help...");
+					await delay(500);
+					
+					// Re-analyze the prompt in context of current generation
+					try {
+						const analysisResponse = await fetch('/api/brand-builder/analyze-prompt', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ 
+								userPrompt: userMessage,
+								context: {
+									isDuringGeneration: true,
+									currentSteps: messages
+										.filter(m => m.type === 'step')
+										.map(m => ({
+											title: m.stepData?.stepTitle,
+											index: m.stepData?.stepIndex,
+											isApproved: m.stepData?.isApproved
+										}))
+								}
+							})
+						});
+						
+						if (analysisResponse.ok) {
+							const analysis = await analysisResponse.json();
+							if (analysis.analysis) {
+								// Use the analysis to understand what user wants
+								await sendBotMessage("I've analyzed your request. " + 
+									(analysis.analysis.missingFields?.length > 0 
+										? `I'll incorporate this into the brand guidelines.` 
+										: `I understand what you need. Let me continue with the generation.`));
+							}
+						}
+					} catch (error) {
+						console.error('Error analyzing prompt during generation:', error);
+					}
+				}
+				return;
+			}
+		}
+		
+		// Handle step regeneration feedback (legacy support)
 		if (waitingForStepFeedback && currentRegeneratingStepIndex >= 0) {
 			if (!userInput.trim()) {
 				await sendBotMessage("Please provide feedback on what you'd like to change.");
 				return;
 			}
-			await handleRegenerateStep(userInput.trim());
+			await handleRegenerateStep(currentRegeneratingStepIndex, userInput.trim(), false);
+			waitingForStepFeedback = false;
+			currentRegeneratingStepIndex = -1;
+			userInput = '';
 			return;
 		}
 
@@ -799,11 +1032,12 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 			try {
 				// If conversation is complete, treat this as a new brand guideline request
 				// but keep previous messages for context/history
-				if (conversationComplete) {
+				if (conversationComplete && !isGeneratingGuidelines) {
 					await sendBotMessage("🆕 Starting a fresh plan—I'll keep our previous conversation for reference.");
 					conversationComplete = false;
 				}
 				
+				// Analyze the prompt deeply
 				await analyzePromptAndGenerateQuestions(prompt);
 			} catch (error) {
 				console.error('Error handling free-form prompt:', error);
@@ -1014,8 +1248,11 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 		);
 	}
 
+
 	// Handle generation
 	function handleGenerate() {
+		generationAbortController = new AbortController();
+		
 		// Use collectedInfo and answers to build formData
 		const brandName = collectedInfo.brandName || answers['brandName'] || '';
 		const industry = collectedInfo.industry || answers['industry'] || '';
@@ -1076,6 +1313,17 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 	
 	// Export function to clear chat state (for reset)
 	export function clearChatState() {
+		// Abort any ongoing fetch requests first
+		if (generationAbortController) {
+			generationAbortController.abort();
+			generationAbortController = null;
+		}
+		
+		// Clear all auto-approve timeouts
+		autoApproveTimeouts.forEach(timeout => clearTimeout(timeout));
+		autoApproveTimeouts.clear();
+		
+		// Reset all state variables
 		messages = [];
 		currentQuestionIndex = -1;
 		answers = {};
@@ -1091,8 +1339,9 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 		isMultiline = false;
 		showSuggestions = false;
 		currentSuggestions = [];
+		isTyping = false;
 		
-		// Clear new state variables
+		// Clear new state variables - CRITICAL: Set waitingForInitialPrompt to true
 		waitingForInitialPrompt = true;
 		isAnalyzingPrompt = false;
 		promptAnalysis = null;
@@ -1100,10 +1349,10 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 		allQuestions = [];
 		hasFetchedIndustryQuestions = false;
 		collectedInfo = {};
-	groundingData = null;
-	groundingIndustry = null;
-	isFetchingGroundingData = false;
-	hasAnnouncedGrounding = false;
+		groundingData = null;
+		groundingIndustry = null;
+		isFetchingGroundingData = false;
+		hasAnnouncedGrounding = false;
 		
 		// Clear input element references
 		textInput = null;
@@ -1120,10 +1369,19 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 		} catch (error) {
 			console.error('Failed to clear chat state:', error);
 		}
+		
+		// Send initial welcome message after clearing - use tick to ensure state is updated
+		tick().then(async () => {
+			await delay(300);
+			await sendBotMessage(
+				"👋 Hi! I'm your Brand Builder Assistant. I'll help you create comprehensive brand guidelines.\n\n**Please describe what you'd like to create.** You can tell me about your brand name, industry, style preferences, or any other details you have in mind. I'll analyze your input and ask any additional questions needed!"
+			);
+			await scrollToBottom();
+		});
 	}
 	
 	// Handle step generation event (called from ProgressiveGenerator)
-	export function handleStepGenerated(step: {
+	export async function handleStepGenerated(step: {
 		stepId: string;
 		stepTitle: string;
 		stepDescription: string;
@@ -1162,12 +1420,17 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 			messages = [...messages, stepMessage];
 		}
 		
+		// Step generated - no automatic message (user can see the step and approve/change as needed)
+		
 		scrollToBottom();
 	}
 	
 	// Handle step approval
 	async function handleApproveStep(stepIndex: number) {
 		if (!onApproveStep) return;
+		
+		// Cancel auto-approval if it exists
+		cancelAutoApprove(stepIndex);
 		
 		// Check if step is still generating - don't allow approval
 		const messageIndex = messages.findIndex(
@@ -1216,28 +1479,233 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 		}
 	}
 	
-	// Handle step regeneration request
-	async function handleRequestRegenerate(stepIndex: number) {
-		waitingForStepFeedback = true;
-		currentRegeneratingStepIndex = stepIndex;
+	// Natural language processing for step commands
+	function parseStepCommand(userMessage: string): {
+		action: 'approve' | 'change' | 'modify' | 'add' | 'remove' | 'update' | 'regenerate' | null;
+		stepIndex: number | null;
+		feedback: string | null;
+		isCompleteReplacement: boolean;
+	} {
+		const lowerMessage = userMessage.toLowerCase().trim();
 		
-		// Update input placeholder
-		await delay(300);
-		await sendBotMessage("What would you like to change? Please describe your feedback in the input below.");
+		// Find step references by number (e.g., "step 1", "first step", "step one")
+		let stepIndex: number | null = null;
+		const stepNumberMatch = lowerMessage.match(/(?:step|#)\s*(\d+)|(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+step/i);
+		if (stepNumberMatch) {
+			const num = stepNumberMatch[1] ? parseInt(stepNumberMatch[1]) : 
+				['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth']
+					.indexOf(stepNumberMatch[0].split(' ')[0]) + 1;
+			if (num > 0) stepIndex = num - 1; // Convert to 0-based index
+		}
+		
+		// Find step references by name/keywords and step titles
+		const stepKeywords: Record<string, number> = {
+			'brand positioning': 0,
+			'positioning': 0,
+			'logo': 1,
+			'logo guidelines': 1,
+			'color': 2,
+			'color palette': 2,
+			'colors': 2,
+			'typography': 3,
+			'font': 3,
+			'fonts': 3,
+			'iconography': 4,
+			'icons': 4,
+			'icon': 4
+		};
+		
+		if (stepIndex === null) {
+			// First try keyword matching
+			for (const [keyword, idx] of Object.entries(stepKeywords)) {
+				if (lowerMessage.includes(keyword)) {
+					// Check if this step exists in messages
+					const stepExists = messages.some(m => 
+						m.type === 'step' && 
+						m.stepData?.stepIndex === idx &&
+						!m.stepData?.isApproved
+					);
+					if (stepExists) {
+						stepIndex = idx;
+						break;
+					}
+				}
+			}
+			
+			// If still not found, try matching by step title
+			if (stepIndex === null) {
+				for (const message of messages) {
+					if (message.type === 'step' && message.stepData && !message.stepData.isApproved) {
+						const stepTitle = message.stepData.stepTitle?.toLowerCase() || '';
+						const stepDesc = message.stepData.stepDescription?.toLowerCase() || '';
+						
+						// Check if user message contains words from step title or description
+						const titleWords = stepTitle.split(/\s+/).filter(w => w.length > 3);
+						const descWords = stepDesc.split(/\s+/).filter(w => w.length > 3);
+						
+						const hasTitleMatch = titleWords.some(word => lowerMessage.includes(word));
+						const hasDescMatch = descWords.some(word => lowerMessage.includes(word));
+						
+						if (hasTitleMatch || hasDescMatch) {
+							stepIndex = message.stepData.stepIndex;
+							break;
+						}
+					}
+				}
+			}
+		}
+		
+		// If no specific step mentioned, use the most recent unapproved step
+		if (stepIndex === null) {
+			const unapprovedSteps = messages
+				.filter(m => m.type === 'step' && m.stepData && !m.stepData.isApproved && !m.stepData.isGenerating)
+				.map(m => m.stepData!.stepIndex);
+			if (unapprovedSteps.length > 0) {
+				stepIndex = unapprovedSteps[unapprovedSteps.length - 1]; // Most recent
+			}
+		}
+		
+		// Detect action
+		let action: 'approve' | 'change' | 'modify' | 'add' | 'remove' | 'update' | 'regenerate' | null = null;
+		const approveKeywords = ['approve', 'looks good', 'perfect', 'yes', 'ok', 'okay', 'fine', 'good', 'great', 'accept', 'keep it', 'that works'];
+		const changeKeywords = ['change', 'modify', 'update', 'edit', 'adjust', 'fix', 'correct', 'revise', 'redo', 'regenerate', 'remake'];
+		const addKeywords = ['add', 'include', 'insert', 'append'];
+		const removeKeywords = ['remove', 'delete', 'omit', 'exclude', 'drop'];
+		
+		if (approveKeywords.some(kw => lowerMessage.includes(kw))) {
+			action = 'approve';
+		} else if (changeKeywords.some(kw => lowerMessage.includes(kw))) {
+			action = lowerMessage.includes('regenerate') || lowerMessage.includes('remake') || lowerMessage.includes('redo completely') ? 'regenerate' : 'change';
+		} else if (addKeywords.some(kw => lowerMessage.includes(kw))) {
+			action = 'add';
+		} else if (removeKeywords.some(kw => lowerMessage.includes(kw))) {
+			action = 'remove';
+		}
+		
+		// Detect if user wants complete replacement (only if explicitly stated)
+		// By default, modifications are partial - only regenerate completely if user explicitly says so
+		// Check for very explicit complete replacement phrases
+		const explicitCompletePhrases = [
+			'completely regenerate',
+			'completely remake',
+			'completely redo',
+			'entirely regenerate',
+			'entirely remake',
+			'start over',
+			'redo completely',
+			'regenerate completely',
+			'remake completely',
+			'change everything',
+			'replace everything',
+			'redo everything',
+			'start from scratch',
+			'completely change',
+			'completely replace'
+		];
+		
+		const isCompleteReplacement = explicitCompletePhrases.some(phrase => lowerMessage.includes(phrase));
+		
+		// Extract feedback (everything after action keywords)
+		let feedback: string | null = null;
+		if (action && action !== 'approve') {
+			const actionIndex = Math.max(
+				...changeKeywords.map(kw => lowerMessage.indexOf(kw)).filter(i => i >= 0),
+				...addKeywords.map(kw => lowerMessage.indexOf(kw)).filter(i => i >= 0),
+				...removeKeywords.map(kw => lowerMessage.indexOf(kw)).filter(i => i >= 0)
+			);
+			if (actionIndex >= 0) {
+				feedback = userMessage.substring(actionIndex).replace(/^(change|modify|update|edit|adjust|fix|correct|revise|redo|regenerate|remake|add|include|insert|append|remove|delete|omit|exclude|drop)\s+/i, '').trim();
+				if (!feedback || feedback.length < 3) feedback = null;
+			}
+		}
+		
+		return { action, stepIndex, feedback, isCompleteReplacement };
+	}
+	
+	// Setup auto-approval for a step
+	function setupAutoApprove(stepIndex: number) {
+		// Clear any existing timeout for this step
+		if (autoApproveTimeouts.has(stepIndex)) {
+			clearTimeout(autoApproveTimeouts.get(stepIndex)!);
+		}
+		
+		// Set new timeout
+		const timeout = setTimeout(async () => {
+			// Check if user is currently typing (don't auto-approve if they're active)
+			if (userInput.trim().length > 0) {
+				// User is typing, reset the timeout
+				setupAutoApprove(stepIndex);
+				return;
+			}
+			
+			const stepMessage = messages.find(m => 
+				m.type === 'step' && 
+				m.stepData?.stepIndex === stepIndex &&
+				!m.stepData?.isApproved &&
+				!m.stepData?.isGenerating
+			);
+			
+			if (stepMessage && stepMessage.stepData) {
+				await handleApproveStep(stepIndex);
+			}
+			
+			autoApproveTimeouts.delete(stepIndex);
+		}, AUTO_APPROVE_DELAY);
+		
+		autoApproveTimeouts.set(stepIndex, timeout);
+	}
+	
+	// Cancel auto-approval for a step
+	function cancelAutoApprove(stepIndex: number) {
+		if (autoApproveTimeouts.has(stepIndex)) {
+			clearTimeout(autoApproveTimeouts.get(stepIndex)!);
+			autoApproveTimeouts.delete(stepIndex);
+		}
 	}
 	
 	// Handle step regeneration with feedback
-	async function handleRegenerateStep(feedback: string) {
-		if (!onRegenerateStep || currentRegeneratingStepIndex === -1 || !feedback.trim()) {
+	async function handleRegenerateStep(stepIndex: number, feedback: string, isCompleteReplacement: boolean = false) {
+		if (!onRegenerateStep || !feedback.trim()) {
 			return;
 		}
 		
-		// Show user's feedback
-		await sendUserMessage(`Feedback: ${feedback}`);
+		// Cancel auto-approval for this step
+		cancelAutoApprove(stepIndex);
+		
+		// Get the current step content to preserve it
+		const stepMessage = messages.find(m => 
+			m.type === 'step' && m.stepData?.stepIndex === stepIndex
+		);
+		const currentStepContent = stepMessage?.stepData?.content || '';
+		
+		// Enhance feedback based on whether it's a complete replacement or partial modification
+		let enhancedFeedback = feedback;
+		if (!isCompleteReplacement && feedback) {
+			// For partial modifications, instruct AI to preserve existing content and only change what's mentioned
+			enhancedFeedback = `IMPORTANT: Analyze the user's request carefully and ONLY modify the specific thing they mentioned. Preserve ALL other existing content exactly as it is.
+
+USER REQUEST: "${feedback}"
+
+INSTRUCTIONS:
+1. Read the current step content below
+2. Identify EXACTLY what the user wants to change (analyze their request)
+3. Make ONLY that specific change
+4. Keep everything else exactly the same
+5. Do NOT regenerate or rewrite the entire step
+6. Do NOT add new content unless the user explicitly asked to add something
+7. Do NOT remove content unless the user explicitly asked to remove something
+
+CURRENT STEP CONTENT:
+${typeof currentStepContent === 'string' ? currentStepContent.substring(0, 2000) : JSON.stringify(currentStepContent).substring(0, 2000)}
+
+Now make ONLY the specific change requested by the user: "${feedback}"`;
+		} else if (isCompleteReplacement) {
+			enhancedFeedback = `Please completely regenerate this step with the following requirements: ${feedback}`;
+		}
 		
 		// Update message to show regenerating state
 		const messageIndex = messages.findIndex(
-			m => m.type === 'step' && m.stepData?.stepIndex === currentRegeneratingStepIndex
+			m => m.type === 'step' && m.stepData?.stepIndex === stepIndex
 		);
 		
 		if (messageIndex !== -1) {
@@ -1245,22 +1713,18 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 				...messages[messageIndex],
 				stepData: {
 					...messages[messageIndex].stepData!,
-					isGenerating: true
+					isGenerating: true,
+					isApproved: false
 				}
 			};
 			messages = [...messages];
 		}
 		
 		// Call the regenerate function
-		onRegenerateStep(currentRegeneratingStepIndex, feedback);
-		
-		// Reset state
-		waitingForStepFeedback = false;
-		currentRegeneratingStepIndex = -1;
-		userInput = '';
+		onRegenerateStep(stepIndex, enhancedFeedback);
 		
 		await delay(300);
-		await sendBotMessage("🔄 Regenerating step with your feedback...");
+		await sendBotMessage(`🔄 ${isCompleteReplacement ? 'Regenerating' : 'Updating'} step with your feedback...`);
 	}
 
 	// Handle Enter key
@@ -1299,18 +1763,48 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 
 	// Clear chat messages only (keeps conversation state)
 	function clearChatMessages() {
-		messages = [];
+		// Abort any ongoing operations
+		if (generationAbortController) {
+			generationAbortController.abort();
+			generationAbortController = null;
+		}
+		
+		// Reset processing states
+		isAnalyzingPrompt = false;
 		isTyping = false;
-		scrollToBottom();
+		isFetchingGroundingData = false;
+		
+		// Clear messages
+		messages = [];
 		
 		// Clear sessionStorage messages (browser only)
 		try {
 			if (typeof window !== 'undefined' && window.sessionStorage) {
 				sessionStorage.removeItem('brandBuilderChatMessages');
+				// Also update state to reflect cleared messages
+				sessionStorage.setItem('brandBuilderChatState', JSON.stringify({
+					currentQuestionIndex,
+					answers,
+					conversationComplete,
+					waitingForConfirmation,
+					waitingForInitialPrompt,
+					isAnalyzingPrompt: false,
+					allQuestions,
+					collectedInfo,
+					hasFetchedIndustryQuestions,
+					isGeneratingGuidelines,
+					waitingForStepFeedback,
+					currentRegeneratingStepIndex,
+					groundingData,
+					groundingIndustry,
+					hasAnnouncedGrounding
+				}));
 			}
 		} catch (error) {
 			console.error('Failed to clear chat messages:', error);
 		}
+		
+		scrollToBottom();
 	}
 </script>
 
@@ -1397,14 +1891,6 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 											>
 												<CheckCircle class="mr-2 h-4 w-4" />
 												Approve
-											</Button>
-											<Button
-												onclick={() => handleRequestRegenerate(message.stepData!.stepIndex)}
-												variant="outline"
-												size="sm"
-											>
-												<RefreshCw class="mr-2 h-4 w-4" />
-												Change
 											</Button>
 										</div>
 									{:else if message.stepData.isApproved}
@@ -1537,9 +2023,11 @@ async function ensureGroundingDataForIndustry(industry?: string) {
 											? "Describe what you'd like to change..." 
 											: isEditingMode 
 												? "Edit your answer..." 
-												: conversationComplete
-													? "Add more details or ask questions about your brand..."
-													: "Type your answer..."
+												: isGeneratingGuidelines
+													? "Type to approve steps or request changes (e.g., 'approve', 'change the colors', 'make it more modern')..."
+													: conversationComplete
+														? "Add more details or ask questions about your brand..."
+														: "Type your answer..."
 							}
 							class="flex-1 text-base"
 							onkeydown={handleKeyPress}

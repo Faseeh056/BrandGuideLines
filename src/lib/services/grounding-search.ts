@@ -111,54 +111,55 @@ IMPORTANT: Only return valid JSON. No markdown, no code blocks, just the JSON ar
 }
 
 /**
- * Scrape multiple websites and extract relevant facts
+ * Scrape multiple websites and extract relevant facts (PARALLELIZED for speed)
  */
 export async function scrapeIndustryWebsites(
 	websites: IndustryWebsite[],
 	industry: string
 ): Promise<ScrapedIndustryData> {
-	const scrapedResults = [];
-	const errors: string[] = [];
+	console.log(`🔍 Starting parallel scraping of ${websites.length} websites for ${industry} industry...`);
 	
-	console.log(`🔍 Starting to scrape ${websites.length} websites for ${industry} industry...`);
-	
-	for (const website of websites) {
+	// Scrape all websites in parallel for maximum speed
+	const scrapePromises = websites.map(async (website) => {
 		try {
 			console.log(`📡 Scraping ${website.url}...`);
 			
 			// Scrape the website
 			const scrapedData = await webScraper.scrapeWebpage(website.url);
 			
-			// Extract relevant facts using Gemini
+			// Extract relevant facts using Gemini (also in parallel)
 			const extractedFacts = await extractRelevantFacts(scrapedData, industry, website.title);
 			
-			scrapedResults.push({
+			return {
 				url: website.url,
 				title: website.title || scrapedData.title || website.url,
 				scrapedData: {
 					colors: scrapedData.colors?.palette || (Array.isArray(scrapedData.colors) ? scrapedData.colors : []),
 					typography: scrapedData.typography || {},
 					fonts: (scrapedData as any).fonts || [],
-					elements: (scrapedData as any).elements?.slice(0, 50) || [], // Limit elements
+					elements: (scrapedData as any).elements?.slice(0, 30) || [], // Reduced limit for speed
 					logo: (scrapedData as any).logo || null,
 					title: scrapedData.title || website.title
 				},
 				extractedFacts
-			});
-			
-			console.log(`✅ Successfully scraped ${website.url} - extracted ${extractedFacts.length} facts`);
-			
-			// Add delay between scrapes to be respectful
-			await new Promise(resolve => setTimeout(resolve, 2000));
+			};
 		} catch (error) {
 			console.error(`❌ Failed to scrape ${website.url}:`, error);
-			errors.push(`${website.url}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			return null;
 		}
-	}
+	});
 	
-	// Generate summary of findings
-	const summary = await generateIndustrySummary(scrapedResults, industry);
-	const keyFindings = extractKeyFindings(scrapedResults);
+	// Wait for all scrapes to complete in parallel
+	const results = await Promise.all(scrapePromises);
+	const scrapedResults = results.filter((r): r is NonNullable<typeof r> => r !== null);
+	
+	console.log(`✅ Completed parallel scraping - ${scrapedResults.length}/${websites.length} websites successfully scraped`);
+	
+	// Generate summary and key findings in parallel
+	const [summary, keyFindings] = await Promise.all([
+		generateIndustrySummary(scrapedResults, industry),
+		Promise.resolve(extractKeyFindings(scrapedResults))
+	]);
 	
 	return {
 		websites: scrapedResults,
@@ -168,7 +169,7 @@ export async function scrapeIndustryWebsites(
 }
 
 /**
- * Extract relevant facts from scraped website data using Gemini
+ * Extract relevant facts from scraped website data using Gemini (OPTIMIZED for speed)
  */
 async function extractRelevantFacts(
 	scrapedData: any,
@@ -178,26 +179,21 @@ async function extractRelevantFacts(
 	try {
 		const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 		
-		const prompt = `You are analyzing a website (${websiteTitle}) in the "${industry}" industry to extract relevant brand guideline facts.
+		// Optimize: Limit data sent to AI for faster processing while maintaining accuracy
+		const colors = (scrapedData.colors?.palette || scrapedData.colors || []).slice(0, 8);
+		const fonts = (scrapedData.fonts || []).slice(0, 5);
+		const elements = (scrapedData.elements || []).slice(0, 15);
+		
+		const prompt = `Analyze this ${industry} website (${websiteTitle}) and extract 6-8 key brand guideline facts. Focus on actionable, specific patterns that can inform brand guideline creation.
 
-Here's what was scraped from the website:
-- Colors: ${JSON.stringify(scrapedData.colors?.palette || scrapedData.colors || [])}
+Data:
+- Colors: ${JSON.stringify(colors)}
 - Typography: ${JSON.stringify(scrapedData.typography || {})}
-- Fonts: ${JSON.stringify(scrapedData.fonts || [])}
-- Logo info: ${JSON.stringify(scrapedData.logo || {})}
-- Key elements: ${JSON.stringify((scrapedData.elements || []).slice(0, 20))}
+- Fonts: ${JSON.stringify(fonts)}
+- Elements: ${JSON.stringify(elements)}
 
-Extract 5-10 specific, actionable facts about brand guidelines for the ${industry} industry based on this website. Focus on:
-1. Color usage patterns and palettes
-2. Typography choices and font combinations
-3. Design patterns and visual elements
-4. Brand identity elements
-5. Industry-specific design conventions
-
-Format each fact as a concise sentence. Return ONLY a JSON array of strings:
-["Fact 1", "Fact 2", "Fact 3", ...]
-
-IMPORTANT: Only return valid JSON array. No markdown, no code blocks, just the JSON array.`;
+Extract concise facts about color patterns, typography, design conventions. Return ONLY a JSON array:
+["Fact 1", "Fact 2", ...]`;
 
 		const result = await model.generateContent(prompt);
 		const response = await result.response;
@@ -210,7 +206,7 @@ IMPORTANT: Only return valid JSON array. No markdown, no code blocks, just the J
 		}
 		
 		const facts: string[] = JSON.parse(jsonMatch[0]);
-		return facts.filter(fact => fact && fact.trim().length > 0);
+		return facts.filter(fact => fact && fact.trim().length > 0).slice(0, 8); // Limit to 8 facts per website for better accuracy
 	} catch (error) {
 		console.error('Error extracting facts:', error);
 		return [];
@@ -267,10 +263,10 @@ function extractKeyFindings(
 		factCounts.set(normalized, (factCounts.get(normalized) || 0) + 1);
 	});
 	
-	// Return top 10 most common/important facts
+	// Return top 12 most common/important facts (increased for 5 websites to maintain accuracy)
 	return Array.from(factCounts.entries())
 		.sort((a, b) => b[1] - a[1])
-		.slice(0, 10)
+		.slice(0, 12)
 		.map(([fact]) => fact);
 }
 
@@ -303,19 +299,38 @@ function getFallbackWebsites(industry: string, limit: number): IndustryWebsite[]
 	return fallbacks.slice(0, limit);
 }
 
+// Cache for grounding search results (in-memory, per industry)
+const groundingCache = new Map<string, { data: ScrapedIndustryData; timestamp: number }>();
+const CACHE_DURATION = 1000 * 60 * 60; // 1 hour cache
+
 /**
- * Main function: Perform grounding search for an industry
+ * Main function: Perform grounding search for an industry (OPTIMIZED with caching and reduced websites)
  */
 export async function performGroundingSearch(industry: string): Promise<ScrapedIndustryData> {
-	console.log(`🔍 Starting grounding search for industry: ${industry}`);
+	const normalizedIndustry = industry.toLowerCase().trim();
 	
-	// Step 1: Find relevant websites
+	// Check cache first
+	const cached = groundingCache.get(normalizedIndustry);
+	if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+		console.log(`✅ Using cached grounding data for ${industry}`);
+		return cached.data;
+	}
+	
+	console.log(`🔍 Starting optimized grounding search for industry: ${industry}`);
+	
+	// Step 1: Find relevant websites (5 websites for comprehensive and accurate data)
 	const websites = await findIndustryWebsites(industry, 5);
 	console.log(`✅ Found ${websites.length} relevant websites`);
 	
-	// Step 2: Scrape websites and extract facts
+	// Step 2: Scrape websites and extract facts (now parallelized)
 	const scrapedData = await scrapeIndustryWebsites(websites, industry);
 	console.log(`✅ Completed grounding search - ${scrapedData.websites.length} websites analyzed`);
+	
+	// Cache the result
+	groundingCache.set(normalizedIndustry, {
+		data: scrapedData,
+		timestamp: Date.now()
+	});
 	
 	return scrapedData;
 }

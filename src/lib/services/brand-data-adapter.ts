@@ -478,7 +478,10 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 	console.log('🔍 Processing steps:', {
 		stepsCount: steps.length,
 		stepIds: steps.map(s => s.stepId),
-		positioningStep: steps.find(s => s.stepId === 'brand-positioning')?.content?.substring(0, 100)
+		positioningStep: (() => {
+			const content = steps.find(s => s.stepId === 'brand-positioning')?.content;
+			return typeof content === 'string' ? content.substring(0, 100) : content;
+		})()
 	});
 
 	// Find specific steps
@@ -486,7 +489,14 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 	const positioningStep = steps.find((s: any) => s.stepId === 'brand-positioning');
 	
 	// Parse brand introduction data from first step
-	const brandIntroduction = parseBrandIntroduction(firstStep?.content || '');
+	// Ensure content is a string
+	const firstStepContent = firstStep?.content;
+	const brandIntroductionContent = typeof firstStepContent === 'string' 
+		? firstStepContent 
+		: typeof firstStepContent === 'object' 
+			? JSON.stringify(firstStepContent)
+			: String(firstStepContent || '');
+	const brandIntroduction = parseBrandIntroduction(brandIntroductionContent);
 	const colorStep = steps.find((s: any) => s.stepId === 'color-palette');
 	const typographyStep = steps.find((s: any) => s.stepId === 'typography');
 	const logoStep = steps.find((s: any) => s.stepId === 'logo-guidelines');
@@ -495,11 +505,19 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 	const appStep = steps.find((s: any) => s.stepId === 'applications');
 	
 	// Parse positioning data - use actual step content
+	const positioningContent = positioningStep?.content;
+	const positioningContentPreview = typeof positioningContent === 'string'
+		? positioningContent.substring(0, 200)
+		: typeof positioningContent === 'object'
+			? JSON.stringify(positioningContent).substring(0, 200)
+			: String(positioningContent || '').substring(0, 200);
+	
 	console.log('🔍 Positioning step found:', {
 		hasPositioningStep: !!positioningStep,
 		stepId: positioningStep?.stepId,
-		contentLength: positioningStep?.content?.length,
-		contentPreview: positioningStep?.content?.substring(0, 200)
+		contentType: typeof positioningContent,
+		contentLength: typeof positioningContent === 'string' ? positioningContent.length : 'N/A',
+		contentPreview: positioningContentPreview
 	});
 
 	// Debug: Show the full content structure
@@ -509,8 +527,15 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 		console.log('🔍 Content keys (if object):', typeof positioningStep.content === 'object' ? Object.keys(positioningStep.content) : 'N/A');
 	}
 
+	// Ensure positioning content is a string before parsing
+	const positioningContentForParsing = typeof positioningContent === 'string'
+		? positioningContent
+		: typeof positioningContent === 'object'
+			? JSON.stringify(positioningContent)
+			: String(positioningContent || '');
+	
 	const positioning = positioningStep 
-		? parseBrandPositioning(positioningStep.content)
+		? parseBrandPositioning(positioningContentForParsing)
 		: {
 			mission: frontendData.shortDescription || 'Our mission',
 			vision: 'Our vision',
@@ -519,22 +544,22 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 		};
 
 	console.log('🔍 Parsed positioning result:', {
-		mission: positioning.mission?.substring(0, 50),
-		vision: positioning.vision?.substring(0, 50),
+		mission: typeof positioning.mission === 'string' ? positioning.mission.substring(0, 50) : positioning.mission,
+		vision: typeof positioning.vision === 'string' ? positioning.vision.substring(0, 50) : positioning.vision,
 		valuesCount: positioning.values?.length,
-		personality: positioning.personality?.substring(0, 50)
+		personality: typeof positioning.personality === 'string' ? positioning.personality.substring(0, 50) : positioning.personality
 	});
 
 	// If no content was parsed, try a simple fallback
 	if (!positioning.mission && !positioning.vision && positioningStep?.content) {
 		console.log('🔍 No content parsed, trying fallback extraction...');
-		const content = positioningStep.content;
+		const content = positioningContentForParsing;
 		
 		// Simple fallback: use first paragraph as mission if it's substantial
 		const paragraphs = content.split('\n\n').filter(p => p.trim().length > 20);
 		if (paragraphs.length > 0) {
 			positioning.mission = paragraphs[0].trim();
-			console.log('🔍 Fallback mission:', positioning.mission.substring(0, 50));
+			console.log('🔍 Fallback mission:', typeof positioning.mission === 'string' ? positioning.mission.substring(0, 50) : positioning.mission);
 		}
 		
 		// Try to extract any meaningful content from the step
@@ -545,19 +570,27 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 		// Use the first substantial line as mission if nothing else works
 		if (lines.length > 0 && !positioning.mission) {
 			positioning.mission = lines[0].trim();
-			console.log('🔍 Using first line as mission:', positioning.mission.substring(0, 50));
+			console.log('🔍 Using first line as mission:', typeof positioning.mission === 'string' ? positioning.mission.substring(0, 50) : positioning.mission);
 		}
 		
 		// Use second substantial line as vision if available
 		if (lines.length > 1 && !positioning.vision) {
 			positioning.vision = lines[1].trim();
-			console.log('🔍 Using second line as vision:', positioning.vision.substring(0, 50));
+			console.log('🔍 Using second line as vision:', typeof positioning.vision === 'string' ? positioning.vision.substring(0, 50) : positioning.vision);
 		}
 	}
 	
+	// Ensure color content is a string before parsing
+	const colorContent = colorStep?.content;
+	const colorContentForParsing = typeof colorContent === 'string'
+		? colorContent
+		: typeof colorContent === 'object'
+			? JSON.stringify(colorContent)
+			: String(colorContent || '');
+	
 	// Parse colors
 	const colors = colorStep 
-		? parseColorPalette(colorStep.content)
+		? parseColorPalette(colorContentForParsing)
 		: {
 			primary: {
 				name: 'Brand Blue',
@@ -578,11 +611,22 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 		hasTypographyStep: !!typographyStep,
 		stepId: typographyStep?.stepId,
 		contentLength: typographyStep?.content?.length,
-		contentPreview: typographyStep?.content?.substring(0, 200)
+		contentPreview: (() => {
+			const content = typographyStep?.content;
+			return typeof content === 'string' ? content.substring(0, 200) : content;
+		})()
 	});
 
+	// Ensure typography content is a string before parsing
+	const typographyContent = typographyStep?.content;
+	const typographyContentForParsing = typeof typographyContent === 'string'
+		? typographyContent
+		: typeof typographyContent === 'object'
+			? JSON.stringify(typographyContent)
+			: String(typographyContent || '');
+	
 	const typography = typographyStep 
-		? parseTypography(typographyStep.content)
+		? parseTypography(typographyContentForParsing)
 		: {
 			primaryFont: {
 				name: 'Inter',
@@ -713,7 +757,10 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 		logoUrlType: typeof adapted.logo?.primaryLogoUrl,
 		hasStepHistory: !!adapted.stepHistory,
 		stepHistoryLength: adapted.stepHistory?.length || 0,
-		iconographyStep: adapted.stepHistory?.find((s: any) => s.step === 'iconography')?.content?.substring(0, 100) || 'No iconography step'
+		iconographyStep: (() => {
+			const content = adapted.stepHistory?.find((s: any) => s.step === 'iconography')?.content;
+			return typeof content === 'string' ? content.substring(0, 100) : content || 'No iconography step';
+		})()
 	});
 	
 	return adapted;

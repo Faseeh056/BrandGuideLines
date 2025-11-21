@@ -11,15 +11,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const body = await request.json();
-		const { industry, industrySpecificInfo } = body;
+		const { industry, industrySpecificInfo, groundingData } = body;
 
 		if (!industry || typeof industry !== 'string') {
 			return json({ error: 'industry is required' }, { status: 400 });
 		}
 
-		console.log('[industry-steps API] Generating steps for industry:', industry);
+		console.log('[industry-steps API] Generating steps for industry:', industry, {
+			hasGroundingData: !!groundingData,
+			hasIndustrySpecificInfo: !!industrySpecificInfo
+		});
 		
-		const steps = await generateIndustrySpecificSteps(industry, industrySpecificInfo);
+		const steps = await generateIndustrySpecificSteps(industry, industrySpecificInfo, groundingData);
 
 		console.log('[industry-steps API] Generated steps:', steps);
 

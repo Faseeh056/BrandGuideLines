@@ -29,7 +29,12 @@ export interface ProgressiveGenerationRequest {
 export async function getIndustrySpecificSteps(
 	industry: string,
 	industrySpecificInfo?: Record<string, any>,
-	fetchFn?: typeof fetch
+	fetchFn?: typeof fetch,
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	}
 ): Promise<string[]> {
 	// Normalize industry name
 	const normalizedIndustry = industry?.trim() || '';
@@ -48,7 +53,7 @@ export async function getIndustrySpecificSteps(
 		// On server without fetchFn: use Gemini service directly (most efficient)
 		try {
 			const { generateIndustrySpecificSteps } = await import('$lib/services/industry-steps-generator');
-			const steps = await generateIndustrySpecificSteps(normalizedIndustry, industrySpecificInfo);
+			const steps = await generateIndustrySpecificSteps(normalizedIndustry, industrySpecificInfo, groundingData);
 			console.log(`[progressive-generation] ✓ Generated ${steps.length} industry-specific steps for "${normalizedIndustry}" (server-side direct):`, steps);
 			return steps;
 		} catch (error) {
@@ -76,7 +81,8 @@ export async function getIndustrySpecificSteps(
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				industry: normalizedIndustry,
-				industrySpecificInfo: industrySpecificInfo || {}
+				industrySpecificInfo: industrySpecificInfo || {},
+				groundingData: groundingData || undefined
 			})
 		});
 
@@ -111,10 +117,15 @@ export async function getIndustrySpecificSteps(
 export async function getAllStepsForIndustry(
 	industry: string,
 	industrySpecificInfo?: Record<string, any>,
-	fetchFn?: typeof fetch
+	fetchFn?: typeof fetch,
+	groundingData?: {
+		summary: string;
+		keyFindings: string[];
+		websites: Array<{ url: string; title: string; extractedFacts: string[] }>;
+	}
 ): Promise<string[]> {
 	const commonSteps = [...COMMON_GENERATION_STEPS];
-	const industrySteps = await getIndustrySpecificSteps(industry, industrySpecificInfo, fetchFn);
+	const industrySteps = await getIndustrySpecificSteps(industry, industrySpecificInfo, fetchFn, groundingData);
 	return [...commonSteps, ...industrySteps];
 }
 

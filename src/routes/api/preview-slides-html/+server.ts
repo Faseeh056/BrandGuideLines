@@ -25,11 +25,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         // Debug: Log the actual stepHistory structure
         if (body.stepHistory && body.stepHistory.length > 0) {
+            const firstStepContent = body.stepHistory[0].content;
+            const contentPreview = typeof firstStepContent === 'string' 
+                ? firstStepContent.substring(0, 200)
+                : typeof firstStepContent === 'object' 
+                    ? JSON.stringify(firstStepContent).substring(0, 200)
+                    : String(firstStepContent || '').substring(0, 200);
+            
             console.log('🔍 First step details:', {
                 step: body.stepHistory[0].step,
                 title: body.stepHistory[0].title,
-                contentLength: body.stepHistory[0].content?.length,
-                contentPreview: body.stepHistory[0].content?.substring(0, 200)
+                contentType: typeof firstStepContent,
+                contentLength: typeof firstStepContent === 'string' ? firstStepContent.length : 'N/A',
+                contentPreview
             });
         }
 
@@ -41,8 +49,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         console.log('🔍 Adapted brand input:', {
             brandName: brandInput.brandName,
-            mission: brandInput.mission?.substring(0, 50),
-            vision: brandInput.vision?.substring(0, 50),
+            mission: typeof brandInput.mission === 'string' ? brandInput.mission.substring(0, 50) : brandInput.mission,
+            vision: typeof brandInput.vision === 'string' ? brandInput.vision.substring(0, 50) : brandInput.vision,
             valuesCount: brandInput.values?.length
         });
 

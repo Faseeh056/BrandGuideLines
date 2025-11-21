@@ -59,6 +59,7 @@
 	// Component references
 	let progressiveGeneratorRef: ProgressiveGenerator;
 	let chatbotRef: BrandBuilderChatbot;
+	
 
 	// Expanded domain options (consolidated from both fields) - MUST BE BEFORE questions array
 	const domainOptions = [
@@ -599,9 +600,9 @@ ${customPrompt}`;
 		}
 	}
 	
-	function handleStepGenerated(step: any) {
+	async function handleStepGenerated(step: any) {
 		if (chatbotRef) {
-			chatbotRef.handleStepGenerated(step);
+			await chatbotRef.handleStepGenerated(step);
 		}
 	}
 

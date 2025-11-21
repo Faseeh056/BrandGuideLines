@@ -226,6 +226,12 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 				hasGroundingData: !!groundingData
 			});
 			
+			// Include stepHistory in previousSteps so industry-specific steps can reference previous common steps
+			const previousStepsWithHistory = {
+				...(previousSteps || {}),
+				stepHistory: stepHistory || []
+			};
+			
 			stepResult = await generateEnhancedProgressiveStep({
 				step,
 				brandName,
@@ -235,7 +241,7 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 				description: description || undefined,
 				values: values || undefined,
 				industrySpecificInfo: Object.keys(industrySpecificInfo).length > 0 ? industrySpecificInfo : undefined,
-				previousSteps: previousSteps || {},
+				previousSteps: previousStepsWithHistory,
 				feedback: feedback || undefined,
 				extractedColors: extractedColors || undefined,
 				extractedTypography: extractedTypography || undefined,

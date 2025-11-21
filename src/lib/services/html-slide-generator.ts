@@ -26,11 +26,20 @@ function extractIconographyIcons(brandInput: any, fileName?: string, templateSet
 	const stepHistory = brandInput.stepHistory || [];
 	const iconographyStep = stepHistory.find((step: any) => step.step === 'iconography');
 	
+	// Ensure content is a string for logging
+	const iconographyContent = iconographyStep?.content;
+	const iconographyContentPreview = typeof iconographyContent === 'string'
+		? iconographyContent.substring(0, 200)
+		: typeof iconographyContent === 'object'
+			? JSON.stringify(iconographyContent).substring(0, 200)
+			: String(iconographyContent || '').substring(0, 200);
+	
 	console.log('🔍 Extracting iconography icons:', {
 		hasStepHistory: !!brandInput.stepHistory,
 		stepHistoryLength: stepHistory.length,
 		iconographyStep: !!iconographyStep,
-		iconographyContent: iconographyStep?.content?.substring(0, 200) || 'No content',
+		contentType: typeof iconographyContent,
+		iconographyContent: iconographyContentPreview || 'No content',
 		templateSet: templateSet
 	});
 	
@@ -49,7 +58,14 @@ function extractIconographyIcons(brandInput: any, fileName?: string, templateSet
 	}
 	const iconSymbolClass = useAltFormat ? 'icon-symbol' : 'icon-circle';
 	
-	if (!iconographyStep || !iconographyStep.content) {
+	// Ensure content is a string before processing
+	const iconographyContentForProcessing = typeof iconographyContent === 'string'
+		? iconographyContent
+		: typeof iconographyContent === 'object'
+			? JSON.stringify(iconographyContent)
+			: String(iconographyContent || '');
+	
+	if (!iconographyStep || !iconographyContentForProcessing) {
 		// Fallback to default icons if no iconography step found
 		return generateIconHTML([
 			{ symbol: '◐', name: 'Brand' },
@@ -65,7 +81,7 @@ function extractIconographyIcons(brandInput: any, fileName?: string, templateSet
 	
 	// Extract icons from content using the same pattern as SmartPresentationAgent
 	const icons: Array<{ symbol: string; name: string }> = [];
-	const lines = iconographyStep.content.split('\n');
+	const lines = iconographyContentForProcessing.split('\n');
 	
 	console.log(`🔍 Processing ${lines.length} lines from iconography content`);
 	

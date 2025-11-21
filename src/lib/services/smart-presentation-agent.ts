@@ -80,10 +80,22 @@ export class SmartPresentationAgent {
 				if (!stepData || !stepData.approved) continue;
 
 				if (LOGGING.ENABLED) {
+					const contentLength = typeof stepData.content === 'string'
+						? stepData.content.length
+						: typeof stepData.content === 'object'
+							? JSON.stringify(stepData.content).length
+							: String(stepData.content || '').length;
+					
+					const contentPreview = typeof stepData.content === 'string'
+						? stepData.content.substring(0, 1500) + (contentLength > 1500 ? '...' : '')
+						: typeof stepData.content === 'object'
+							? JSON.stringify(stepData.content).substring(0, 1500) + '...'
+							: String(stepData.content || '').substring(0, 1500);
+					
 					console.log(`\n📄 Slide ${i + 2}: ${stepData.title} (${stepData.step})`);
 					console.log(`   Content:`);
-					console.log(`   ${stepData.content.substring(0, 1500)}${stepData.content.length > 1500 ? '...' : ''}`);
-					console.log(`   Content length: ${stepData.content.length} chars`);
+					console.log(`   ${contentPreview}`);
+					console.log(`   Content length: ${contentLength} chars`);
 				}
 
 				// STAGE 1: Analyze this slide's content
