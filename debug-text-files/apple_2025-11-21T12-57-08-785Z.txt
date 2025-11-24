@@ -1,0 +1,369 @@
+ï»¿Buffer visual guidelines
+Please follow these guidelines to ensure our logo
+and brand assets always look their best
+
+Buffer logo
+This is our primary logo. Use the full logo whenever possible.
+
+Black, light background Navy, light background White, dark background
+
+Whitespace
+Please leave space for our logo to breath.
+
+x x x x
+x x x x
+
+x x x x
+x x x x
+
+On colored light backgrounds use the black logo Use the navy logo only on white and light gray On dark backgrounds use the white logo
+backgrounds
+
+Buffer logo do's
+
+YES YES
+You can use the icon separately You can use the icon in the white version on dark backgrounds
+
+Buffer logo don'ts
+
+NO NO NO
+Please don't change the color of our logo Please don't mix colors together Please don't use the navy logo on a colored background
+
+NO NO NO
+Please don't outline the logo Please don't change proportions of the logo Please, don't use the stacked version of the logo
+
+Tool icons
+These are our tool icons. Use the full, colored version whenever possible.
+
+Publishing
+
+Two-color, light background Black-and-white, light background White, dark background
+
+Analytics
+
+Two-color, light background Black-and-white, light background White, dark background
+
+Engagement
+
+Two-color, light background Black-and-white, light background White, dark background
+
+App icons
+Tool icons are not symmetrical. When using square icons, please ensure our marks are optically centered.
+
+2x 1x
+
+2x 1x 1x
+
+1x
+
+Primary colors
+Colors used in texts, primary buttons and hovers.
+
+Black Blue Yellow White
+#231F20 #2C4BFF #FADE2A #FFFFFF
+
+Secondary colors
+Main colors of Buffer products.
+
+Dark Blue
+#121E66
+Light Blue
+#6B81FF
+Lighter Red
+#F3AFB9
+Light Orange
+#FF9B6B
+
+Primary color pairs
+
+Blue Lighter Red Lighter Red Yellow Lighter Orange Blue
+#2C4BFF #F3AFB9 #F3AFB9 #FADE2A #FFC6AB #2C4BFF
+
+Light Orange Lighter Orange Yellow Yellow Lighter Blue Light Lighter Blue
+#FF9B6B #FFC6AB #FADE2A #FDF2AA #6B81FF #ABB7FF
+
+You can always pair colors in the same shade.
+
+Full-color palette
+The color palette is based on colors from the Design System. One additional color is added.
+
+Lighter #F3AFB9 Lighter #FFC6AB Lighter #FDF2AA
+
+Light #E97284 Light #FF9B6B Light #FCE86A
+
+Red #E0364F Orange #FF702C Yellow #FADE2A
+
+Dark #9D2637 Dark #B34E1F Dark #A8961D
+
+Darker #5A1620 Darker #662D12 Darker #645911
+
+Lighter #CFE7A6 Lighter #99E9EC Lighter #ABB7FF
+
+Light #ABD464 Light #4DD9DD Light #6B81FF
+
+Green #87C221 Teal #00C8CF Blue #2C4BFF
+
+Dark #5F8817 Dark #008C91 Dark #1F35B3
+
+Darker #364E0D Darker #005053 Darker #121E66
+
+Lighter #D7AAFF Lighter #F0A8DE Lighter #F5F5F5
+
+Light #BA6BFF Light #E466C5 Light #E0E0E0
+
+Purple #9C2BFF Pink #D925AC Gray #B8B8B8
+
+Dark #6D1EB3 Dark #981A78 Dark #636363
+
+Darker #3E1166 Darker #570F45 Darker #3D3D3D
+
+Black #231F20
+Avoid changing opacity. Acceptable only for image backgrounds.
+Avoid dark shades.
+
+Fonts
+
+Headings: Poppins Bold (800)
+Buffer headlines are set in Poppins Bold. Do not use other font weights that belong to Poppins font
+family. When creating headings please use black #231F20. Always typeset it with optical kerning,
+set the letter-spacing to 0, and set in sentence case. Do not set in all caps or all lowercase.
+When using Poppins in small headings (around 18px) add letter-spacing 0.2px.
+
+Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm
+Nn Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz
+0123456789
+
+Body text: Roboto family
+
+Typeset all text and paragraph text in Roboto. Always typeset Roboto with optical kerning,
+set the letter-spacing to 0.2px, and set in title case or sentence case (as determined by the content).
+Set in all caps or all lowercase only in case of short labels.
+
+Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm
+Nn Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz
+0123456789
+
+Light
+Light Italic
+Regular
+Italic
+Medium
+Medium Italic
+Bold
+Bold Italic
+Black
+Black Italic
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+Buffer helps innovative brands leave their mark on the world.
+
+Ideal font stack
+
+Label
+Roboto Bold, 16px
+All Caps
+Letter-spacing: 0.5px
+INSTAGRAM
+
+H1
+Poppins Bold, 48px
+Remarkable brands built here
+
+H2
+Poppins Bold, 34px
+Craft the perfect post for social network
+
+H3
+Poppins Bold, 26px
+Compassion and empathy
+
+H4
+Poppins Bold, 16px
+Letter-spacing: 0.2px
+Tailored posts
+
+Paragraph
+Roboto Regular, 18px
+Letter-spacing: 0.2px
+W e c r e a t e p i x e l - p e r f e c t e x p e r i e n c e s f o r o u r c u s t o m e r s b e c a u s e w e
+v a l u e t h e i r t i m e a n d a t t e n t i o n . Q u a l i t y b r e e d s t r u s t . A t t e n t i o n t o d e t a i l
+b r i n g s r e s p e c t . L o v e a n d c a r e b u i l d b o n d s ( w e h o p e ! ) .
+
+Quote mark
+38x40px
+
+Pull quote
+Our mission is to make it easier
+to build a remarkable brand on
+social media and connect with
+your customers.
+
+Attribution KEVAN LEE, Marketing Director
+Roboto Bold, 16px
+All Caps
+Letter-spacing: 0.5px
+
+Roboto Regular, 16px
+Letter-spacing: 0.2px
+
+CTA text
+Start a free 14-day trial Sign up now Log in
+
+Roboto Medium, 18px
+Letter-spacing: 0.3px
+free
+Roboto Regular, 18px
+Letter-spacing: 0.3px
+Roboto Regular, 18px
+Letter-spacing: 0.3pxMaster brand variations x x
+Master brand variations are any external-facing programs x Y Y x
+and apps created by Buffer. They consist of a Buffer logo Community
+and a name of the variation written in Roboto Light with
+an optical kerning. x x
+
+x x
+
+x x
+x Y Y x
+Remix
+x x
+
+x x
+
+Icons
+Buffer icons are used across the marketing website.
+They help clarify the message by improving visual interest.
+Icons are built from simple lines with round caps.
+
+Social media assets
+
+Profile picture
+Profile picture is based on Buffer logo mark. It can be used
+in three following versions.
+
+White, blue background Black, white background Navy, white background
+
+Cover photo
+We use patterns as a primary cover photo. We allow using
+promo banners as secondary covers.
+
+Stories
+We use patterns as the main background for the tiles.
+The main fonts used are Poppins bold and Roboto
+regular. We keep a simple composition of the tiles.
+The text is left-aligned or centered. The text sizes can
+vary depending on text lengths. Text proportions must Title: Poppins bold, Title: Poppins bold,
+be preserved. no kerning, white black #231f20
+Additional text â Roboto regular, Additional text â Roboto regular,
+We allow stickers to be placed in various places around letter-spacing: 0,2px letter-spacing: 0,2px
+the tiles.
+
+Illustration
+
+In contrast to standardized brand elements, Buffer
+illustrations are more organic and playful.
+
+We believe that illustration is a medium that shouldn't be
+strictly standardized. Every illustration carries a piece of
+the artist's soul, and the main goal of Buffer illustrations
+is communicating a message that reflects Buffer
+personality of humanity, friendships, and diversity.
+The general visual style is symbolic. Flat geometric
+shapes meet lines. We love metaphors. The illustrations
+are minimalistic and flat. We avoid using perspective.
+
+Photography
+
+Photography is a powerful way to communicate Buffer
+brand identity. Imagery is key to showing real human
+emotions. We treat photography as a key tool to show our
+diverse community. The photos we choose accurately
+reflect the Buffer brand values. The colors are bright and
+match the established color palette. We go for
+contrasting, minimalistic style with flat color areas.
+
+Lifestyle
+
+We stand for authenticity. We want our photos to reflect
+that. Simple and human images are the best way to
+express who we are. Use cases:
+
+â blog photos,
+â various photos on website,
+â social media assets,
+â photos used in products as examples for posts and stories.
+
+Lifestyle photos dos
+
+YES YES YES
+Use photos that have flat colors and minimalistic Pick bright photos that show emotions Pick minimalistic still natures
+backgrounds
+
+YES YES YES
+Use photos that include minimalistic, geometric Pick minimalistic compositions Apply brand stickers on photos to make them even more
+patterns on-brand
+
+Lifestyle photos dont's
+
+NO NO NO
+Please don't use dark and dull colors with artificial Avoid business still-natures with no emotions Please don't use not contrasting, blurry photos
+color-balance
+
+NO NO NO
+Please don't use monochromatic photos Please avoid color gradients Please don't use photos without contrasting colors
+
+Portraits and avatars
+For portraits we choose minimalistic photos with the
+focus on the face. The style is honest and warm. We use
+a single-focus composition. The background is simple,
+minimalistic, and out of focus. Use cases:
+
+â customers avatars used in product screenshots,
+â customers avatars used across Buffer website.
+
+Product avatars dos
+
+YES YES YES
+Use photos that have flat colors and minimalistic Pick bright portraits that show emotions You can place portraits on monochromatic brand
+backgrounds patterns
+
+Products avatars don'ts
+
+NO NO NO
+Please don't use portraits captured on complicated Please avoid dark shadows Please don't use portraits not captured from a front
+backgrounds perspective
+
+Internal photography and teammates avatars
+All avatars we use at Buffer are cohesive and aligned with
+established photography guide. We allow two styles of
+the avatars â on a greenery background or on a colorful,
+plain background. Use cases:
+
+â avatars used in newsletters,
+â avatars used in external communications,
+â avatars used across website,
+â avatars used in blog articles.
+
+Team avatars dos
+
+YES YES YES
+Use photos that have flat colors and minimalistic You can place portraits on minimalistic patterns You can place portraits on solid colors
+backgrounds
+
+Team avatars don'ts
+
+NO NO NO
+Please don't use portraits with color overlays Please avoid unnecessary accessories covering your Please don't use photos where person is not looking at
+face the camera
+
+NO NO NO
+Copyright @2021 Buffer
+Please don't use portraits captured on complicated Please, avoid dark shadows Please don't use portraits not captured from a front
+backgrounds perspective

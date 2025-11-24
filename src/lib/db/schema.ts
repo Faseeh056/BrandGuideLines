@@ -335,6 +335,27 @@ export const generatedSlides = pgTable('generated_slides', {
 		.$defaultFn(() => new Date())
 });
 
+export const brandBuilderChats = pgTable('brand_builder_chats', {
+	id: text('id')
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	title: text('title')
+		.notNull()
+		.$default('Untitled Chat'),
+	brandName: text('brand_name'),
+	messages: text('messages'),
+	state: text('state'),
+	createdAt: timestamp('created_at', { mode: 'date' })
+		.notNull()
+		.$defaultFn(() => new Date()),
+	updatedAt: timestamp('updated_at', { mode: 'date' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
 // Analysis Results Table (from audit-brand2 branch)
 export const analysisResults = pgTable('analysis_results', {
 	id: serial('id').primaryKey(),

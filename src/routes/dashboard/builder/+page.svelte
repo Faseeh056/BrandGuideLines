@@ -16,14 +16,16 @@
 		Loader2,
 		CheckCircle,
 		AlertCircle,
-		History,
-		Edit3,
-		Save,
 		X,
 		FileText,
 		Zap,
-		FileDown
+		FileDown,
+		Plus,
+		Trash2,
+		History
 	} from 'lucide-svelte';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { mockMoodOptions, mockTargetAudiences } from '$lib/data/mock-data';
 	import type { BrandGuidelineResponse } from '$lib/services/gemini';
 	import type { BrandGuidelinesSpec } from '$lib/types/brand-guidelines';
@@ -47,19 +49,505 @@
 	let contactRole = '';
 	let contactCompany = '';
 
+	type LogoFileEntry = {
+		filename: string;
+		filePath: string;
+		usageTag: string;
+		fileData?: string;
+		aiGenerated?: boolean;
+	};
+
 	// UI state
 	let logoFile: File | null = null;
 	let logoPreview: string | null = null;
-	let logoFiles: Array<{ filename: string; filePath: string; usageTag: string; fileData?: string }> = [];
+	let logoFiles: LogoFileEntry[] = [];
 	let showGuidelines = false;
 	let comprehensiveGuidelines: BrandGuidelinesSpec | null = null;
 	let errorMessage = '';
 	let chatData: any = null; // Store chatbot data for progressive generator
-	
+
 	// Component references
 	let progressiveGeneratorRef: ProgressiveGenerator;
 	let chatbotRef: BrandBuilderChatbot;
-	
+
+	type ChatSessionRecord = {
+		id: string;
+		title: string | null;
+		brandName: string | null;
+		messages: string | null;
+		state: string | null;
+		createdAt: string;
+		updatedAt: string;
+	};
+
+	type BuilderStateSnapshot = {
+		brandName: string;
+		brandDomain: string;
+		shortDescription: string;
+		brandValues: string;
+		selectedMood: string;
+		selectedAudience: string;
+		customPrompt: string;
+		contactName: string;
+		contactEmail: string;
+		contactRole: string;
+		contactCompany: string;
+		logoFiles: LogoFileEntry[];
+		logoPreview: string | null;
+		savedLogoPath: string | null;
+		showGuidelines: boolean;
+		showProgressiveGenerator: boolean;
+		comprehensiveGuidelines: BrandGuidelinesSpec | null;
+		progressiveStepHistory: Array<{ step: string; content: string; approved: boolean }>;
+		savedGuidelineId: string | null;
+		chatData: any;
+	};
+
+	let chatSessions: ChatSessionRecord[] = [];
+	let chatSessionsLoading = true;
+	let chatSessionsError = '';
+	let isCreatingChat = false;
+	let activeChatId: string | null = null;
+	let activeChatStorageKey: string | null = null;
+	let showChatDropdown = false;
+	let chatDropdownRef: HTMLDivElement | null = null;
+	const LOCAL_CHAT_ID = 'local-chat';
+	let useLocalChatOnly = false;
+	const ACTIVE_CHAT_STORAGE_KEY = 'brandBuilderActiveChatId';
+	const BUILDER_STATE_PREFIX = 'brandBuilderGeneratorState:';
+
+	onMount(() => {
+		const preferredChatId = getPersistedActiveChatId();
+		loadChatSessions(preferredChatId);
+		if (typeof document !== 'undefined') {
+			const handleClickOutside = (event: MouseEvent) => {
+				if (
+					showChatDropdown &&
+					chatDropdownRef &&
+					!chatDropdownRef.contains(event.target as Node)
+				) {
+					showChatDropdown = false;
+				}
+			};
+			document.addEventListener('click', handleClickOutside);
+			return () => {
+				document.removeEventListener('click', handleClickOutside);
+			};
+		}
+	});
+
+	function storageKeysForChat(id: string) {
+		return {
+			messagesKey: `brandBuilderChatMessages:${id}`,
+			stateKey: `brandBuilderChatState:${id}`
+		};
+	}
+
+	function parseJSONSafely<T>(value: string | null): T | null {
+		if (!value) return null;
+		try {
+			return JSON.parse(value) as T;
+		} catch (error) {
+			console.warn('Failed to parse chat session payload', error);
+			return null;
+		}
+	}
+
+	function hydrateSessionStorageForChat(
+		id: string,
+		messagesData: any[] | null,
+		stateData: any | null
+	) {
+		if (!browser) return;
+		const { messagesKey, stateKey } = storageKeysForChat(id);
+		if (messagesData) {
+			sessionStorage.setItem(messagesKey, JSON.stringify(messagesData));
+		} else {
+			sessionStorage.removeItem(messagesKey);
+		}
+
+		if (stateData) {
+			sessionStorage.setItem(stateKey, JSON.stringify(stateData));
+		} else {
+			sessionStorage.removeItem(stateKey);
+		}
+	}
+
+	function removeChatStorage(id: string) {
+		if (!browser) return;
+		const { messagesKey, stateKey } = storageKeysForChat(id);
+		sessionStorage.removeItem(messagesKey);
+		sessionStorage.removeItem(stateKey);
+	}
+
+	function builderStateStorageKey(id: string) {
+		return `${BUILDER_STATE_PREFIX}${id}`;
+	}
+
+	function persistActiveChatId(id: string | null) {
+		if (!browser) return;
+		if (id) {
+			localStorage.setItem(ACTIVE_CHAT_STORAGE_KEY, id);
+		} else {
+			localStorage.removeItem(ACTIVE_CHAT_STORAGE_KEY);
+		}
+	}
+
+	function getPersistedActiveChatId() {
+		if (!browser) return null;
+		return localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY);
+	}
+
+	function clearBuilderStateForChat(id: string) {
+		if (!browser) return;
+		sessionStorage.removeItem(builderStateStorageKey(id));
+	}
+
+	function getChatStateFromSession(id: string) {
+		if (!browser) return null;
+		const { stateKey } = storageKeysForChat(id);
+		const raw = sessionStorage.getItem(stateKey);
+		if (!raw) return null;
+		try {
+			return JSON.parse(raw);
+		} catch (error) {
+			console.error('Failed to parse chat state for', id, error);
+			sessionStorage.removeItem(stateKey);
+			return null;
+		}
+	}
+
+	function applyBuilderStateSnapshot(snapshot: BuilderStateSnapshot | null) {
+		resetForm();
+		if (!snapshot) return;
+		brandName = snapshot.brandName ?? '';
+		brandDomain = snapshot.brandDomain ?? '';
+		shortDescription = snapshot.shortDescription ?? '';
+		brandValues = snapshot.brandValues ?? '';
+		selectedMood = snapshot.selectedMood ?? '';
+		selectedAudience = snapshot.selectedAudience ?? '';
+		customPrompt = snapshot.customPrompt ?? '';
+		contactName = snapshot.contactName ?? '';
+		contactEmail = snapshot.contactEmail ?? '';
+		contactRole = snapshot.contactRole ?? '';
+		contactCompany = snapshot.contactCompany ?? '';
+		logoFiles = snapshot.logoFiles ?? [];
+		logoPreview = snapshot.logoPreview ?? null;
+		savedLogoPath = snapshot.savedLogoPath ?? null;
+		showGuidelines = snapshot.showGuidelines ?? false;
+		showProgressiveGenerator = snapshot.showProgressiveGenerator ?? false;
+		comprehensiveGuidelines = snapshot.comprehensiveGuidelines ?? null;
+		progressiveStepHistory = snapshot.progressiveStepHistory ?? [];
+		savedGuidelineId = snapshot.savedGuidelineId ?? null;
+		chatData = snapshot.chatData ?? null;
+	}
+
+	function loadBuilderStateForChat(id: string) {
+		if (!browser) return false;
+		const raw = sessionStorage.getItem(builderStateStorageKey(id));
+		if (!raw) return false;
+		try {
+			const snapshot = JSON.parse(raw) as BuilderStateSnapshot;
+			applyBuilderStateSnapshot(snapshot);
+			return true;
+		} catch (error) {
+			console.error('Failed to load builder state for', id, error);
+			sessionStorage.removeItem(builderStateStorageKey(id));
+			return false;
+		}
+	}
+
+	function syncFormWithChatState(chatState: any) {
+		resetForm();
+		if (!chatState) return;
+		const answers = chatState.answers ?? {};
+		const collectedInfo = chatState.collectedInfo ?? {};
+
+		const derivedBrandName = collectedInfo.brandName || answers['brandName'] || '';
+		const derivedIndustry =
+			collectedInfo.industry || answers['industry'] || answers['brandDomain'] || '';
+		const derivedStyle = collectedInfo.style || answers['style'] || answers['selectedMood'] || '';
+		const derivedAudience =
+			collectedInfo.audience || answers['audience'] || answers['selectedAudience'] || '';
+		const derivedDescription = collectedInfo.description || answers['shortDescription'] || '';
+		const derivedValues = collectedInfo.values || answers['brandValues'] || '';
+
+		brandName = derivedBrandName;
+		brandDomain = derivedIndustry;
+		selectedMood = derivedStyle;
+		selectedAudience = derivedAudience;
+		shortDescription = derivedDescription;
+		brandValues = derivedValues;
+		customPrompt = answers['customPrompt'] || collectedInfo.description || '';
+		contactName = answers['contactName'] || '';
+		contactEmail = answers['contactEmail'] || '';
+		contactRole = answers['contactRole'] || '';
+		contactCompany = answers['contactCompany'] || '';
+
+		const logoAnswer = answers['logo'];
+		if (logoAnswer && typeof logoAnswer === 'object') {
+			logoPreview = logoAnswer.fileData || null;
+			savedLogoPath = logoAnswer.fileData || null;
+			logoFiles = [
+				{
+					filename: logoAnswer.filename || 'logo.svg',
+					filePath: logoAnswer.filePath || '',
+					fileData: logoAnswer.fileData,
+					usageTag: logoAnswer.usageTag || 'primary',
+					aiGenerated: logoAnswer.type === 'ai-generated'
+				}
+			];
+		} else {
+			logoFiles = [];
+			logoPreview = null;
+			savedLogoPath = null;
+		}
+
+		chatData = {
+			brandName: derivedBrandName,
+			brandDomain: derivedIndustry,
+			shortDescription: derivedDescription,
+			brandValues: derivedValues,
+			selectedMood: derivedStyle,
+			selectedAudience: derivedAudience,
+			customPrompt,
+			contactName,
+			contactEmail,
+			contactRole,
+			contactCompany,
+			logoData: logoAnswer,
+			industrySpecificInfo: collectedInfo.industrySpecificInfo || chatState.industrySpecificInfo,
+			groundingData: chatState.groundingData || null
+		};
+	}
+
+	function restoreBuilderStateForActiveChat() {
+		if (!activeChatStorageKey) {
+			resetForm();
+			return;
+		}
+
+		if (loadBuilderStateForChat(activeChatStorageKey)) {
+			return;
+		}
+
+		const chatState = getChatStateFromSession(activeChatStorageKey);
+		if (chatState) {
+			syncFormWithChatState(chatState);
+		} else {
+			resetForm();
+		}
+	}
+
+	function enableLocalChatMode(message?: string) {
+		useLocalChatOnly = true;
+		if (message) {
+			chatSessionsError = message;
+		}
+		activeChatId = LOCAL_CHAT_ID;
+		activeChatStorageKey = LOCAL_CHAT_ID;
+		persistActiveChatId(LOCAL_CHAT_ID);
+		showChatDropdown = false;
+		chatSessions = [];
+		restoreBuilderStateForActiveChat();
+	}
+
+	async function loadChatSessions(preferredId?: string | null) {
+		try {
+			chatSessionsLoading = true;
+			chatSessionsError = '';
+			const response = await fetch('/api/chat-sessions');
+			if (!response.ok) {
+				throw new Error(await response.text());
+			}
+			const result = await response.json();
+			const fetchedChats = Array.isArray(result.sessions)
+				? result.sessions
+				: Array.isArray(result.chats)
+					? result.chats
+					: [];
+			chatSessions = fetchedChats.sort(
+				(a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+			);
+
+			if (chatSessions.length === 0) {
+				await createNewChat(true);
+			} else {
+				const persistedId = preferredId || getPersistedActiveChatId();
+				const preferredSession =
+					(persistedId && chatSessions.find((session) => session.id === persistedId)) ||
+					chatSessions[0];
+				if (preferredSession) {
+					selectChat(preferredSession);
+				}
+			}
+		} catch (error) {
+			console.error('Failed to load chat sessions', error);
+			const message = error instanceof Error ? error.message : 'Failed to load chat history';
+			enableLocalChatMode(message);
+		} finally {
+			chatSessionsLoading = false;
+		}
+	}
+
+	function selectChat(session: ChatSessionRecord) {
+		if (!session) return;
+		const parsedMessages = parseJSONSafely<any[]>(session.messages);
+		const parsedState = parseJSONSafely<any>(session.state);
+		hydrateSessionStorageForChat(session.id, parsedMessages, parsedState);
+		activeChatId = session.id;
+		activeChatStorageKey = session.id;
+		persistActiveChatId(session.id);
+		showChatDropdown = false;
+		restoreBuilderStateForActiveChat();
+	}
+
+	async function createNewChat(skipLocalFallback = false) {
+		if (useLocalChatOnly) {
+			activeChatId = LOCAL_CHAT_ID;
+			activeChatStorageKey = LOCAL_CHAT_ID;
+			persistActiveChatId(LOCAL_CHAT_ID);
+			if (chatbotRef) {
+				chatbotRef.clearChatState();
+			}
+			restoreBuilderStateForActiveChat();
+			return;
+		}
+		if (isCreatingChat) return;
+		isCreatingChat = true;
+		try {
+			const response = await fetch('/api/chat-sessions', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ title: 'Untitled Chat' })
+			});
+			if (!response.ok) {
+				throw new Error(await response.text());
+			}
+			const result = await response.json();
+			if (result?.chat) {
+				chatSessions = [result.chat, ...chatSessions];
+				selectChat(result.chat);
+			}
+		} catch (error) {
+			console.error('Failed to create chat session', error);
+			const message = error instanceof Error ? error.message : 'Unable to create chat';
+			chatSessionsError = message;
+			if (!skipLocalFallback) {
+				enableLocalChatMode(message);
+			}
+		} finally {
+			isCreatingChat = false;
+		}
+	}
+
+	async function handleChatSessionSave(payload: {
+		id: string;
+		brandName?: string;
+		messages: any[];
+		state: any;
+	}) {
+		if (useLocalChatOnly) return;
+		if (!payload?.id) return;
+		try {
+			await fetch(`/api/chat-sessions/${payload.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					brandName: payload.brandName,
+					messages: payload.messages,
+					state: payload.state
+				})
+			});
+
+			const updatedAt = new Date().toISOString();
+			chatSessions = chatSessions
+				.map((session) =>
+					session.id === payload.id
+						? {
+								...session,
+								brandName: payload.brandName || session.brandName,
+								title: payload.brandName || session.title,
+								messages: JSON.stringify(payload.messages),
+								state: JSON.stringify(payload.state),
+								updatedAt
+							}
+						: session
+				)
+				.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+		} catch (error) {
+			console.error('Failed to save chat session', error);
+		}
+	}
+
+	async function deleteChatSession(sessionId: string) {
+		if (useLocalChatOnly) return;
+		try {
+			const response = await fetch(`/api/chat-sessions/${sessionId}`, {
+				method: 'DELETE'
+			});
+			if (!response.ok) {
+				throw new Error(await response.text());
+			}
+			removeChatStorage(sessionId);
+			clearBuilderStateForChat(sessionId);
+			chatSessions = chatSessions.filter((session) => session.id !== sessionId);
+
+			if (activeChatId === sessionId) {
+				if (chatSessions.length > 0) {
+					selectChat(chatSessions[0]);
+				} else {
+					await createNewChat();
+				}
+			}
+		} catch (error) {
+			console.error('Failed to delete chat session', error);
+			chatSessionsError = error instanceof Error ? error.message : 'Unable to delete chat';
+		}
+	}
+
+	function formatChatTimestamp(value: string) {
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) return '';
+		return date.toLocaleDateString(undefined, {
+			month: 'short',
+			day: 'numeric'
+		});
+	}
+
+	$: if (browser && activeChatStorageKey) {
+		const snapshot: BuilderStateSnapshot = {
+			brandName,
+			brandDomain,
+			shortDescription,
+			brandValues,
+			selectedMood,
+			selectedAudience,
+			customPrompt,
+			contactName,
+			contactEmail,
+			contactRole,
+			contactCompany,
+			logoFiles: [...logoFiles],
+			logoPreview,
+			savedLogoPath,
+			showGuidelines,
+			showProgressiveGenerator,
+			comprehensiveGuidelines,
+			progressiveStepHistory,
+			savedGuidelineId,
+			chatData
+		};
+
+		try {
+			sessionStorage.setItem(
+				builderStateStorageKey(activeChatStorageKey),
+				JSON.stringify(snapshot)
+			);
+		} catch (error) {
+			console.error('Failed to persist builder state', error);
+		}
+	}
 
 	// Expanded domain options (consolidated from both fields) - MUST BE BEFORE questions array
 	const domainOptions = [
@@ -89,148 +577,147 @@
 		'Creative Agency & Design'
 	];
 
-	
 	const questions = [
 		// Brand Identity Questions
-		{ 
-			id: 'brandName', 
-			question: 'What is your brand name?', 
+		{
+			id: 'brandName',
+			question: 'What is your brand name?',
 			placeholder: 'Enter your brand name',
 			helper: 'This is the official name of your brand or company',
 			type: 'text',
 			required: true,
 			icon: '🏢',
 			getValue: () => brandName,
-			setValue: (val: string) => brandName = val,
+			setValue: (val: string) => (brandName = val),
 			suggestions: []
 		},
-		{ 
-			id: 'brandDomain', 
-			question: 'What industry does your brand operate in?', 
+		{
+			id: 'brandDomain',
+			question: 'What industry does your brand operate in?',
 			placeholder: 'Type your own or select from suggestions below',
 			helper: 'Choose from common industries or type your own',
 			type: 'text-with-suggestions',
 			required: true,
 			icon: '🎯',
 			getValue: () => brandDomain,
-			setValue: (val: string) => brandDomain = val,
+			setValue: (val: string) => (brandDomain = val),
 			suggestions: domainOptions
 		},
-		{ 
-			id: 'shortDescription', 
-			question: 'Briefly describe what your brand does', 
+		{
+			id: 'shortDescription',
+			question: 'Briefly describe what your brand does',
 			placeholder: 'Tell us about your brand and what makes it unique...',
-			helper: 'A few sentences about your brand\'s purpose and offerings',
+			helper: "A few sentences about your brand's purpose and offerings",
 			type: 'textarea',
 			required: true,
 			icon: '📝',
 			getValue: () => shortDescription,
-			setValue: (val: string) => shortDescription = val,
+			setValue: (val: string) => (shortDescription = val),
 			suggestions: []
 		},
-		{ 
-			id: 'brandValues', 
-			question: 'What are your brand\'s core values and mission?', 
-			placeholder: 'Describe your brand\'s values, mission, and what makes you unique...',
-			helper: 'Help us understand your brand\'s purpose and personality',
+		{
+			id: 'brandValues',
+			question: "What are your brand's core values and mission?",
+			placeholder: "Describe your brand's values, mission, and what makes you unique...",
+			helper: "Help us understand your brand's purpose and personality",
 			type: 'textarea',
 			required: false,
 			icon: '💎',
 			getValue: () => brandValues,
-			setValue: (val: string) => brandValues = val,
+			setValue: (val: string) => (brandValues = val),
 			suggestions: []
 		},
 		// Brand Positioning Questions
-		{ 
-			id: 'selectedMood', 
-			question: 'How should your brand feel and communicate?', 
+		{
+			id: 'selectedMood',
+			question: 'How should your brand feel and communicate?',
 			placeholder: 'Type your own or select from suggestions below',
 			helper: 'Choose a mood or describe your own brand personality',
 			type: 'text-with-suggestions',
 			required: false,
 			icon: '🎨',
 			getValue: () => selectedMood,
-			setValue: (val: string) => selectedMood = val,
+			setValue: (val: string) => (selectedMood = val),
 			suggestions: mockMoodOptions
 		},
-		{ 
-			id: 'selectedAudience', 
-			question: 'Who is your target audience?', 
+		{
+			id: 'selectedAudience',
+			question: 'Who is your target audience?',
 			placeholder: 'Type your own or select from suggestions below',
 			helper: 'Choose from common audiences or describe your own',
 			type: 'text-with-suggestions',
 			required: false,
 			icon: '👥',
 			getValue: () => selectedAudience,
-			setValue: (val: string) => selectedAudience = val,
+			setValue: (val: string) => (selectedAudience = val),
 			suggestions: mockTargetAudiences
 		},
 		// Contact Information - Individual Questions
-		{ 
-			id: 'contactName', 
-			question: 'What is your contact name?', 
+		{
+			id: 'contactName',
+			question: 'What is your contact name?',
 			placeholder: 'e.g., John Doe',
 			helper: 'Your full name for the brand guidelines',
 			type: 'text',
 			required: false,
 			icon: '👤',
 			getValue: () => contactName,
-			setValue: (val: string) => contactName = val,
+			setValue: (val: string) => (contactName = val),
 			suggestions: []
 		},
-		{ 
-			id: 'contactEmail', 
-			question: 'What is your contact email?', 
+		{
+			id: 'contactEmail',
+			question: 'What is your contact email?',
 			placeholder: 'e.g., john@company.com',
 			helper: 'Your email address',
 			type: 'email',
 			required: false,
 			icon: '📧',
 			getValue: () => contactEmail,
-			setValue: (val: string) => contactEmail = val,
+			setValue: (val: string) => (contactEmail = val),
 			suggestions: []
 		},
-		{ 
-			id: 'contactRole', 
-			question: 'What is your role?', 
+		{
+			id: 'contactRole',
+			question: 'What is your role?',
 			placeholder: 'e.g., Marketing Manager',
 			helper: 'Your position or role in the company',
 			type: 'text',
 			required: false,
 			icon: '💼',
 			getValue: () => contactRole,
-			setValue: (val: string) => contactRole = val,
+			setValue: (val: string) => (contactRole = val),
 			suggestions: []
 		},
-		{ 
-			id: 'contactCompany', 
-			question: 'What is your company name?', 
+		{
+			id: 'contactCompany',
+			question: 'What is your company name?',
 			placeholder: 'e.g., Acme Corp',
 			helper: 'The name of your company or organization',
 			type: 'text',
 			required: false,
 			icon: '🏢',
 			getValue: () => contactCompany,
-			setValue: (val: string) => contactCompany = val,
+			setValue: (val: string) => (contactCompany = val),
 			suggestions: []
 		},
 		// Additional Details Question
-		{ 
-			id: 'customPrompt', 
-			question: 'Any additional requirements or preferences?', 
+		{
+			id: 'customPrompt',
+			question: 'Any additional requirements or preferences?',
 			placeholder: 'Taglines, style preferences, color inspirations, specific requirements...',
 			helper: 'Share any additional details that would help us create your brand guidelines',
 			type: 'textarea',
 			required: false,
 			icon: '✨',
 			getValue: () => customPrompt,
-			setValue: (val: string) => customPrompt = val,
+			setValue: (val: string) => (customPrompt = val),
 			suggestions: []
 		},
 		// Logo Upload Question
-		{ 
-			id: 'logo', 
-			question: 'Do you have a logo to upload?', 
+		{
+			id: 'logo',
+			question: 'Do you have a logo to upload?',
 			placeholder: '',
 			helper: 'Upload your existing logo or skip to generate one with AI',
 			type: 'logo',
@@ -337,7 +824,7 @@
 		contactEmail = '';
 		contactRole = '';
 		contactCompany = '';
-		
+
 		// Reset state
 		removeLogo();
 		showGuidelines = false;
@@ -348,7 +835,7 @@
 		savedLogoPath = null;
 		progressiveStepHistory = [];
 	}
-	
+
 	// Check if we can generate (all required questions answered)
 	function canGenerate(): boolean {
 		return brandName.trim() !== '' && brandDomain !== '' && shortDescription.trim() !== '';
@@ -525,7 +1012,7 @@ ${customPrompt}`;
 	function handleProgressiveGeneration(data?: any) {
 		// Store chatData for later use
 		chatData = data;
-		
+
 		// If called from chatbot, populate form fields
 		if (data) {
 			brandName = data.brandName || brandName;
@@ -535,13 +1022,13 @@ ${customPrompt}`;
 			selectedMood = data.selectedMood || selectedMood;
 			selectedAudience = data.selectedAudience || selectedAudience;
 			customPrompt = data.customPrompt || customPrompt;
-			
+
 			// Handle individual contact info fields
 			contactName = data.contactName || contactName;
 			contactEmail = data.contactEmail || contactEmail;
 			contactRole = data.contactRole || contactRole;
 			contactCompany = data.contactCompany || contactCompany;
-			
+
 			// Handle logo
 			if (data.logoData) {
 				// Check if it's an uploaded logo or AI-generated
@@ -549,36 +1036,42 @@ ${customPrompt}`;
 					// AI-generated logo - use the fileData from generation
 					if (data.logoData.fileData) {
 						logoPreview = data.logoData.fileData;
-						logoFiles = [{
-							filename: data.logoData.filename || 'ai-generated-logo.svg',
-							filePath: '',
-							fileData: data.logoData.fileData,
-							usageTag: 'primary',
-							aiGenerated: true
-						}];
+						logoFiles = [
+							{
+								filename: data.logoData.filename || 'ai-generated-logo.svg',
+								filePath: '',
+								fileData: data.logoData.fileData,
+								usageTag: 'primary',
+								aiGenerated: true
+							}
+						];
 					} else {
 						// Fallback if fileData is missing
-						logoFiles = [{
-							filename: 'ai-generated-logo.svg',
-							filePath: '',
-							fileData: '',
-							usageTag: 'primary',
-							aiGenerated: true
-						}];
+						logoFiles = [
+							{
+								filename: 'ai-generated-logo.svg',
+								filePath: '',
+								fileData: '',
+								usageTag: 'primary',
+								aiGenerated: true
+							}
+						];
 					}
 				} else {
 					// Uploaded logo
 					logoPreview = data.logoData.fileData;
-					logoFiles = [{
-						filename: data.logoData.filename,
-						filePath: data.logoData.filePath,
-						fileData: data.logoData.fileData,
-						usageTag: 'primary'
-					}];
+					logoFiles = [
+						{
+							filename: data.logoData.filename,
+							filePath: data.logoData.filePath,
+							fileData: data.logoData.fileData,
+							usageTag: 'primary'
+						}
+					];
 				}
 			}
 		}
-		
+
 		// Validate required fields for progressive generation
 		if (!brandName || !brandDomain || !shortDescription) {
 			errorMessage =
@@ -589,7 +1082,7 @@ ${customPrompt}`;
 		showProgressiveGenerator = true;
 		showGuidelines = false;
 		errorMessage = '';
-		
+
 		// Auto-start generation when chatbot-controlled
 		// Wait for component to mount
 		setTimeout(() => {
@@ -598,20 +1091,20 @@ ${customPrompt}`;
 			}
 		}, 100);
 	}
-	
+
 	// Wrapper functions for step approval/regeneration
 	function handleApproveStep(stepIndex: number) {
 		if (progressiveGeneratorRef) {
 			progressiveGeneratorRef.approveStep(stepIndex);
 		}
 	}
-	
+
 	function handleRegenerateStep(stepIndex: number, feedback: string) {
 		if (progressiveGeneratorRef) {
 			progressiveGeneratorRef.regenerateStep(stepIndex, feedback);
 		}
 	}
-	
+
 	async function handleStepGenerated(step: any) {
 		if (chatbotRef) {
 			await chatbotRef.handleStepGenerated(step);
@@ -629,7 +1122,7 @@ ${customPrompt}`;
 		comprehensiveGuidelines = data.completeGuidelines;
 		// Store step history for custom display
 		progressiveStepHistory = data.stepHistory;
-		
+
 		// Store MINIMAL data for preview page (avoid sessionStorage quota issues)
 		const previewData = {
 			brandName,
@@ -641,7 +1134,7 @@ ${customPrompt}`;
 			brandInput: data.brandInput,
 			guidelineId: data.savedGuidelines?.id // Store just the ID for fetching from DB
 		};
-		
+
 		try {
 			sessionStorage.setItem('preview_brand_data', JSON.stringify(previewData));
 		} catch (error: any) {
@@ -654,14 +1147,10 @@ ${customPrompt}`;
 			};
 			sessionStorage.setItem('preview_brand_data', JSON.stringify(minimalData));
 		}
-		
-		// Clear chatbot state before redirecting
-		if (chatbotRef) {
-			chatbotRef.clearChatState();
-		}
-		
-        // Redirect to new HTML-based preview page
-        goto('/dashboard/preview-html');
+		sessionStorage.setItem('preview_brand_saved', 'true');
+
+		// Redirect to new HTML-based preview page
+		goto('/dashboard/preview-html');
 	}
 
 	async function handleDownloadPptx() {
@@ -689,7 +1178,7 @@ ${customPrompt}`;
 				errorMessage = result.error || 'Failed to download PowerPoint';
 			} else {
 				successMessage = 'PowerPoint presentation downloaded successfully!';
-				setTimeout(() => successMessage = '', 3000);
+				setTimeout(() => (successMessage = ''), 3000);
 			}
 		} catch (error: any) {
 			console.error('Error downloading PowerPoint:', error);
@@ -772,11 +1261,6 @@ ${customPrompt}`;
 			URL.revokeObjectURL(url);
 			document.body.removeChild(a);
 		}
-	}
-
-
-	function goToHistory() {
-		goto('/dashboard/history');
 	}
 
 	function handleSlideExport(format: string, editedData?: BrandGuidelinesSpec) {
@@ -1281,36 +1765,46 @@ ${customPrompt}`;
 </script>
 
 <!-- Enhanced Header with Gradient - Full Width -->
-<div class="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500/10 via-orange-600/5 to-transparent p-8 border border-orange-500/20">
+<div
+	class="relative mb-8 overflow-hidden rounded-2xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 via-orange-600/5 to-transparent p-8"
+>
 	<!-- Animated Background Elements -->
-	<div class="absolute inset-0 overflow-hidden pointer-events-none">
-		<div class="absolute -top-1/2 -right-1/2 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse"></div>
-		<div class="absolute -bottom-1/2 -left-1/2 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+	<div class="pointer-events-none absolute inset-0 overflow-hidden">
+		<div
+			class="absolute -top-1/2 -right-1/2 h-96 w-96 animate-pulse rounded-full bg-orange-500/10 blur-3xl"
+		></div>
+		<div
+			class="absolute -bottom-1/2 -left-1/2 h-96 w-96 animate-pulse rounded-full bg-orange-600/10 blur-3xl"
+			style="animation-delay: 1s;"
+		></div>
 	</div>
-	
+
 	<div class="relative flex items-center justify-between">
 		<div class="space-y-2">
 			<div class="flex items-center gap-3">
-				<div class="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20">
+				<div
+					class="rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 p-2 shadow-lg shadow-orange-500/20"
+				>
 					<Zap class="h-6 w-6 text-white" />
 				</div>
-				<h1 class="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Brand Builder</h1>
+				<h1
+					class="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-4xl font-bold text-transparent"
+				>
+					Brand Builder
+				</h1>
 			</div>
-			<p class="text-muted-foreground text-lg ml-14">Create brand guidelines step-by-step with AI assistance</p>
+			<p class="ml-14 text-lg text-muted-foreground">
+				Create brand guidelines step-by-step with AI assistance
+			</p>
 		</div>
-		<div class="flex gap-2">
-			<Button variant="outline" size="sm" onclick={goToHistory} class="border-orange-500/20 hover:bg-orange-500/10 hover:border-orange-500/40 transition-all duration-300">
-				<History class="mr-2 h-4 w-4" />
-				View History
-			</Button>
-		</div>
+		<div class="flex gap-2"></div>
 	</div>
 </div>
 
-<div class="flex justify-end pr-6 lg:pr-12">
-	<div class="grid grid-cols-1 gap-8 lg:grid-cols-2 items-start max-w-[1400px]">
-		<!-- Brand Guidelines Generator (Left Side) -->
-		<div class="space-y-6 h-[1000px]">
+<div class="px-4 pb-10 lg:px-8">
+	<div class="grid gap-8 xl:grid-cols-[minmax(0,0.5fr)_minmax(0,0.5fr)]">
+		<!-- Brand Guidelines Generator -->
+		<div class="space-y-6">
 			{#if showProgressiveGenerator}
 				<ProgressiveGenerator
 					bind:this={progressiveGeneratorRef}
@@ -1337,7 +1831,9 @@ ${customPrompt}`;
 							company: contactCompany || brandName
 						},
 						// Include industry-specific info if available (from chatbot)
-						...(chatData?.industrySpecificInfo ? { industrySpecificInfo: chatData.industrySpecificInfo } : {}),
+						...(chatData?.industrySpecificInfo
+							? { industrySpecificInfo: chatData.industrySpecificInfo }
+							: {}),
 						...(chatData?.groundingData ? { groundingData: chatData.groundingData } : {})
 					} as any}
 					{logoFiles}
@@ -1346,15 +1842,17 @@ ${customPrompt}`;
 					onStepGenerated={handleStepGenerated}
 				/>
 			{:else if errorMessage}
-				<Card class="border-destructive/20 shadow-lg bg-destructive/5 backdrop-blur-sm h-full w-[650px]">
+				<Card
+					class="h-full w-full border-destructive/20 bg-destructive/5 shadow-lg backdrop-blur-sm"
+				>
 					<CardContent class="p-6">
 						<div class="flex items-start gap-4">
-							<div class="p-3 rounded-full bg-destructive/20">
+							<div class="rounded-full bg-destructive/20 p-3">
 								<AlertCircle class="h-6 w-6 text-destructive" />
 							</div>
 							<div class="flex-1">
-								<h3 class="text-base font-semibold text-destructive mb-2">Generation Error</h3>
-								<p class="text-sm text-destructive/90 mb-4">{errorMessage}</p>
+								<h3 class="mb-2 text-base font-semibold text-destructive">Generation Error</h3>
+								<p class="mb-4 text-sm text-destructive/90">{errorMessage}</p>
 								<Button
 									variant="outline"
 									size="sm"
@@ -1370,88 +1868,241 @@ ${customPrompt}`;
 						</div>
 					</CardContent>
 				</Card>
-		{:else if showGuidelines && comprehensiveGuidelines}
-			<!-- Brand guidelines completed -->
-			<Card class="border-orange-500/20 shadow-xl bg-gradient-to-br from-orange-500/5 to-transparent backdrop-blur-sm relative overflow-hidden h-full w-[650px]">
-				<!-- Animated Success Background -->
-				<div class="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-orange-600/10"></div>
-				<div class="absolute top-0 right-0 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl animate-pulse"></div>
-				
-				<CardContent class="relative p-8 text-center">
-					<div class="mb-6 inline-flex p-4 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 animate-bounce">
-						<CheckCircle class="h-16 w-16 text-orange-500" />
-					</div>
-					<h2 class="mb-3 text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-						Brand Guidelines Created Successfully!
-					</h2>
-					<p class="mb-8 text-base text-muted-foreground max-w-lg mx-auto">
-						Your brand guidelines have been generated and saved. You can view them in your history or download as PowerPoint.
-					</p>
-					<div class="flex flex-col sm:flex-row justify-center gap-3">
-						<Button 
-							onclick={() => goto('/dashboard/history')} 
-							size="lg"
-							class="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 transition-all duration-300"
+			{:else if showGuidelines && comprehensiveGuidelines}
+				<!-- Brand guidelines completed -->
+				<Card
+					class="relative h-full w-full overflow-hidden border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-transparent shadow-xl backdrop-blur-sm"
+				>
+					<!-- Animated Success Background -->
+					<div
+						class="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-orange-600/10"
+					></div>
+					<div
+						class="absolute top-0 right-0 h-64 w-64 animate-pulse rounded-full bg-orange-500/20 blur-3xl"
+					></div>
+
+					<CardContent class="relative p-8 text-center">
+						<div
+							class="mb-6 inline-flex animate-bounce rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 p-4"
 						>
-							<History class="mr-2 h-5 w-5" />
-							View in History
-						</Button>
-						<Button 
-							variant="outline" 
-							onclick={handleDownloadPptx} 
-							size="lg"
-							class="border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-500/50 transition-all duration-300"
-						>
-							<FileDown class="mr-2 h-5 w-5" />
-							Download PowerPoint
-						</Button>
-						<Button 
-							variant="outline" 
-							onclick={resetForm} 
-							size="lg"
-							class="border-border/50 hover:bg-muted transition-all duration-300"
-						>
-							Create New Guidelines
-						</Button>
-					</div>
-				</CardContent>
-			</Card>
-			{:else}
-				<Card class="flex h-full w-[650px] items-center justify-center border-border/50 shadow-lg bg-card/50 backdrop-blur-sm relative overflow-hidden group">
-					<!-- Animated Background -->
-					<div class="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-orange-600/5"></div>
-					<div class="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-					<div class="absolute bottom-0 left-0 w-64 h-64 bg-orange-600/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000" style="animation-delay: 0.5s;"></div>
-					
-					<div class="relative text-center text-muted-foreground p-8">
-						<div class="mb-6 inline-flex p-5 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 group-hover:scale-110 transition-transform duration-300">
-							<Zap class="h-16 w-16 text-orange-500 animate-pulse" />
+							<CheckCircle class="h-16 w-16 text-orange-500" />
 						</div>
-						<p class="mb-3 text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Brand Guidelines Generator</p>
-						<p class="text-base text-muted-foreground max-w-md">
+						<h2
+							class="mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-3xl font-bold text-transparent"
+						>
+							Brand Guidelines Created Successfully!
+						</h2>
+						<p class="mx-auto mb-8 max-w-lg text-base text-muted-foreground">
+							Your brand guidelines have been generated and saved. You can download them as
+							PowerPoint or start a new project.
+						</p>
+						<div class="flex flex-col justify-center gap-3 sm:flex-row">
+							<Button
+								variant="outline"
+								onclick={handleDownloadPptx}
+								size="lg"
+								class="border-orange-500/30 transition-all duration-300 hover:border-orange-500/50 hover:bg-orange-500/10"
+							>
+								<FileDown class="mr-2 h-5 w-5" />
+								Download PowerPoint
+							</Button>
+							<Button
+								variant="outline"
+								onclick={resetForm}
+								size="lg"
+								class="border-border/50 transition-all duration-300 hover:bg-muted"
+							>
+								Create New Guidelines
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
+			{:else}
+				<Card
+					class="group relative flex h-full w-full items-center justify-center overflow-hidden border-border/50 bg-card/50 shadow-lg backdrop-blur-sm"
+				>
+					<!-- Animated Background -->
+					<div
+						class="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-orange-600/5"
+					></div>
+					<div
+						class="absolute top-0 right-0 h-64 w-64 rounded-full bg-orange-500/10 blur-3xl transition-transform duration-1000 group-hover:scale-125"
+					></div>
+					<div
+						class="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-orange-600/10 blur-3xl transition-transform duration-1000 group-hover:scale-125"
+						style="animation-delay: 0.5s;"
+					></div>
+
+					<div class="relative p-8 text-center text-muted-foreground">
+						<div
+							class="mb-6 inline-flex rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 p-5 transition-transform duration-300 group-hover:scale-110"
+						>
+							<Zap class="h-16 w-16 animate-pulse text-orange-500" />
+						</div>
+						<p
+							class="mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-xl font-semibold text-transparent"
+						>
+							Brand Guidelines Generator
+						</p>
+						<p class="max-w-md text-base text-muted-foreground">
 							Answer the questions in the chat to start generating your AI-powered brand guidelines
 						</p>
 						<div class="mt-6 flex justify-center gap-2">
-							<div class="h-2 w-2 rounded-full bg-orange-500 animate-bounce"></div>
-							<div class="h-2 w-2 rounded-full bg-orange-500 animate-bounce" style="animation-delay: 0.1s;"></div>
-							<div class="h-2 w-2 rounded-full bg-orange-500 animate-bounce" style="animation-delay: 0.2s;"></div>
+							<div class="h-2 w-2 animate-bounce rounded-full bg-orange-500"></div>
+							<div
+								class="h-2 w-2 animate-bounce rounded-full bg-orange-500"
+								style="animation-delay: 0.1s;"
+							></div>
+							<div
+								class="h-2 w-2 animate-bounce rounded-full bg-orange-500"
+								style="animation-delay: 0.2s;"
+							></div>
 						</div>
 					</div>
 				</Card>
 			{/if}
 		</div>
 
-		<!-- Chatbot Interface (Right Side) -->
-		<div class="space-y-6">
-			<BrandBuilderChatbot
-				bind:this={chatbotRef}
-				{questions}
-				onComplete={handleProgressiveGeneration}
-				{canGenerate}
-				totalSteps={7}
-				onApproveStep={handleApproveStep}
-				onRegenerateStep={handleRegenerateStep}
-			/>
+		<!-- Chatbot -->
+		<div class="flex flex-col items-center">
+			<div class="mb-4 flex w-full items-center justify-end gap-3">
+				<Button
+					variant="outline"
+					size="sm"
+					class="gap-1 border-orange-500/30 hover:bg-orange-500/10"
+					onclick={createNewChat}
+					disabled={isCreatingChat || chatSessionsLoading}
+				>
+					{#if isCreatingChat}
+						<Loader2 class="h-4 w-4 animate-spin" />
+					{:else}
+						<Plus class="h-4 w-4" />
+					{/if}
+					New Chat
+				</Button>
+				{#if !useLocalChatOnly}
+					<div class="relative" bind:this={chatDropdownRef}>
+						<button
+							type="button"
+							class="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-background/80 text-foreground transition hover:bg-muted"
+							title="Previous chats"
+							onclick={(event) => {
+								event.stopPropagation();
+								if (!chatSessionsLoading) {
+									showChatDropdown = !showChatDropdown;
+								}
+							}}
+						>
+							<History class={`h-4 w-4 ${showChatDropdown ? 'text-orange-500' : ''}`} />
+							<span class="sr-only">Toggle chat history</span>
+						</button>
+						{#if showChatDropdown}
+							<div
+								class="absolute right-0 z-20 mt-2 w-72 rounded-xl border border-border/60 bg-card shadow-xl"
+							>
+								<div class="flex items-center justify-between border-b border-border/40 px-4 py-2">
+									<p class="text-xs font-semibold text-muted-foreground uppercase">
+										Previous chats
+									</p>
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 px-2 text-xs"
+										onclick={() => {
+											showChatDropdown = false;
+										}}
+									>
+										Close
+									</Button>
+								</div>
+								{#if chatSessionsError}
+									<div class="border-b border-border/40 px-4 py-3 text-xs text-destructive">
+										{chatSessionsError}
+									</div>
+								{/if}
+								{#if chatSessionsLoading}
+									<div class="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+										<Loader2 class="h-4 w-4 animate-spin" />
+										Loading…
+									</div>
+								{:else if chatSessions.length === 0}
+									<div class="px-4 py-3 text-sm text-muted-foreground">
+										No sessions yet. Start a new chat to begin.
+									</div>
+								{:else}
+									<div class="max-h-72 overflow-y-auto">
+										{#each chatSessions as session}
+											<div
+												class={`flex items-center gap-3 px-4 py-2 text-sm transition ${
+													session.id === activeChatId ? 'bg-orange-500/10' : 'hover:bg-muted/40'
+												}`}
+											>
+												<button
+													type="button"
+													class="flex-1 text-left"
+													onclick={(event) => {
+														event.stopPropagation();
+														selectChat(session);
+														showChatDropdown = false;
+													}}
+												>
+													<p class="truncate font-semibold text-foreground">
+														{session.brandName || session.title || 'Untitled Chat'}
+													</p>
+													<p class="text-[11px] text-muted-foreground">
+														Updated {formatChatTimestamp(session.updatedAt)}
+													</p>
+												</button>
+												<button
+													type="button"
+													class="text-muted-foreground hover:text-destructive"
+													title="Delete chat"
+													onclick={(event) => {
+														event.stopPropagation();
+														deleteChatSession(session.id);
+													}}
+												>
+													<Trash2 class="h-4 w-4" />
+												</button>
+											</div>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<div class="text-xs text-muted-foreground">History unavailable (offline mode)</div>
+				{/if}
+			</div>
+
+			{#if chatSessionsLoading && !activeChatStorageKey}
+				<div class="flex h-[640px] w-full items-center justify-center gap-2 text-muted-foreground">
+					<Loader2 class="h-4 w-4 animate-spin" />
+					<span>Loading assistant…</span>
+				</div>
+			{:else if activeChatStorageKey}
+				{#key activeChatStorageKey}
+					<BrandBuilderChatbot
+						bind:this={chatbotRef}
+						{questions}
+						onComplete={handleProgressiveGeneration}
+						{canGenerate}
+						totalSteps={7}
+						onApproveStep={handleApproveStep}
+						onRegenerateStep={handleRegenerateStep}
+						storageKey={activeChatStorageKey}
+						onSessionSave={handleChatSessionSave}
+					/>
+				{/key}
+			{:else}
+				<div
+					class="flex h-[640px] flex-col items-center justify-center px-6 text-center text-muted-foreground"
+				>
+					<Zap class="mb-4 h-10 w-10 text-orange-500" />
+					<p class="text-sm">Select or create a chat to start building your brand guidelines.</p>
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>

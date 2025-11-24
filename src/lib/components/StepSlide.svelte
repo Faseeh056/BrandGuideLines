@@ -1661,7 +1661,7 @@ function getIconAccent(index: number): string {
 						>
 							<div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
 							<CheckCircle class="mr-2 h-5 w-5" />
-							<span class="text-base font-semibold">Save Brand Guidelines</span>
+							<span class="text-base font-semibold">Go to Preview</span>
 						</Button>
 					{:else if canGoNext}
 						<Button
