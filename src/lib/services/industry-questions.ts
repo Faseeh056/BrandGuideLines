@@ -263,22 +263,12 @@ export function getEssentialQuestions(analysis: {
 	}
 
 	// Style/Vibe (ALWAYS ASK - even if mentioned)
+	// Limited to 4 options for mock webpage generation
 	const styleOptions = [
 		'Minimalistic',
 		'Maximalistic',
 		'Funky',
-		'Futuristic',
-		'Retro/Vintage',
-		'Playful',
-		'Professional',
-		'Bold',
-		'Modern',
-		'Classic',
-		'Elegant',
-		'Luxury',
-		'Casual',
-		'Artistic',
-		'Contemporary'
+		'Futuristic'
 	];
 
 	questions.push({
@@ -289,7 +279,7 @@ export function getEssentialQuestions(analysis: {
 		type: 'text-with-suggestions',
 		required: true,
 		icon: '🎨',
-		helper: 'Choose a style that best represents your brand\'s aesthetic',
+		helper: 'Choose one of four styles that best represents your brand\'s aesthetic. This will be used to generate your mock webpage.',
 		suggestions: styleOptions
 	});
 

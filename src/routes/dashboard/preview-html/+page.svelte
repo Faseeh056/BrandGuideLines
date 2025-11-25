@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import interact from 'interactjs';
 	import SlideManager from '$lib/components/SlideManager.svelte';
 	import { convertSvelteSlidesToPptx } from '$lib/services/svelte-slide-to-pptx';
 	import type { SlideData } from '$lib/types/slide-data';
 import { Button } from '$lib/components/ui/button';
-import { RotateCcw } from 'lucide-svelte';
+import { RotateCcw, Globe, Loader2 } from 'lucide-svelte';
+import { buildMockWebpage } from '$lib/services/mock-webpage-builder';
+import { saveTempBrandData, updateBuildData } from '$lib/services/temp-brand-storage';
 
 	let slides: Array<{ name: string; html: string }> = [];
 	let brandData: any = null;
@@ -28,6 +31,8 @@ import { RotateCcw } from 'lucide-svelte';
 	let gridSize: number = 10; // Grid size in pixels
 
 	let slideManagerRef: SlideManager; // Reference to SlideManager component
+	let isBuildingWebpage = false;
+	let webpageBuildComplete = false;
 
 	// Store event listener references and interact instances for proper cleanup
 	let editingEventListeners: Array<{
@@ -3224,6 +3229,44 @@ $: if (slides.length > 0 && originalSlidesSnapshot.length > 0) {
 			isSwitchingTemplate = false;
 		}
 	}
+
+	async function buildMockWebpageHandler() {
+		if (!brandData || isBuildingWebpage) return;
+
+		isBuildingWebpage = true;
+		webpageBuildComplete = false;
+
+		try {
+			// Get selected theme from brand data
+			const selectedTheme = brandData?.selectedMood || brandData?.style || 'Minimalistic';
+			const theme = ['Minimalistic', 'Maximalistic', 'Funky', 'Futuristic'].includes(selectedTheme)
+				? (selectedTheme as 'Minimalistic' | 'Maximalistic' | 'Funky' | 'Futuristic')
+				: 'Minimalistic';
+
+			// Build the webpage
+			const buildResult = await buildMockWebpage(brandData, theme);
+
+			// Save to temp storage
+			saveTempBrandData({
+				userInput: brandData,
+				selectedTheme: theme,
+				brandData: brandData,
+				slides: slides,
+				buildData: buildResult
+			});
+
+			webpageBuildComplete = true;
+		} catch (err: any) {
+			console.error('Failed to build mock webpage:', err);
+			error = err.message || 'Failed to build mock webpage';
+		} finally {
+			isBuildingWebpage = false;
+		}
+	}
+
+	function visitMockWebpage() {
+		goto('/dashboard/preview-html/mock-webpage');
+	}
 </script>
 
 {#if loading}
@@ -3275,6 +3318,31 @@ $: if (slides.length > 0 && originalSlidesSnapshot.length > 0) {
 						>
 							<RotateCcw class="h-4 w-4" />
 							Revert Changes
+						</Button>
+					{/if}
+					{#if !webpageBuildComplete}
+						<Button
+							class="flex h-11 items-center justify-center gap-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 text-sm font-semibold dark:bg-blue-500 dark:hover:bg-blue-600"
+							onclick={buildMockWebpageHandler}
+							disabled={isBuildingWebpage}
+							title="Build a mock webpage based on your brand guidelines"
+						>
+							{#if isBuildingWebpage}
+								<Loader2 class="h-4 w-4 animate-spin" />
+								Building...
+							{:else}
+								<Globe class="h-4 w-4" />
+								Build Mock Webpage
+							{/if}
+						</Button>
+					{:else}
+						<Button
+							class="flex h-11 items-center justify-center gap-2 rounded-full bg-green-600 text-white hover:bg-green-700 text-sm font-semibold dark:bg-green-500 dark:hover:bg-green-600"
+							onclick={visitMockWebpage}
+							title="Visit your mock webpage"
+						>
+							<Globe class="h-4 w-4" />
+							Visit Mock Webpage
 						</Button>
 					{/if}
 				</div>

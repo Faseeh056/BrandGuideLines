@@ -2,18 +2,15 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
-  import anime from 'animejs/lib/anime.es.js';
+  import { loadTempBrandData } from '$lib/services/temp-brand-storage';
+  
+  // Import theme templates
+  import MinimalisticApp from '$lib/templates_mock_webpage/minimalistic/App.svelte';
+  import MaximalisticApp from '$lib/templates_mock_webpage/maximalistic/App.svelte';
+  import FunkyApp from '$lib/templates_mock_webpage/funky/App.svelte';
+  import FuturisticApp from '$lib/templates_mock_webpage/futuristic/App.svelte';
 
   type ThemeKey = 'minimalistic' | 'maximalistic' | 'funky' | 'futuristic';
-  type HtmlSlide = { name: string; html: string };
-
-  const THEME_PRIORITY: ThemeKey[] = ['futuristic', 'maximalistic', 'funky', 'minimalistic'];
-  const THEME_KEYWORDS: Record<ThemeKey, string[]> = {
-    futuristic: ['futuristic', 'future', 'tech', 'ai', 'cyber', 'neon', 'digital'],
-    maximalistic: ['maximal', 'luxury', 'bold', 'premium', 'editorial', 'gourmet'],
-    funky: ['funky', 'playful', 'retro', 'vibrant', 'youth', 'street', 'creative'],
-    minimalistic: ['minimal', 'minimalist', 'clean', 'calm', 'modern', 'serene', 'soft']
-  };
 
   const THEME_PRESETS: Record<ThemeKey, { bg: string; surface: string; accent: string; accentSoft: string; text: string; gradient: string }>
     = {
@@ -74,23 +71,13 @@
     ]
   };
 
-  const UNSPLASH_KEY = (import.meta as any).env?.VITE_UNSPLASH_ACCESS_KEY || (import.meta as any).env?.PUBLIC_UNSPLASH_ACCESS_KEY || '';
-  const PEXELS_KEY = (import.meta as any).env?.VITE_PEXELS_API_KEY || (import.meta as any).env?.PUBLIC_PEXELS_API_KEY || '';
 
   let brandData: any = null;
-  let slides: HtmlSlide[] = [];
   let loading = true;
   let error: string | null = null;
-  let vibes: string[] = [];
   let theme: ThemeKey = 'minimalistic';
-  let palette: string[] = [];
-  let heroImage: string | null = null;
-  let galleryImages: string[] = [];
-  let primaryFont = 'Inter';
-  let secondaryFont = 'Manrope';
-  let heroCopy = { title: 'Bring your brand to life', subtitle: 'This mock experience shows how your guidelines translate to a live web presence.', cta: 'Launch brand-ready site' };
-  let featureList: { title: string; description: string }[] = [];
-  let cubeRef: HTMLDivElement | null = null;
+  let images: { hero: string | null; gallery: string[] } = { hero: null, gallery: [] };
+  let content: Record<string, any> = {};
 
   onMount(() => {
     if (!browser) return;
@@ -107,243 +94,88 @@
   });
 
   async function hydrate() {
-    const raw = sessionStorage.getItem('preview_brand_data');
-    if (!raw) {
-      error = 'No brand data available. Please return to the presentation view.';
-      return;
-    }
-
-    brandData = JSON.parse(raw);
-    await ensureGuidelineMetadata();
-    await ensureSlides();
-
-    vibes = extractVibes();
-    theme = resolveTheme(vibes);
-    palette = extractPalette();
-    const { headline, body } = extractTypography();
-    primaryFont = headline;
-    secondaryFont = body;
-    heroCopy = buildHeroCopy();
-    featureList = deriveFeatureList();
-
-    await loadThemeImagery();
-
-    if (theme === 'futuristic') {
-      queueMicrotask(() => initFuturisticAnimation());
-    }
-  }
-
-  async function ensureGuidelineMetadata() {
-    let guidelineId = brandData?.id || brandData?.guidelineId;
-    if (guidelineId) {
-      sessionStorage.setItem('current_guideline_id', guidelineId);
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/brand-guidelines/by-name?brandName=${encodeURIComponent(brandData?.brandName || '')}`);
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.guideline) {
-          guidelineId = result.guideline.id;
-          sessionStorage.setItem('current_guideline_id', guidelineId);
-        }
+    // Load from temp brand storage (includes build data)
+    const tempData = loadTempBrandData();
+    
+    if (!tempData) {
+      // Fallback to sessionStorage for backward compatibility
+      const raw = sessionStorage.getItem('preview_brand_data');
+      if (!raw) {
+        error = 'No brand data available. Please build a mock webpage first from the preview page.';
+        return;
       }
-    } catch (err) {
-      console.warn('Guideline lookup failed:', err);
-    }
-  }
-
-  async function ensureSlides() {
-    const slidesStep = brandData?.stepHistory?.find((s: any) => s.step === 'generated-slides');
-    if (slidesStep?.content) {
-      try {
-        slides = JSON.parse(slidesStep.content) as HtmlSlide[];
-      } catch (err) {
-        console.warn('Slide parse failed, refetching…', err);
-        slides = [];
+      brandData = JSON.parse(raw);
+      // Use default theme
+      theme = 'minimalistic';
+    } else {
+      brandData = tempData.brandData;
+      theme = tempData.selectedTheme.toLowerCase() as ThemeKey;
+      
+      // Use build data if available
+      if (tempData.buildData) {
+        images = tempData.buildData.images || { hero: null, gallery: [] };
+        content = tempData.buildData.content || {};
       }
     }
 
-    if (slides.length) return;
-
-    try {
-      const res = await fetch('/api/preview-slides-html', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandName: brandData.brand_name || brandData.brandName,
-          brandDomain: brandData.brand_domain || brandData.brandDomain,
-          contact: brandData.contact,
-          stepHistory: brandData.stepHistory,
-          logoFiles: brandData.logoFiles,
-          logoUrl: brandData.logoUrl,
-          logo: brandData.logo
-        })
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      const data = await res.json();
-      if (data.success && data.slides) {
-        slides = data.slides as HtmlSlide[];
-        if (slidesStep) {
-          slidesStep.content = JSON.stringify(slides);
-          sessionStorage.setItem('preview_brand_data', JSON.stringify(brandData));
-        }
-      }
-    } catch (err) {
-      console.error('Slide fetch failed:', err);
+    // Ensure we have images and content
+    if (!images || !images.hero) {
+      await loadThemeImagery();
+    }
+    
+    if (!content || Object.keys(content).length === 0) {
+      content = buildDefaultContent();
     }
   }
-
-  function extractVibes(): string[] {
-    const collected: string[] = [];
-    const pushValue = (value: unknown) => {
-      if (!value) return;
-      if (Array.isArray(value)) {
-        value.forEach(pushValue);
-      } else if (typeof value === 'string') {
-        value.split(/[,&]/).forEach((token) => collected.push(token.trim().toLowerCase()));
-      }
-    };
-
-    pushValue(brandData?.selectedMood);
-    pushValue(brandData?.brandValues);
-    pushValue(brandData?.vibes);
-    pushValue(brandData?.toneOfVoice);
-
-    return Array.from(new Set(collected.filter(Boolean)));
-  }
-
-  function resolveTheme(vibeList: string[]): ThemeKey {
-    for (const key of THEME_PRIORITY) {
-      if (vibeList.some((vibe) => THEME_KEYWORDS[key].some((kw) => vibe.includes(kw)))) {
-        return key;
-      }
-    }
-    return 'minimalistic';
-  }
-
-  function extractPalette(): string[] {
-    const pools: string[][] = [];
-    if (Array.isArray(brandData?.colorPalette)) {
-      pools.push(brandData.colorPalette);
-    }
-    if (Array.isArray(brandData?.brandColors)) {
-      pools.push(brandData.brandColors);
-    }
-    if (brandData?.palette?.colors) {
-      pools.push(Object.values(brandData.palette.colors));
-    }
-
-    const merged = Array.from(new Set(pools.flat().filter((color) => typeof color === 'string')));
-    if (merged.length >= 3) return merged.slice(0, 5);
-
-    const preset = THEME_PRESETS[theme];
-    return [preset.accent, preset.accentSoft, preset.text, '#ffffff'];
-  }
-
-  function extractTypography() {
-    const typography = brandData?.typography || brandData?.brandTypography;
-    const headline = typography?.headings?.font || typography?.headlineFont || 'Space Grotesk';
-    const body = typography?.body?.font || typography?.bodyFont || 'Inter';
-    return { headline, body };
-  }
-
-  function buildHeroCopy() {
-    const tagline = brandData?.tagline || brandData?.brandTagline;
-    const mission = brandData?.missionStatement || brandData?.mission;
-    const audience = brandData?.selectedAudience || brandData?.audiencePersona;
+  
+  function buildDefaultContent() {
+    const brandName = brandData?.brand_name || brandData?.brandName || 'Brand';
     return {
-      title: tagline || `Experience ${resolveBrandName()} online`,
-      subtitle: mission || 'An expressive hero section that mirrors your guidelines in motion.',
-      cta: audience ? `Engage ${Array.isArray(audience) ? audience[0] : audience} today` : 'Preview live experience'
+      heroTitle: `Welcome to ${brandName}`,
+      heroDescription: `Experience the future of ${brandData?.industry || 'innovation'}.`,
+      heroBadge: 'Featured',
+      ctaPrimary: 'Get Started',
+      ctaSecondary: 'Learn More',
+      features: [],
+      stats: []
     };
-  }
-
-  function deriveFeatureList() {
-    const differentiators = brandData?.valueProps || brandData?.keyDifferentiators || [];
-    if (Array.isArray(differentiators) && differentiators.length) {
-      return differentiators.slice(0, 3).map((item: string, idx: number) => ({
-        title: item.split(':')[0] || `Benefit ${idx + 1}`,
-        description: item.split(':').slice(1).join(':').trim() || 'Detailed storyline directly from your guideline copy.'
-      }));
-    }
-
-    return [
-      { title: 'Brand-consistent hero', description: 'Color, typography, and messaging mirror the presentation deck.' },
-      { title: 'Guideline-driven modules', description: 'Components assemble dynamically using your approved content blocks.' },
-      { title: 'Imagery matched to vibe', description: 'Unsplash/Pexels photography aligns with the selected mood.' }
-    ];
   }
 
   async function loadThemeImagery() {
-    const query = vibes[0] || theme;
-    heroImage = await fetchPreferredImage(`${query} brand hero`);
-
-    const galleryPromises = [0, 1, 2].map((idx) => fetchPreferredImage(`${query} lifestyle ${idx}`));
-    const results = await Promise.all(galleryPromises);
-    galleryImages = results.filter(Boolean) as string[];
-
-    if (!galleryImages.length) {
-      galleryImages = FALLBACK_GALLERIES[theme];
-    }
-  }
-
-  async function fetchPreferredImage(query: string): Promise<string | null> {
-    const unsplash = await fetchUnsplashImage(query);
-    if (unsplash) return unsplash;
-    const pexels = await fetchPexelsImage(query);
-    if (pexels) return pexels;
-    return null;
-  }
-
-  async function fetchUnsplashImage(query: string): Promise<string | null> {
-    if (!UNSPLASH_KEY) return null;
+    const brandName = brandData?.brand_name || brandData?.brandName || 'brand';
+    const query = `${brandName} ${theme} lifestyle`;
+    
     try {
-      const res = await fetch(`https://api.unsplash.com/photos/random?orientation=landscape&query=${encodeURIComponent(query)}`, {
-        headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` }
+      const response = await fetch('/api/mock-webpage/images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandName,
+          theme,
+          imageType: 'lifestyle',
+          count: 4
+        })
       });
-      if (!res.ok) throw new Error('Unsplash request failed');
-      const data = await res.json();
-      return data.urls?.regular || null;
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.images) {
+          images = {
+            hero: data.images[0] || null,
+            gallery: data.images.slice(1)
+          };
+          return;
+        }
+      }
     } catch (err) {
-      console.warn('Unsplash fetch failed:', err);
-      return null;
+      console.warn('Image fetch failed:', err);
     }
-  }
 
-  async function fetchPexelsImage(query: string): Promise<string | null> {
-    if (!PEXELS_KEY) return null;
-    try {
-      const res = await fetch(`https://api.pexels.com/v1/search?per_page=1&orientation=landscape&query=${encodeURIComponent(query)}`, {
-        headers: { Authorization: PEXELS_KEY }
-      });
-      if (!res.ok) throw new Error('Pexels request failed');
-      const data = await res.json();
-      return data.photos?.[0]?.src?.large || null;
-    } catch (err) {
-      console.warn('Pexels fetch failed:', err);
-      return null;
-    }
-  }
-
-  function initFuturisticAnimation() {
-    if (!cubeRef) return;
-    anime({
-      targets: cubeRef,
-      rotateY: ['0deg', '360deg'],
-      rotateX: ['0deg', '360deg'],
-      scale: [0.95, 1.05],
-      duration: 6000,
-      easing: 'easeInOutSine',
-      loop: true
-    });
-  }
-
-  function resolveBrandName() {
-    return brandData?.brand_name || brandData?.brandName || 'Your Brand';
+    // Fallback
+    images = {
+      hero: FALLBACK_GALLERIES[theme][0] || null,
+      gallery: FALLBACK_GALLERIES[theme].slice(1)
+    };
   }
 
   function navigateBack() {
@@ -369,90 +201,17 @@
   </div>
 {:else}
   {#if brandData}
-    <div class={`mock-shell theme-${theme}`} style={`--bg:${THEME_PRESETS[theme].bg}; --surface:${THEME_PRESETS[theme].surface}; --accent:${THEME_PRESETS[theme].accent}; --accent-soft:${THEME_PRESETS[theme].accentSoft}; --text:${THEME_PRESETS[theme].text}; --gradient:${THEME_PRESETS[theme].gradient}; --font-headline:${primaryFont}; --font-body:${secondaryFont};`}>
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">{resolveBrandName()} · Guided by your presentation</p>
-          <h1 style={`font-family:${primaryFont}, 'Space Grotesk', sans-serif`}>{heroCopy.title}</h1>
-          <p style={`font-family:${secondaryFont}, 'Inter', sans-serif`}>{heroCopy.subtitle}</p>
-          <div class="hero-actions">
-            <button class="primary">{heroCopy.cta}</button>
-            <button class="secondary" on:click={navigateBack}>← Back to presentation</button>
-          </div>
-          {#if vibes.length}
-            <div class="vibe-chips">
-              {#each vibes.slice(0, 6) as vibe}
-                <span class="chip">{vibe}</span>
-              {/each}
-            </div>
-          {/if}
-        </div>
-        <div class="hero-visual">
-          {#if heroImage}
-            <img src={heroImage} alt="Thematic hero" loading="lazy" />
-          {:else}
-            <div class="hero-placeholder">Imagery loads automatically using Unsplash/Pexels.</div>
-          {/if}
-          {#if theme === 'futuristic'}
-            <div class="cube-wrapper">
-              <div class="futuristic-cube" bind:this={cubeRef}></div>
-            </div>
-          {/if}
-        </div>
-      </section>
-
-      <section class="palette">
-        <div class="section-heading">
-          <h2>Color system</h2>
-          <p>Derived from the presentation palette</p>
-        </div>
-        <div class="swatches">
-          {#each palette.slice(0, 5) as color}
-            <div class="swatch" style={`--swatch:${color}`}>
-              <span>{color}</span>
-            </div>
-          {/each}
-        </div>
-      </section>
-
-      <section class="feature-grid">
-        {#each featureList as feature}
-          <article class="feature-card">
-            <h3>{feature.title}</h3>
-            <p>{feature.description}</p>
-          </article>
-        {/each}
-      </section>
-
-      <section class="gallery">
-        <div class="section-heading">
-          <h2>Imagery direction</h2>
-          <p>Matched to the selected vibe</p>
-        </div>
-        <div class="gallery-grid">
-          {#each galleryImages.slice(0, 3) as image}
-            <figure>
-              <img src={image} alt="Gallery" loading="lazy" />
-            </figure>
-          {/each}
-        </div>
-      </section>
-
-      <section class="typography">
-        <div>
-          <p class="eyebrow">Typography</p>
-          <h2 style={`font-family:${primaryFont}, 'Space Grotesk', sans-serif`}>{primaryFont}</h2>
-          <p style={`font-family:${secondaryFont}, 'Inter', sans-serif`}>
-            {secondaryFont} keeps paragraphs, descriptions, and UI patterns readable and on-brand.
-          </p>
-        </div>
-        <div class="cta-card">
-          <h3>Ready to ship this experience?</h3>
-          <p>Use the export controls in presentation view to deliver editable assets.</p>
-          <button class="primary" on:click={navigateBack}>Open presentation ↗</button>
-        </div>
-      </section>
-    </div>
+    {#if theme === 'minimalistic'}
+      <MinimalisticApp {brandData} {images} {content} />
+    {:else if theme === 'maximalistic'}
+      <MaximalisticApp {brandData} {images} {content} />
+    {:else if theme === 'funky'}
+      <FunkyApp {brandData} {images} {content} />
+    {:else if theme === 'futuristic'}
+      <FuturisticApp {brandData} {images} {content} />
+    {:else}
+      <MinimalisticApp {brandData} {images} {content} />
+    {/if}
   {/if}
 {/if}
 
