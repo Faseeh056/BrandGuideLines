@@ -4,6 +4,8 @@
 	import SlideManager from '$lib/components/SlideManager.svelte';
 	import { convertSvelteSlidesToPptx } from '$lib/services/svelte-slide-to-pptx';
 	import type { SlideData } from '$lib/types/slide-data';
+import { Button } from '$lib/components/ui/button';
+import { RotateCcw } from 'lucide-svelte';
 
 	let slides: Array<{ name: string; html: string }> = [];
 	let brandData: any = null;
@@ -19,16 +21,12 @@
 	let interactInstance: any = null; // Store interact instance for cleanup
 	let originalSlidesSnapshot: Array<{ name: string; html: string }> = []; // Backup for revert
 	let isInjectingInteract = false; // Prevent duplicate script injection
-	let showExportDropdown = false; // Control export dropdown visibility
-	let exportDropdownRef: HTMLDivElement; // Reference to export dropdown
 	let selectedElement: HTMLElement | null = null; // Selected element for editing
 	let editHistory: string[] = []; // Undo/redo history
 	let historyIndex: number = -1; // Current history index
 	let snapToGridEnabled: boolean = true; // Snap to grid
 	let gridSize: number = 10; // Grid size in pixels
 
-	// New: Svelte component mode toggle
-	let useSvelteComponents = false; // Toggle between HTML iframe and Svelte components
 	let slideManagerRef: SlideManager; // Reference to SlideManager component
 
 	// Store event listener references and interact instances for proper cleanup
@@ -67,8 +65,61 @@
 	];
 
 	// Track whether this guideline has been explicitly saved to history
-	let hasSavedGuideline = false;
-	let isSavingGuideline = false;
+let hasSavedGuideline = false;
+let hasUnsavedChanges = false; // Track if user made changes
+let isSavingToMyBrands = false; // Track save to My Brands operation
+let isSavingSlides = false; // Track local slide saves
+
+function cloneData<T>(obj: T): T {
+	try {
+		// @ts-ignore structuredClone exists in modern runtimes
+		return structuredClone(obj);
+	} catch (err) {
+		return JSON.parse(JSON.stringify(obj));
+	}
+}
+
+function prepareBrandDataForCache(data: any) {
+	const clone = cloneData(data);
+	if (clone.logoFiles) {
+		clone.logoFiles = clone.logoFiles.map((file: any) => ({
+			id: file?.id,
+			fileName: file?.fileName || file?.name
+		}));
+	}
+	if (clone.stepHistory) {
+		clone.stepHistory = clone.stepHistory.map((step: any) => {
+			const entry = { ...step };
+			if (entry.step === 'generated-slides') {
+				entry.content = '__slides_cached_externally__';
+			} else if (typeof entry.content === 'string' && entry.content.length > 2500) {
+				entry.content = `${entry.content.slice(0, 2500)}…`;
+			}
+			return entry;
+		});
+	}
+	return clone;
+}
+
+function safeSetSessionItem(key: string, value: string) {
+	try {
+		sessionStorage.setItem(key, value);
+		return true;
+	} catch (error) {
+		if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+			console.warn('Session storage quota exceeded for', key);
+			try {
+				sessionStorage.removeItem(key);
+				sessionStorage.setItem(key, value);
+				return true;
+			} catch (err) {
+				console.warn('Still unable to store item after cleanup:', err);
+				return false;
+			}
+		}
+		throw error;
+	}
+}
 
 	onMount(async () => {
 		try {
@@ -90,6 +141,26 @@
 				hasSavedGuideline = false;
 				if (savedFlag === null) {
 					sessionStorage.setItem('preview_brand_saved', 'false');
+				}
+			}
+
+			// Restore cached slides snapshot if available
+			const cachedSlidesRaw = sessionStorage.getItem('preview_saved_slides_html');
+			if (cachedSlidesRaw) {
+				try {
+					const cachedSlides = JSON.parse(cachedSlidesRaw);
+					if (Array.isArray(cachedSlides) && cachedSlides.length > 0) {
+						slides = cachedSlides;
+						originalSlidesSnapshot = cachedSlides.map((slide) => ({
+							name: slide.name,
+							html: slide.html
+						}));
+						hasUnsavedChanges = true;
+						console.log('✅ Restored slides from cached snapshot:', cachedSlides.length);
+					}
+				} catch (err) {
+					console.warn('⚠️ Failed to parse cached slides snapshot:', err);
+					sessionStorage.removeItem('preview_saved_slides_html');
 				}
 			}
 
@@ -267,42 +338,12 @@
 			// We can fetch it later if needed using guidelineId
 			console.log('💾 Skipping sessionStorage update - slides stored in DB');
 
-			// Handle clicking outside export dropdown to close it
-			document.addEventListener('click', (e) => {
-				if (
-					showExportDropdown &&
-					exportDropdownRef &&
-					!exportDropdownRef.contains(e.target as Node)
-				) {
-					showExportDropdown = false;
-				}
-			});
 		} catch (e: any) {
 			error = e?.message || 'Failed to load preview';
 		} finally {
 			loading = false;
 		}
 	});
-
-	function nextSlide() {
-		// If currently editing, save changes before switching slides
-		if (isEditable) {
-			updateSlideContent();
-		}
-		if (currentSlide < slides.length - 1) {
-			currentSlide++;
-		}
-	}
-
-	function prevSlide() {
-		// If currently editing, save changes before switching slides
-		if (isEditable) {
-			updateSlideContent();
-		}
-		if (currentSlide > 0) {
-			currentSlide--;
-		}
-	}
 
 	async function toggleEdit() {
 		if (isEditable) {
@@ -375,8 +416,16 @@
 						(s: any) => s.step === 'generated-slides'
 					);
 					if (slidesStep) {
-						slidesStep.content = JSON.stringify(slides);
-						sessionStorage.setItem('preview_brand_data', JSON.stringify(updatedBrandData));
+						const cleanSlides = slides.map((slide) => ({
+							name: slide.name,
+							html: createCleanHtml(slide.html)
+						}));
+						slidesStep.content = JSON.stringify(cleanSlides);
+						safeSetSessionItem('preview_saved_slides_html', JSON.stringify(cleanSlides));
+						safeSetSessionItem(
+							'preview_brand_data',
+							JSON.stringify(prepareBrandDataForCache(updatedBrandData))
+						);
 						brandData = updatedBrandData;
 					}
 				} catch (error) {
@@ -388,11 +437,12 @@
 			try {
 				await syncToDatabase(brandData);
 
-				// Update snapshot to current saved state
-				originalSlidesSnapshot = slides.map((slide) => ({ name: slide.name, html: slide.html }));
-				console.log('📸 Updated snapshot after saving');
+			// Update snapshot to current saved state
+			originalSlidesSnapshot = slides.map((slide) => ({ name: slide.name, html: slide.html }));
+			hasUnsavedChanges = false;
+			console.log('📸 Updated snapshot after saving');
 
-				// Remove saving message and show success
+			// Remove saving message and show success
 				savingMsg.remove();
 				const successMsg = document.createElement('div');
 				successMsg.className =
@@ -755,13 +805,24 @@
 				(s: any) => s.step === 'generated-slides'
 			);
 			if (slidesStep) {
-				slidesStep.content = JSON.stringify(slides);
-				sessionStorage.setItem('preview_brand_data', JSON.stringify(updatedBrandData));
+				const cleanSlides = slides.map((slide) => ({
+					name: slide.name,
+					html: createCleanHtml(slide.html)
+				}));
+				slidesStep.content = JSON.stringify(cleanSlides);
+				safeSetSessionItem('preview_saved_slides_html', JSON.stringify(cleanSlides));
+				safeSetSessionItem(
+					'preview_brand_data',
+					JSON.stringify(prepareBrandDataForCache(updatedBrandData))
+				);
 				brandData = updatedBrandData;
 			}
 
 			// Sync original to database
 			await syncToDatabase(brandData);
+
+			// Reset change tracking
+			hasUnsavedChanges = false;
 
 			// Show success message
 			const successMsg = document.createElement('div');
@@ -2607,14 +2668,25 @@
 					const newHtml = iframeDoc.documentElement.outerHTML;
 					slides[currentSlide].html = newHtml;
 
+					// Check if changes were made
+					checkForChanges();
+
 					// Update sessionStorage immediately
 					const updatedBrandData = { ...brandData };
 					const slidesStep = updatedBrandData.stepHistory?.find(
 						(s: any) => s.step === 'generated-slides'
 					);
 					if (slidesStep) {
-						slidesStep.content = JSON.stringify(slides);
-						sessionStorage.setItem('preview_brand_data', JSON.stringify(updatedBrandData));
+						const cleanSlides = slides.map((slide) => ({
+							name: slide.name,
+							html: createCleanHtml(slide.html)
+						}));
+						slidesStep.content = JSON.stringify(cleanSlides);
+						safeSetSessionItem('preview_saved_slides_html', JSON.stringify(cleanSlides));
+						safeSetSessionItem(
+							'preview_brand_data',
+							JSON.stringify(prepareBrandDataForCache(updatedBrandData))
+						);
 						brandData = updatedBrandData;
 						console.log('✅ Slide content updated and saved to sessionStorage');
 
@@ -2626,6 +2698,223 @@
 				console.warn('Could not update slide content:', error);
 			}
 		}
+	}
+
+	// Check if user has made changes by comparing current slides with original snapshot
+	function checkForChanges(): boolean {
+		if (!originalSlidesSnapshot || originalSlidesSnapshot.length === 0) {
+			hasUnsavedChanges = false;
+			return false;
+		}
+
+		if (slides.length !== originalSlidesSnapshot.length) {
+			hasUnsavedChanges = true;
+			return true;
+		}
+
+		// Compare each slide's HTML
+		for (let i = 0; i < slides.length; i++) {
+			const currentHtml = slides[i]?.html || '';
+			const originalHtml = originalSlidesSnapshot[i]?.html || '';
+			if (currentHtml !== originalHtml) {
+				hasUnsavedChanges = true;
+				return true;
+			}
+		}
+
+		hasUnsavedChanges = false;
+		return false;
+	}
+
+	// Save to My Brands - handles both create and update (overwrite)
+	async function saveToMyBrands(options?: { silent?: boolean }) {
+		if (isSavingToMyBrands) return;
+
+		const silent = options?.silent ?? false;
+
+		isSavingToMyBrands = true;
+		const savingMsg = silent
+			? null
+			: (() => {
+					const msg = document.createElement('div');
+					msg.className = 'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+					msg.textContent = '💾 Saving to My Brands...';
+					document.body.appendChild(msg);
+					return msg;
+			  })();
+
+		try {
+			const guidelineId = sessionStorage.getItem('current_guideline_id');
+			const updatedBrandData = { ...brandData };
+			
+			// Update stepHistory with current slides
+			if (!updatedBrandData.stepHistory) {
+				updatedBrandData.stepHistory = [];
+			}
+
+			let slidesStep = updatedBrandData.stepHistory.find((s: any) => s.step === 'generated-slides');
+			if (slidesStep) {
+				slidesStep.content = JSON.stringify(slides);
+			} else {
+				slidesStep = {
+					step: 'generated-slides',
+					stepTitle: 'Generated Slides',
+					content: JSON.stringify(slides),
+					approved: true,
+					timestamp: new Date().toISOString()
+				};
+				updatedBrandData.stepHistory.push(slidesStep);
+			}
+
+			// If guidelineId exists, UPDATE (overwrite)
+			if (guidelineId) {
+				console.log('🔄 Updating existing guideline:', guidelineId);
+				const response = await fetch(`/api/brand-guidelines/${guidelineId}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						content: JSON.stringify(updatedBrandData),
+						brandName: brandData.brandName || brandData.brand_name,
+						structuredData: JSON.stringify(updatedBrandData)
+					})
+				});
+
+				if (!response.ok) {
+					const errorData = await response.json().catch(() => ({ error: 'Update failed' }));
+					throw new Error(errorData.error || 'Failed to update guideline');
+				}
+
+				const result = await response.json();
+				if (!result.success) {
+					throw new Error(result.error || 'Failed to update guideline');
+				}
+
+				// Also sync slides
+				await syncToDatabase(updatedBrandData, true);
+			} else {
+				// No guidelineId, check if we can find by brand name
+				const brandName = brandData.brandName || brandData.brand_name;
+				if (brandName) {
+					try {
+						const findResponse = await fetch(
+							`/api/brand-guidelines/by-name?brandName=${encodeURIComponent(brandName)}`
+						);
+						if (findResponse.ok) {
+							const findResult = await findResponse.json();
+							if (findResult.success && findResult.guideline) {
+								// Found existing, update it
+								const existingId = findResult.guideline.id;
+								console.log('🔄 Found existing guideline, updating:', existingId);
+								
+								const updateResponse = await fetch(`/api/brand-guidelines/${existingId}`, {
+									method: 'PUT',
+									headers: { 'Content-Type': 'application/json' },
+									body: JSON.stringify({
+										content: JSON.stringify(updatedBrandData),
+										brandName: brandName,
+										structuredData: JSON.stringify(updatedBrandData)
+									})
+								});
+
+								if (updateResponse.ok) {
+									const updateResult = await updateResponse.json();
+									if (updateResult.success) {
+										sessionStorage.setItem('current_guideline_id', existingId);
+										await syncToDatabase(updatedBrandData, true);
+										hasSavedGuideline = true;
+										hasUnsavedChanges = false;
+										sessionStorage.setItem('preview_brand_saved', 'true');
+										
+										savingMsg.remove();
+										const successMsg = document.createElement('div');
+										successMsg.className =
+											'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+										successMsg.textContent = '✅ Saved to My Brands!';
+										document.body.appendChild(successMsg);
+										setTimeout(() => successMsg.remove(), 3000);
+										return;
+									}
+								}
+							}
+						}
+					} catch (e) {
+						console.warn('Could not find existing guideline:', e);
+					}
+				}
+
+				// No existing found, create new via comprehensive endpoint
+				console.log('🆕 Creating new guideline');
+				const createResponse = await fetch('/api/brand-guidelines/comprehensive', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						brandName: brandData.brandName || brandData.brand_name,
+						brandDomain: brandData.brand_domain || brandData.brandDomain,
+						shortDescription: brandData.short_description || brandData.shortDescription,
+						brandValues: brandData.brandValues,
+						selectedMood: brandData.selectedMood,
+						selectedAudience: brandData.selectedAudience,
+						customPrompt: brandData.customPrompt,
+						contact: brandData.contact,
+						logoFiles: brandData.logoFiles || []
+					})
+				});
+
+				if (!createResponse.ok) {
+					const errorData = await createResponse.json().catch(() => ({ error: 'Create failed' }));
+					throw new Error(errorData.error || 'Failed to create guideline');
+				}
+
+				const createResult = await createResponse.json();
+				if (createResult.success && createResult.savedGuidelines) {
+					const newId = createResult.savedGuidelines.id;
+					sessionStorage.setItem('current_guideline_id', newId);
+					await syncToDatabase(updatedBrandData, true);
+					hasSavedGuideline = true;
+					hasUnsavedChanges = false;
+					sessionStorage.setItem('preview_brand_saved', 'true');
+				} else {
+					throw new Error('Failed to create guideline');
+				}
+			}
+
+			// Update snapshot after successful save
+			originalSlidesSnapshot = slides.map((slide) => ({ name: slide.name, html: slide.html }));
+			hasUnsavedChanges = false;
+			hasSavedGuideline = true;
+			sessionStorage.setItem('preview_brand_saved', 'true');
+
+			if (!silent && savingMsg) {
+				savingMsg.remove();
+				const successMsg = document.createElement('div');
+				successMsg.className =
+					'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+				successMsg.textContent = '✅ Saved to My Brands!';
+				document.body.appendChild(successMsg);
+				setTimeout(() => successMsg.remove(), 3000);
+			}
+		} catch (error) {
+			console.error('Error saving to My Brands:', error);
+			if (silent) {
+				throw error;
+			} else {
+				if (savingMsg) savingMsg.remove();
+				const errorMsg = document.createElement('div');
+				errorMsg.className =
+					'fixed top-4 right-4 bg-destructive text-white px-4 py-2 rounded-lg z-50 shadow-lg';
+				errorMsg.textContent = `⚠️ Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`;
+				document.body.appendChild(errorMsg);
+				setTimeout(() => errorMsg.remove(), 3000);
+			}
+		} finally {
+			if (savingMsg) savingMsg.remove();
+			isSavingToMyBrands = false;
+		}
+	}
+
+	// Reactive statement to check for changes
+$: if (slides.length > 0 && originalSlidesSnapshot.length > 0) {
+		checkForChanges();
 	}
 
 	// Immediate database sync function
@@ -2715,61 +3004,83 @@
 		return cleanHtml;
 	}
 
-	async function saveChanges() {
-		if (isSavingGuideline) return;
+	async function saveSlidesSnapshot(payload?: {
+		brandDataSnapshot?: any;
+		slidesHtml?: Array<{ name: string; html: string }>;
+	}) {
+		if (isSavingSlides) return;
 
-		isSavingGuideline = true;
+		isSavingSlides = true;
 		const savingMsg = document.createElement('div');
 		savingMsg.className =
 			'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50 shadow-lg';
-		savingMsg.textContent = '💾 Saving changes...';
+		savingMsg.textContent = '💾 Saving & syncing slides...';
 		document.body.appendChild(savingMsg);
 
 		try {
-			const updatedBrandData = { ...brandData };
+			const slidesHtmlSnapshot =
+				payload?.slidesHtml ?? slideManagerRef?.getSlidesHtmlSnapshot?.() ?? slides;
+
+			const cleanedSlides = slidesHtmlSnapshot.map((slide) => ({
+				name: slide.name,
+				html: createCleanHtml(slide.html || '')
+			}));
+
+			slides = cleanedSlides;
+
+			const updatedBrandData =
+				payload?.brandDataSnapshot ?? slideManagerRef?.getBrandDataSnapshot?.() ?? {
+					...brandData
+				};
 			if (!updatedBrandData.stepHistory) {
 				updatedBrandData.stepHistory = [];
 			}
 
 			let slidesStep = updatedBrandData.stepHistory.find((s: any) => s.step === 'generated-slides');
 			if (slidesStep) {
-				slidesStep.content = JSON.stringify(slides);
+				slidesStep.content = JSON.stringify(cleanedSlides);
 			} else {
 				slidesStep = {
 					step: 'generated-slides',
 					stepTitle: 'Generated Slides',
-					content: JSON.stringify(slides),
+					content: JSON.stringify(cleanedSlides),
 					approved: true,
 					timestamp: new Date().toISOString()
 				};
 				updatedBrandData.stepHistory.push(slidesStep);
 			}
 
-			sessionStorage.setItem('preview_brand_data', JSON.stringify(updatedBrandData));
+			safeSetSessionItem('preview_saved_slides_html', JSON.stringify(cleanedSlides));
+			safeSetSessionItem(
+				'preview_brand_data',
+				JSON.stringify(prepareBrandDataForCache(updatedBrandData))
+			);
+			sessionStorage.setItem('preview_brand_saved', 'false');
+
 			brandData = updatedBrandData;
 
-			await syncToDatabase(updatedBrandData, true);
+			await saveToMyBrands({ silent: true });
 			hasSavedGuideline = true;
-			sessionStorage.setItem('preview_brand_saved', 'true');
+			hasUnsavedChanges = false;
 
 			savingMsg.remove();
 			const successMsg = document.createElement('div');
 			successMsg.className =
 				'fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg z-50 shadow-lg';
-			successMsg.textContent = '✅ Changes saved and synced!';
+			successMsg.textContent = '✅ Slides synced to My Brands!';
 			document.body.appendChild(successMsg);
 			setTimeout(() => successMsg.remove(), 3000);
 		} catch (error) {
-			console.error('Error saving changes:', error);
+			console.error('Error saving slides snapshot:', error);
 			savingMsg.remove();
 			const errorMsg = document.createElement('div');
 			errorMsg.className =
 				'fixed top-4 right-4 bg-destructive text-white px-4 py-2 rounded-lg z-50 shadow-lg';
-			errorMsg.textContent = '⚠️ Failed to save changes';
+			errorMsg.textContent = '⚠️ Failed to save slides';
 			document.body.appendChild(errorMsg);
 			setTimeout(() => errorMsg.remove(), 3000);
 		} finally {
-			isSavingGuideline = false;
+			isSavingSlides = false;
 		}
 	}
 
@@ -2778,43 +3089,7 @@
 			isDownloading = true;
 			error = null;
 
-			// If using Svelte components, use the new editable PPTX converter
-			if (useSvelteComponents && slideManagerRef) {
-				console.log('🔄 Using Svelte component PPTX converter (editable)...');
-
-				// Get all slide data from SlideManager
-				const allSlideData: SlideData[] = [];
-
-				// Access the component refs from SlideManager
-				// We need to collect data from all slide components
-				// The SlideManager already has a downloadAllSlidesPPTX method, but we'll call it directly
-				// For now, we'll use the SlideManager's internal method
-				try {
-					// Call the SlideManager's download method
-					// Since SlideManager has its own download button, we'll trigger it programmatically
-					// Or we can collect the data ourselves
-					const brandName = brandData?.brandName || brandData?.brand_name || 'Brand';
-
-					// We'll need to access the slide refs from SlideManager
-					// For now, let's use a simpler approach - trigger the SlideManager's download
-					console.log('📊 Collecting slide data from Svelte components...');
-
-					// The SlideManager component handles this internally, so we'll use a workaround
-					// by calling the convertSvelteSlidesToPptx directly if we can access the refs
-					// For now, let's show a message to use the SlideManager's download button
-					alert(
-						'Please use the "Download All Slides as PPTX" button in the Svelte component view to get editable PPTX files.'
-					);
-					return;
-				} catch (err: any) {
-					console.error('Svelte PPTX conversion error:', err);
-					throw new Error(
-						'Failed to generate editable PPTX. Please try the download button in the component view.'
-					);
-				}
-			}
-
-			// Use original HTML-based PPTX generation with updated slides (image-based)
+			// Use HTML-based PPTX generation endpoint
 			const res = await fetch('/api/generate-slides-html', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -2970,279 +3245,44 @@
 		</div>
 	</div>
 {:else}
-	<div class="min-h-screen bg-background p-4">
-		<div class="mx-auto max-w-7xl">
-			<!-- Header Controls -->
-			<div class="mb-6 rounded-lg bg-white p-4 shadow-sm">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-4">
-						<div class="text-sm text-muted-foreground">
-							Slide {currentSlide + 1} of {slides.length} - {slides[currentSlide]?.name}
-						</div>
-						<div class="flex items-center gap-2">
-							<button
-								class="rounded border px-3 py-1 transition-colors hover:bg-background disabled:opacity-50"
-								onclick={prevSlide}
-								disabled={currentSlide === 0}
-							>
-								← Previous
-							</button>
-							<button
-								class="rounded border px-3 py-1 transition-colors hover:bg-background disabled:opacity-50"
-								onclick={nextSlide}
-								disabled={currentSlide >= slides.length - 1}
-							>
-								Next →
-							</button>
-						</div>
-					</div>
+	<div class="min-h-screen bg-background px-4 pb-10 pt-4">
+		<div class="mx-auto w-full space-y-6">
+			{#if brandData}
+				<SlideManager
+					bind:this={slideManagerRef}
+					{brandData}
+					onDownloadPPTX={downloadPPTX}
+					onDownloadPDF={downloadPDF}
+					onGoToBrands={() => goto('/dashboard/my-brands')}
+									onSaveSlides={saveSlidesSnapshot}
+									isSavingSlides={isSavingSlides}
+					{isDownloading}
+				/>
+			{:else}
+				<div class="rounded-xl border border-dashed border-amber-200 bg-white/70 p-8 text-center text-gray-500 shadow-sm">
+					Loading brand data...
+				</div>
+			{/if}
 
-					<div class="flex items-center gap-2">
-						<!-- Toggle between HTML iframe and Svelte components -->
-						<button
-							class="rounded border px-3 py-2 transition-colors {useSvelteComponents
-								? 'border-green-600 bg-green-500 text-white'
-								: 'bg-muted text-foreground hover:bg-gray-300'}"
-							onclick={() => (useSvelteComponents = !useSvelteComponents)}
-							title={useSvelteComponents
-								? 'Switch to HTML iframe view'
-								: 'Switch to Svelte component view (editable PPTX)'}
+			<div class="flex flex-wrap items-center justify-between gap-3 border-t border-amber-100 pt-4">
+				<div class="flex gap-3">
+					{#if originalSlidesSnapshot && originalSlidesSnapshot.length > 0}
+						<Button
+							variant="outline"
+							class="flex h-11 items-center justify-center gap-2 rounded-full border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:bg-gray-600 dark:text-white dark:border-orange-500 dark:hover:bg-gray-500"
+							onclick={revertChanges}
+							title="Discard all edits and revert to original state"
 						>
-							{useSvelteComponents ? '🔄 HTML View' : '⚡ Svelte View'}
-						</button>
-						{#if !useSvelteComponents}
-							{#if isEditable}
-								<button
-									class="rounded border px-3 py-2 transition-colors {editMode === 'text'
-										? 'border-primary bg-primary/20 text-primary'
-										: 'bg-muted text-foreground'}"
-									onclick={toggleEditMode}
-									title="Switch to {editMode === 'text' ? 'Layout' : 'Text'} editing mode"
-								>
-									{editMode === 'text' ? '📝 Text Mode' : '🎨 Layout Mode'}
-								</button>
-							{/if}
-							<button
-								class="rounded border px-4 py-2 transition-colors {isEditable
-									? 'border-blue-500 bg-primary text-white'
-									: 'bg-muted text-foreground hover:bg-gray-300'}"
-								onclick={toggleEdit}
-							>
-								{isEditable ? '💾 Save & Done' : '✏️ Edit Slide'}
-							</button>
-						{/if}
-						<button
-							class="rounded bg-primary px-4 py-2 text-white transition-colors hover:bg-green-600"
-							onclick={saveChanges}
-							disabled={isSavingGuideline}
-						>
-							{isSavingGuideline ? '💾 Saving...' : '💾 Save Changes'}
-						</button>
-						{#if originalSlidesSnapshot && originalSlidesSnapshot.length > 0}
-							<button
-								class="rounded bg-orange-500 px-4 py-2 text-white transition-colors hover:bg-orange-600"
-								onclick={revertChanges}
-								title="Discard all edits and revert to original state"
-							>
-								🔄 Revert Changes
-							</button>
-						{/if}
-						<!-- Export As Dropdown -->
-						<div class="relative inline-block" bind:this={exportDropdownRef}>
-							<button
-								class="flex items-center gap-2 rounded bg-purple-500 px-4 py-2 text-white transition-colors hover:bg-purple-600 disabled:opacity-50"
-								disabled={isDownloading}
-								onclick={() => (showExportDropdown = !showExportDropdown)}
-							>
-								{isDownloading ? '⏳ Generating...' : '📥 Export As'}
-								<span class="text-sm">▼</span>
-							</button>
-
-							{#if showExportDropdown}
-								<div
-									class="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-border bg-white shadow-lg"
-								>
-									<button
-										class="flex w-full items-center gap-2 rounded-t-lg border-b border-border px-4 py-2 text-left text-sm hover:bg-muted"
-										onclick={() => {
-											downloadPPTX();
-											showExportDropdown = false;
-										}}
-										disabled={isDownloading}
-									>
-										{useSvelteComponents ? '📄 PPTX (Editable)' : '📄 PPTX (Image-based)'}
-									</button>
-									<button
-										class="flex w-full items-center gap-2 rounded-b-lg px-4 py-2 text-left text-sm hover:bg-muted"
-										onclick={() => {
-											downloadPDF();
-											showExportDropdown = false;
-										}}
-										disabled={isDownloading}
-									>
-										📄 PDF
-									</button>
-								</div>
-							{/if}
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<div class="grid gap-6 lg:grid-cols-[1fr_300px]">
-				<!-- Main Slide Viewer -->
-				<div class="space-y-4">
-					{#if useSvelteComponents}
-						<!-- Svelte Component View -->
-						<div class="rounded-lg bg-white p-4 shadow-lg">
-							<div class="relative mx-auto w-full">
-								<div class="mx-auto max-w-[1280px]">
-									{#if brandData}
-										<SlideManager bind:this={slideManagerRef} {brandData} />
-									{:else}
-										<div class="p-8 text-center text-gray-500">Loading brand data...</div>
-									{/if}
-								</div>
-							</div>
-						</div>
-					{:else}
-						<!-- HTML Iframe View (Original) -->
-						<div class="rounded-lg bg-white p-4 shadow-lg">
-							<div class="relative mx-auto w-full">
-								<div
-									class="mx-auto max-w-[1280px] overflow-hidden rounded-lg border-2 border-border bg-white"
-								>
-									{#if slides[currentSlide]}
-										<iframe
-											bind:this={iframeRef}
-											title={slides[currentSlide].name}
-											srcdoc={slides[currentSlide].html}
-											class="h-[720px] w-[1280px] border shadow"
-										></iframe>
-									{/if}
-								</div>
-							</div>
-						</div>
+							<RotateCcw class="h-4 w-4" />
+							Revert Changes
+						</Button>
 					{/if}
 				</div>
-
-				<!-- Sidebar -->
-				<div class="space-y-4">
-					{#if !useSvelteComponents}
-						<!-- Template Selector (only for HTML mode) -->
-						<div class="rounded-lg bg-white p-4 shadow-sm">
-							<h3 class="mb-3 font-semibold text-gray-800">🎨 Choose Template</h3>
-							<select
-								value={selectedTemplateSet}
-								onchange={(e) => switchTemplateSet((e.target as HTMLSelectElement).value)}
-								disabled={isSwitchingTemplate}
-								class="w-full rounded border p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-							>
-								{#each templateSets as set}
-									<option value={set.value}>{set.label}</option>
-								{/each}
-							</select>
-							<p class="mt-2 text-xs text-gray-500">
-								{templateSets.find((s) => s.value === selectedTemplateSet)?.description || ''}
-							</p>
-							{#if isSwitchingTemplate}
-								<div class="mt-2 text-sm text-blue-600">Switching template...</div>
-							{/if}
-						</div>
-
-						<!-- Slide Navigation (only for HTML mode) -->
-						<div class="rounded-lg bg-white p-4 shadow-sm">
-							<h3 class="mb-3 font-semibold text-gray-800">Slide Navigation</h3>
-							<div class="max-h-96 space-y-2 overflow-y-auto">
-								{#each slides as slide, idx}
-									{@const slideTitle = (() => {
-										const fileName = slide.name?.replace('.html', '') || '';
-										if (fileName.includes('slide-01')) return 'Cover';
-										if (fileName.includes('slide-02')) return 'Brand Introduction';
-										if (fileName.includes('slide-03')) return 'Brand Positioning';
-										if (fileName.includes('slide-04')) return 'Logo Guidelines';
-										if (fileName.includes('slide-10')) return "Logo Do's";
-										if (fileName.includes('slide-11')) return "Logo Don's";
-										if (fileName.includes('slide-05')) return 'Color Palette';
-										if (fileName.includes('slide-06')) return 'Typography';
-										if (fileName.includes('slide-07')) return 'Iconography';
-										if (fileName.includes('slide-08')) return 'Photography';
-										if (fileName.includes('slide-09')) return 'Applications';
-										if (fileName.includes('slide-12')) return 'Thank You';
-										return `Slide ${idx + 1}`;
-									})()}
-									<button
-										onclick={() => goToSlide(idx)}
-										class="w-full rounded border p-3 text-left text-sm transition-colors hover:bg-background {currentSlide ===
-										idx
-											? 'border-blue-500 bg-blue-50 text-primary'
-											: 'border-border text-foreground'}"
-									>
-										<div class="font-medium">{slideTitle}</div>
-										<div class="mt-1 text-xs text-gray-500">Slide {idx + 1}</div>
-									</button>
-								{/each}
-							</div>
-						</div>
-					{:else}
-						<!-- Info for Svelte Component Mode -->
-						<div class="rounded-lg border border-green-200 bg-green-50 p-4 shadow-sm">
-							<h3 class="mb-3 font-semibold text-green-800">⚡ Svelte Component Mode</h3>
-							<div class="space-y-2 text-sm text-green-700">
-								<p>✅ <strong>Editable PPTX:</strong> Download truly editable PowerPoint files</p>
-								<p>✅ <strong>Live Editing:</strong> Edit slides directly in the browser</p>
-								<p>✅ <strong>Better Performance:</strong> Faster rendering and interactions</p>
-								<p class="mt-3 text-xs text-green-600">
-									Use the controls in the slide viewer to navigate and edit slides.
-								</p>
-							</div>
-						</div>
-					{/if}
-
-					<!-- Edit Status -->
-					<div class="rounded-lg bg-background p-4">
-						<h4 class="mb-2 font-semibold text-gray-800">📋 Status</h4>
-						<div class="space-y-1 text-sm text-muted-foreground">
-							<div><strong>Brand:</strong> {brandData.brandName || 'Unknown'}</div>
-							<div><strong>Slides:</strong> {slides.length}</div>
-							<div><strong>Edit Status:</strong> {isEditable ? '✏️ Editing' : '👁️ Viewing'}</div>
-						</div>
-					</div>
-
-					<!-- Editing Tips -->
-					{#if isEditable}
-						<div class="rounded-lg bg-blue-50 p-4">
-							<h4 class="mb-2 font-semibold text-blue-800">💡 Editing Tips</h4>
-							{#if editMode === 'text'}
-								<ul class="space-y-1 text-sm text-primary">
-									<li>• Click on any text in the slide to edit it</li>
-									<li>• Text will be highlighted with blue borders</li>
-									<li>• Changes are saved automatically</li>
-									<li>• Switch to Layout Mode to move/resize elements</li>
-								</ul>
-							{:else}
-								<ul class="space-y-1 text-sm text-primary">
-									<li>• <strong>Cursor</strong> shows what you can do (grab/resize)</li>
-									<li>• <strong>Drag</strong> elements to move them around</li>
-									<li>• <strong>Resize</strong> by dragging edges/corners</li>
-									<li>• Click to select an element (blue outline)</li>
-									<li>• Switch to Text Mode to edit content</li>
-								</ul>
-							{/if}
-						</div>
-					{/if}
-
-					<!-- How It Works -->
-					<div class="rounded-lg bg-yellow-50 p-4">
-						<h4 class="mb-2 font-semibold text-yellow-800">🔧 How It Works</h4>
-						<div class="space-y-1 text-sm text-yellow-700">
-							<div><strong>Preview Mode:</strong> View slides as generated</div>
-							<div><strong>Edit Mode:</strong> Click text to edit directly</div>
-							<div><strong>Revert:</strong> Discard all changes and go back</div>
-							<div><strong>Download:</strong> Get updated PPTX with changes</div>
-						</div>
-					</div>
-				</div>
+				{#if hasUnsavedChanges}
+					<span class="inline-flex items-center justify-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+						Unsaved edits
+					</span>
+				{/if}
 			</div>
 		</div>
 	</div>

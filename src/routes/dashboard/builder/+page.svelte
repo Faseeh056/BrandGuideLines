@@ -491,14 +491,20 @@
 			}
 			removeChatStorage(sessionId);
 			clearBuilderStateForChat(sessionId);
+			
+			// Update the chatSessions array immediately for UI responsiveness
 			chatSessions = chatSessions.filter((session) => session.id !== sessionId);
 
+			// If we deleted the active chat, switch to another one
 			if (activeChatId === sessionId) {
 				if (chatSessions.length > 0) {
 					selectChat(chatSessions[0]);
 				} else {
 					await createNewChat();
 				}
+			} else {
+				// Reload chat sessions from server to ensure UI is in sync
+				await loadChatSessions(activeChatId);
 			}
 		} catch (error) {
 			console.error('Failed to delete chat session', error);
@@ -1147,7 +1153,7 @@ ${customPrompt}`;
 			};
 			sessionStorage.setItem('preview_brand_data', JSON.stringify(minimalData));
 		}
-		sessionStorage.setItem('preview_brand_saved', 'true');
+		sessionStorage.setItem('preview_brand_saved', 'false');
 
 		// Redirect to new HTML-based preview page
 		goto('/dashboard/preview-html');
@@ -1969,7 +1975,8 @@ ${customPrompt}`;
 				<Button
 					variant="outline"
 					size="sm"
-					class="gap-1 border-orange-500/30 hover:bg-orange-500/10"
+					class="gap-1 border-orange-500/30 text-foreground"
+					style="background-color: rgb(245,158,11); border-color: rgb(245,158,11); color: #111827;"
 					onclick={createNewChat}
 					disabled={isCreatingChat || chatSessionsLoading}
 				>
@@ -1984,7 +1991,8 @@ ${customPrompt}`;
 					<div class="relative" bind:this={chatDropdownRef}>
 						<button
 							type="button"
-							class="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-background/80 text-foreground transition hover:bg-muted"
+							class="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 text-foreground transition hover:bg-orange-500/90"
+							style="background-color: rgb(245,158,11); border-color: rgb(245,158,11); color: #111827;"
 							title="Previous chats"
 							onclick={(event) => {
 								event.stopPropagation();

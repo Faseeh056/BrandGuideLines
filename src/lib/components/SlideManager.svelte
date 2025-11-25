@@ -1,25 +1,43 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick } from 'svelte';
-  import CoverSlide from '$lib/templates_svelte/default/CoverSlide.svelte';
-  import BrandIntroductionSlide from '$lib/templates_svelte/default/BrandIntroductionSlide.svelte';
-  import BrandPositioningSlide from '$lib/templates_svelte/default/BrandPositioningSlide.svelte';
-  import LogoGuidelinesSlide from '$lib/templates_svelte/default/LogoGuidelinesSlide.svelte';
-  import ColorPaletteSlide from '$lib/templates_svelte/default/ColorPaletteSlide.svelte';
-  import TypographySlide from '$lib/templates_svelte/default/TypographySlide.svelte';
-  import IconographySlide from '$lib/templates_svelte/default/IconographySlide.svelte';
-  import PhotographySlide from '$lib/templates_svelte/default/PhotographySlide.svelte';
-  import ApplicationsSlide from '$lib/templates_svelte/default/ApplicationsSlide.svelte';
-  import LogoDosSlide from '$lib/templates_svelte/default/LogoDosSlide.svelte';
-  import LogoDontsSlide from '$lib/templates_svelte/default/LogoDontsSlide.svelte';
-  import ThankYouSlide from '$lib/templates_svelte/default/ThankYouSlide.svelte';
-  import { convertSvelteSlidesToPptx } from '$lib/services/svelte-slide-to-pptx';
-  import type { SlideData } from '$lib/types/slide-data';
-  import EditingPanel from './EditingPanel.svelte';
+import { onMount, onDestroy, tick } from 'svelte';
+import CoverSlide from '$lib/templates_svelte/default/CoverSlide.svelte';
+import BrandIntroductionSlide from '$lib/templates_svelte/default/BrandIntroductionSlide.svelte';
+import BrandPositioningSlide from '$lib/templates_svelte/default/BrandPositioningSlide.svelte';
+import LogoGuidelinesSlide from '$lib/templates_svelte/default/LogoGuidelinesSlide.svelte';
+import ColorPaletteSlide from '$lib/templates_svelte/default/ColorPaletteSlide.svelte';
+import TypographySlide from '$lib/templates_svelte/default/TypographySlide.svelte';
+import IconographySlide from '$lib/templates_svelte/default/IconographySlide.svelte';
+import PhotographySlide from '$lib/templates_svelte/default/PhotographySlide.svelte';
+import ApplicationsSlide from '$lib/templates_svelte/default/ApplicationsSlide.svelte';
+import LogoDosSlide from '$lib/templates_svelte/default/LogoDosSlide.svelte';
+import LogoDontsSlide from '$lib/templates_svelte/default/LogoDontsSlide.svelte';
+import ThankYouSlide from '$lib/templates_svelte/default/ThankYouSlide.svelte';
+import type { SlideData } from '$lib/types/slide-data';
+import EditingPanel from './EditingPanel.svelte';
+import {
+	Pencil,
+	FileDown,
+	ChevronLeft,
+	ChevronRight,
+	Folder,
+	Save as SaveIcon,
+	Loader2,
+	Presentation as PresentationIcon
+} from 'lucide-svelte';
+import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   
-  export let brandData: any = null;
+export let brandData: any = null;
+export let onDownloadPPTX: (() => void | Promise<void>) | null = null;
+export let onDownloadPDF: (() => void | Promise<void>) | null = null;
+export let isDownloading = false;
+export let onGoToBrands: (() => void | Promise<void>) | null = null;
+export let onSaveSlides:
+	| ((payload: { brandDataSnapshot: any; slidesHtml: Array<{ name: string; html: string }> }) => void | Promise<void>)
+	| null = null;
+export let isSavingSlides = false;
   
   // Component refs
-  let coverSlideRef: CoverSlide;
+let coverSlideRef: CoverSlide;
   let brandIntroRef: BrandIntroductionSlide;
   let brandPositioningRef: BrandPositioningSlide;
   let logoGuidelinesRef: LogoGuidelinesSlide;
@@ -32,22 +50,56 @@
   let logoDontsRef: LogoDontsSlide;
   let thankYouRef: ThankYouSlide;
   
-  // State
-  let currentSlideIndex = 0;
-  let isEditable = false;
-  let isDownloading = false;
-  let downloadProgress = { current: 0, total: 0 };
-  let showEditingPanel = false;
-  let editingPanelData: any = {};
+// State
+let currentSlideIndex = 0;
+let isEditable = false;
+let showEditingPanel = false;
+let editingPanelData: any = {};
+let colorSignature = '';
+let showExportDropdown = false;
+let exportDropdownRef: HTMLDivElement | null = null;
+let slideWrappers: Array<HTMLDivElement | null> = [];
+
+function trackSlideWrapper(node: HTMLDivElement, index: number) {
+	slideWrappers[index] = node;
+	return {
+		destroy() {
+			if (slideWrappers[index] === node) {
+				slideWrappers[index] = null;
+			}
+		}
+	};
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (
+    showExportDropdown &&
+    exportDropdownRef &&
+    !exportDropdownRef.contains(event.target as Node)
+  ) {
+    showExportDropdown = false;
+  }
+}
+
+onMount(() => {
+  document.addEventListener('click', handleDocumentClick);
+});
+
+onDestroy(() => {
+  document.removeEventListener('click', handleDocumentClick);
+});
   
   // Get current slide name
   $: currentSlideName = slides[currentSlideIndex]?.name || '';
   
-  // Get current slide's background (reactive to both slide index and background changes)
-  $: currentSlideBackground = slideBackgrounds[currentSlideIndex] || getDefaultBackground(currentSlideIndex);
+// Get current slide's background (reactive to slide index, saved backgrounds, and color palette)
+$: currentSlideBackground = (() => {
+  colorSignature; // ensure dependency on palette colors
+  return slideBackgrounds[currentSlideIndex] || getDefaultBackground(currentSlideIndex);
+})();
   
   // Update editing panel data when slide changes or isEditable changes
-  $: if (isEditable && currentSlideIndex !== undefined) {
+  $: if (currentSlideIndex !== undefined) {
     updateEditingPanelData();
   }
   
@@ -365,13 +417,88 @@
     }
     updateEditingPanelData();
   }
-  
-  function toggleEditingPanel() {
-    showEditingPanel = !showEditingPanel;
-    if (showEditingPanel) {
-      updateEditingPanelData();
-    }
-  }
+
+function cloneBrandDataBase() {
+	try {
+		return structuredClone(brandData ?? {});
+	} catch (error) {
+		return brandData ? JSON.parse(JSON.stringify(brandData)) : {};
+	}
+}
+
+function ensureColorEntry(entry: any, fallback: string) {
+	if (!entry) return { hex: fallback };
+	if (typeof entry === 'string') return { hex: entry };
+	return { ...entry, hex: entry.hex || fallback };
+}
+
+export function getBrandDataSnapshot() {
+	const updated = cloneBrandDataBase();
+
+	updated.brandName = brandName;
+	updated.brand_name = brandName;
+	updated.tagline = tagline;
+	updated.positioningStatement = positioningStatement;
+	updated.mission = mission;
+	updated.vision = vision;
+	updated.values = values;
+	updated.personality = personality;
+
+	updated.colors = updated.colors || {};
+	updated.colors.primary = ensureColorEntry(updated.colors.primary, primaryColor);
+	updated.colors.primary.hex = primaryColor;
+	updated.colors.secondary = ensureColorEntry(updated.colors.secondary, secondaryColor);
+	updated.colors.secondary.hex = secondaryColor;
+	updated.colors.accent = ensureColorEntry(updated.colors.accent, color2);
+	updated.colors.accent.hex = color2;
+	updated.colors.supporting = ensureColorEntry(updated.colors.supporting, color3);
+	updated.colors.supporting.hex = color3;
+	updated.colors.allColors = colors.map((color, idx) => ({
+		name: color.name || `Color ${idx + 1}`,
+		hex: color.hex,
+		usage: color.usage || 'Brand color'
+	}));
+
+	updated.typography = updated.typography || {};
+	updated.typography.primaryFont = {
+		name: primaryFont,
+		weights: primaryWeights
+	};
+	updated.typography.supporting = {
+		name: secondaryFont,
+		weights: secondaryWeights
+	};
+
+	updated.icons = icons;
+	updated.applications = applications;
+	updated.doText = doText;
+	updated.dontText = dontText;
+	updated.guidelineTitle1 = guidelineTitle1;
+	updated.guidelineItems = guidelineItems;
+	updated.guidelineTitle2 = guidelineTitle2;
+
+	updated.contact = {
+		...(updated.contact || {}),
+		name: contactName,
+		email: contactEmail,
+		role: contactRole,
+		company: contactCompany,
+		website,
+		phone
+	};
+
+	return updated;
+}
+
+export function getSlidesHtmlSnapshot(): Array<{ name: string; html: string }> {
+	return slides.map((slide, index) => {
+		const wrapper = slideWrappers[index];
+		return {
+			name: slide.name,
+			html: wrapper ? wrapper.innerHTML : ''
+		};
+	});
+}
   
   // Editable state variables (initialized from brandData)
   let brandName = 'Brand Name';
@@ -1174,6 +1301,28 @@
   $: color6Rgba8 = hexToRgba(color6Hex, 0.08);
   $: color1Rgba5 = hexToRgba(color1Hex, 0.05);
   $: color8Rgba12 = hexToRgba(color8Hex, 0.12);
+
+$: colorSignature = JSON.stringify({
+  c1: color1Hex,
+  c2: color2Hex,
+  c3: color3Hex,
+  c4: color4Hex,
+  c5: color5Hex,
+  c6: color6Hex,
+  c7: color7Hex,
+  c8: color8Hex,
+  c1L: color1Lighter,
+  c2L: color2Lighter,
+  c3L: color3Lighter,
+  c4L: color4Lighter,
+  c5L: color5Lighter,
+  c6L: color6Lighter,
+  c7L: color7Lighter,
+  c8L: color8Lighter,
+  c1R: color1Rgba5,
+  c7R: color7Rgba12,
+  c8R: color8Rgba12
+});
   
   // Slide list
   const slides = [
@@ -1742,311 +1891,175 @@
     return finalSlides;
   }
   
-  // Function to collect all slide data
-  async function collectAllSlideData(): Promise<SlideData[]> {
-    const allSlideData: SlideData[] = [];
-    
-    // Collect data from all slide components in correct order
-    const slideRefs = [
-      coverSlideRef,
-      brandIntroRef,
-      brandPositioningRef,
-      logoGuidelinesRef,
-      logoDosRef,
-      logoDontsRef,
-      colorPaletteRef,
-      typographyRef,
-      iconographyRef,
-      photographyRef,
-      applicationsRef,
-      thankYouRef
-    ];
-    
-    for (const ref of slideRefs) {
-      if (ref && typeof ref.getSlideData === 'function') {
-        try {
-          let slideData: SlideData;
-          
-          // Special handling for iconography slide - convert text icons to image icons
-          if (ref === iconographyRef && typeof (ref as any).getSlideDataWithIcons === 'function') {
-            try {
-              console.log('🔄 [SlideManager] Calling getSlideDataWithIcons() for iconography slide...');
-              slideData = await (ref as any).getSlideDataWithIcons();
-              console.log('✅ [SlideManager] Converted iconography icons to images');
-              
-              // Verify the conversion worked
-              const textIcons = slideData.elements.filter(e => 
-                e.id.startsWith('icon-symbol-') || e.id === 'demo-icon-symbol'
-              );
-              const imageIcons = slideData.elements.filter(e => 
-                e.id.startsWith('icon-image-') || e.id === 'demo-icon-image'
-              );
-              console.log(`📊 [SlideManager] Iconography slide: ${imageIcons.length} image icons, ${textIcons.length} text icons`);
-              
-              if (textIcons.length > 0) {
-                console.warn(`⚠️ [SlideManager] WARNING: ${textIcons.length} text icon elements still present!`);
-              }
-            } catch (iconError) {
-              console.error('❌ [SlideManager] Failed to convert icons to images:', iconError);
-              // Fallback to regular slideData with text icons
-              slideData = ref.getSlideData();
-            }
-          } else {
-            slideData = ref.getSlideData();
-          }
-          
-          if (slideData && slideData.elements && slideData.elements.length > 0) {
-            allSlideData.push(slideData);
-          }
-        } catch (error) {
-          console.error('❌ Error getting slide data:', error);
-        }
-      }
-    }
-    
-    return allSlideData;
-  }
   
   // Note: Svelte slides are automatically saved server-side when HTML slides are generated
   // via the /api/preview-slides-html endpoint. No client-side saving is needed.
   
-  // Export dropdown state
-  let showExportDropdown = false;
-  let exportDropdownRef: HTMLDivElement;
-  
-  async function downloadAllSlidesPPTX() {
-    if (isDownloading) return;
-    
-    isDownloading = true;
-    showExportDropdown = false; // Close dropdown
-    try {
-      console.log('🔄 Collecting slide data from all components...');
-      
-      const allSlideData = await collectAllSlideData();
-      
-      console.log(`📊 Collected ${allSlideData.length} slides, converting to PPTX...`);
-      
-      if (allSlideData.length === 0) {
-        throw new Error('No slide data available to export');
-      }
-      
-      const blob = await convertSvelteSlidesToPptx({
-        slides: allSlideData,
-        brandName: brandName,
-        onProgress: (current, total) => {
-          downloadProgress = { current, total };
-        }
-      });
-      
-      // Download the file
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${brandName.replace(/[^a-zA-Z0-9]/g, '-')}-Brand-Guidelines.pptx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      console.log('✅ PPTX downloaded successfully');
-    } catch (error) {
-      console.error('❌ Error generating PPTX:', error);
-      alert('Failed to generate PPTX file. Please try again.');
-    } finally {
-      isDownloading = false;
-      downloadProgress = { current: 0, total: 0 };
-    }
-  }
-  
-  async function downloadAllSlidesPDF() {
-    if (isDownloading) return;
-    
-    isDownloading = true;
-    showExportDropdown = false; // Close dropdown
-    try {
-      console.log('🔄 Generating PDF from Svelte slides...');
-      
-      // Convert Svelte slide data to HTML slides for PDF generation
-      // We'll use the brand data to generate HTML slides via the API
-      const allSlideData = await collectAllSlideData();
-      
-      if (allSlideData.length === 0) {
-        throw new Error('No slide data available to export');
-      }
-      
-      // Convert SlideData to HTML format for PDF generation
-      // The PDF API expects HTML slides, so we need to convert SlideData to HTML
-      // For now, we'll use the brand data to regenerate HTML slides
-      const response = await fetch('/api/generate-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandName: brandName,
-          brandDomain: brandData?.brand_domain || brandData?.brandDomain || '',
-          shortDescription: brandData?.short_description || brandData?.shortDescription || '',
-          contact: brandData?.contact || {},
-          stepHistory: brandData?.stepHistory || [],
-          logoFiles: brandData?.logoFiles || [],
-          logoUrl: brandData?.logoUrl,
-          logo: brandData?.logo,
-          // Pass brand data for HTML slide generation
-          selectedMood: brandData?.selectedMood,
-          selectedAudience: brandData?.selectedAudience,
-          brandValues: brandData?.brandValues,
-          customPrompt: brandData?.customPrompt
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to generate PDF');
-      }
-      
-      // Download the PDF file
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${brandName.replace(/[^a-zA-Z0-9]/g, '-')}-Brand-Guidelines.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      console.log('✅ PDF downloaded successfully');
-    } catch (error) {
-      console.error('❌ Error generating PDF:', error);
-      alert('Failed to generate PDF file. Please try again.');
-    } finally {
-      isDownloading = false;
-      downloadProgress = { current: 0, total: 0 };
-    }
-  }
-  
-  // Handle clicks outside dropdown to close it
-  let clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
-  
-  $: if (showExportDropdown && typeof document !== 'undefined') {
-    if (!clickOutsideHandler) {
-      clickOutsideHandler = (e: MouseEvent) => {
-        if (exportDropdownRef && !exportDropdownRef.contains(e.target as Node)) {
-          showExportDropdown = false;
-        }
-      };
-      document.addEventListener('click', clickOutsideHandler);
-    }
-  } else {
-    if (clickOutsideHandler) {
-      document.removeEventListener('click', clickOutsideHandler);
-      clickOutsideHandler = null;
-    }
-  }
-  
-  onDestroy(() => {
-    if (clickOutsideHandler && typeof document !== 'undefined') {
-      document.removeEventListener('click', clickOutsideHandler);
-    }
-  });
 </script>
 
 <div class="slide-manager">
+  <div class="presentation-header">
+    <div class="presentation-title">
+      <div class="icon-circle">
+        <PresentationIcon class="h-5 w-5" />
+      </div>
+      <div class="title-text">
+        <p class="title-label">Presentation</p>
+        <span class="title-subtext">Slides overview</span>
+      </div>
+    </div>
+    <div class="presentation-actions">
+      <div class="theme-toggle-chip">
+        <ThemeToggle />
+      </div>
+      {#if onGoToBrands}
+        <a
+          href="/dashboard/my-brands"
+          class="btn secondary large"
+          onclick={() => onGoToBrands?.()}
+        >
+          <Folder class="h-4 w-4" />
+          Go to My Brands
+        </a>
+      {/if}
+    </div>
+  </div>
   <!-- Controls -->
   <div class="controls-bar">
     <div class="controls-left">
       <button
         onclick={() => {
-          isEditable = !isEditable;
           if (isEditable) {
+            isEditable = false;
+            showEditingPanel = false;
+          } else {
+            isEditable = true;
             showEditingPanel = true;
             updateEditingPanelData();
-          } else {
-            showEditingPanel = false;
           }
         }}
         class="btn"
         class:active={isEditable}
       >
-        {isEditable ? '🔒 Lock Editing' : '✏️ Edit Slides'}
+        <Pencil class="h-4 w-4" />
+        <span>{isEditable ? 'Editing Mode' : 'Edit Slides'}</span>
       </button>
       
       {#if isEditable}
         <button
-          onclick={toggleEditingPanel}
-          class="btn"
-          class:active={showEditingPanel}
+          class="btn secondary"
+          onclick={async () => {
+            if (isSavingSlides || !onSaveSlides) return;
+            await onSaveSlides({
+              brandDataSnapshot: getBrandDataSnapshot(),
+              slidesHtml: getSlidesHtmlSnapshot()
+            });
+            isEditable = false;
+            showEditingPanel = false;
+          }}
+          disabled={isSavingSlides}
         >
-          {showEditingPanel ? '📋 Hide Panel' : '📋 Show Panel'}
-        </button>
-      {/if}
-      
-      <!-- Export Dropdown -->
-      <div class="relative inline-block" bind:this={exportDropdownRef}>
-        <button
-          onclick={() => showExportDropdown = !showExportDropdown}
-          disabled={isDownloading}
-          class="btn btn-primary flex items-center gap-2"
-        >
-          {#if isDownloading}
-            ⏳ Generating... ({downloadProgress.current}/{downloadProgress.total})
+          {#if isSavingSlides}
+            <Loader2 class="h-4 w-4 animate-spin" />
+            Saving Slides...
           {:else}
-            📥 Export As
-            <span class="text-xs">▼</span>
+            <SaveIcon class="h-4 w-4" />
+            Save Slides
           {/if}
         </button>
-        
-        {#if showExportDropdown}
-          <div class="absolute left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-            <button
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-t-lg flex items-center gap-2 text-sm border-b border-gray-200"
-              onclick={downloadAllSlidesPPTX}
-              disabled={isDownloading}
-            >
-              📄 PPTX (Editable)
-            </button>
-            <button
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-b-lg flex items-center gap-2 text-sm"
-              onclick={downloadAllSlidesPDF}
-              disabled={isDownloading}
-            >
-              📄 PDF
-            </button>
-          </div>
-        {/if}
+      {:else}
+        <div class="export-controls" bind:this={exportDropdownRef}>
+          <button
+            class="btn"
+            class:active={showExportDropdown}
+            disabled={isDownloading || (!onDownloadPPTX && !onDownloadPDF)}
+            onclick={() => {
+              if (isDownloading || (!onDownloadPPTX && !onDownloadPDF)) return;
+              showExportDropdown = !showExportDropdown;
+            }}
+          >
+            <FileDown class="h-4 w-4" />
+            <span>{isDownloading ? 'Exporting…' : 'Export Slides'}</span>
+          </button>
+
+          {#if showExportDropdown}
+            <div class="export-dropdown">
+              {#if onDownloadPPTX}
+                <button
+                  class="dropdown-item"
+                  onclick={() => {
+                    onDownloadPPTX?.();
+                    showExportDropdown = false;
+                  }}
+                  disabled={isDownloading}
+                >
+                  <FileDown class="h-4 w-4" />
+                  <span>PPTX</span>
+                </button>
+              {/if}
+              {#if onDownloadPDF}
+                <button
+                  class="dropdown-item"
+                  onclick={() => {
+                    onDownloadPDF?.();
+                    showExportDropdown = false;
+                  }}
+                  disabled={isDownloading}
+                >
+                  <FileDown class="h-4 w-4" />
+                  <span>PDF</span>
+                </button>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/if}
+      
+    </div>
+  </div>
+  
+  <div class="slide-workspace">
+    <div class="slide-stage" class:panel-open={showEditingPanel && isEditable}>
+      <!-- Slide Navigation -->
+      <div class="slide-navigation">
+        {#each slides as slide, index}
+          <button
+            onclick={() => goToSlide(index)}
+            class="nav-card"
+            class:active={currentSlideIndex === index}
+          >
+            <span class="slide-index">{index + 1}</span>
+            <div class="slide-meta">
+              <p class="slide-name">{slide.name}</p>
+              <p class="slide-hint">Click to focus</p>
+            </div>
+          </button>
+        {/each}
       </div>
-    </div>
-    
-    <div class="controls-right">
-      <button onclick={prevSlide} disabled={currentSlideIndex === 0} class="btn">
-        ← Previous
-      </button>
-      <span class="slide-counter">
-        Slide {currentSlideIndex + 1} of {slides.length}
-      </span>
-      <button onclick={nextSlide} disabled={currentSlideIndex === slides.length - 1} class="btn">
-        Next →
-      </button>
-    </div>
-  </div>
-  
-  <!-- Slide Navigation -->
-  <div class="slide-navigation">
-    {#each slides as slide, index}
-      <button
-        onclick={() => goToSlide(index)}
-        class="nav-item"
-        class:active={currentSlideIndex === index}
-      >
-        {slide.name}
-      </button>
-    {/each}
-  </div>
-  
-  <!-- Slide Viewer -->
-  <div class="slide-viewer">
-    <div class="slide-container">
+
+      <!-- Slide Viewer -->
+      <div class="slide-viewer">
+        <div class="slide-nav-overlay">
+          <button onclick={prevSlide} disabled={currentSlideIndex === 0} class="btn navigation">
+            <ChevronLeft class="h-4 w-4" />
+            Previous
+          </button>
+          <span class="slide-counter">
+            Slide {currentSlideIndex + 1} of {slides.length}
+          </span>
+          <button onclick={nextSlide} disabled={currentSlideIndex === slides.length - 1} class="btn navigation">
+            Next
+            <ChevronRight class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="slide-container">
       <!-- Render all slides but hide non-visible ones -->
       <!-- This ensures all refs are available for PPTX export -->
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 0}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={0}
+        class:hidden={currentSlideIndex !== 0}
+      >
         <CoverSlide
           bind:this={coverSlideRef}
           bind:brandName
@@ -2065,7 +2078,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 1}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={1}
+        class:hidden={currentSlideIndex !== 1}
+      >
         <BrandIntroductionSlide
           bind:this={brandIntroRef}
           bind:positioningStatement
@@ -2079,7 +2096,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 2}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={2}
+        class:hidden={currentSlideIndex !== 2}
+      >
         <BrandPositioningSlide
           bind:this={brandPositioningRef}
           bind:mission
@@ -2100,7 +2121,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 3}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={3}
+        class:hidden={currentSlideIndex !== 3}
+      >
         <LogoGuidelinesSlide
           bind:this={logoGuidelinesRef}
           bind:brandName
@@ -2115,7 +2140,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 4}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={4}
+        class:hidden={currentSlideIndex !== 4}
+      >
         <LogoDosSlide
           bind:this={logoDosRef}
           bind:brandName
@@ -2133,7 +2162,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 5}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={5}
+        class:hidden={currentSlideIndex !== 5}
+      >
         <LogoDontsSlide
           bind:this={logoDontsRef}
           bind:brandName
@@ -2150,7 +2183,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 6}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={6}
+        class:hidden={currentSlideIndex !== 6}
+      >
         <ColorPaletteSlide
           bind:this={colorPaletteRef}
           bind:colors
@@ -2166,7 +2203,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 7}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={7}
+        class:hidden={currentSlideIndex !== 7}
+      >
         <TypographySlide
           bind:this={typographyRef}
           bind:primaryFont
@@ -2184,7 +2225,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 8}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={8}
+        class:hidden={currentSlideIndex !== 8}
+      >
         <IconographySlide
           bind:this={iconographyRef}
           bind:icons
@@ -2199,7 +2244,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 9}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={9}
+        class:hidden={currentSlideIndex !== 9}
+      >
         <PhotographySlide
           bind:this={photographyRef}
           color1Hex={color1Hex}
@@ -2226,7 +2275,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 10}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={10}
+        class:hidden={currentSlideIndex !== 10}
+      >
         <ApplicationsSlide
           bind:this={applicationsRef}
           bind:applications
@@ -2243,7 +2296,11 @@
           {isEditable}
         />
       </div>
-      <div class="slide-wrapper" class:hidden={currentSlideIndex !== 11}>
+      <div
+        class="slide-wrapper"
+        use:trackSlideWrapper={11}
+        class:hidden={currentSlideIndex !== 11}
+      >
         <ThankYouSlide
           bind:this={thankYouRef}
           bind:thankYouText
@@ -2262,65 +2319,284 @@
           {isEditable}
         />
       </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Editing Panel -->
+    <EditingPanel
+      isOpen={showEditingPanel && isEditable}
+      slideType={currentSlideName}
+      editableData={editingPanelData}
+      on:update={handleEditingPanelUpdate}
+      on:close={() => {
+        showEditingPanel = false;
+        isEditable = false;
+      }}
+    />
   </div>
-  
-  <!-- Editing Panel -->
-  <EditingPanel
-    isOpen={showEditingPanel && isEditable}
-    slideType={currentSlideName}
-    editableData={editingPanelData}
-    on:update={handleEditingPanelUpdate}
-    on:close={() => showEditingPanel = false}
-  />
 </div>
 
 <style>
   .slide-manager {
     display: flex;
     flex-direction: column;
-    min-height: 600px;
-    max-height: 90vh;
-    background: #f5f5f5;
-    border-radius: 8px;
-    overflow: hidden;
+    gap: 1rem;
+    width: 100%;
+    background: transparent;
+  }
+  
+  .presentation-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0 0.5rem 0 0.5rem;
+    background: transparent;
+  }
+  
+  .presentation-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .icon-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 999px;
+    background: #f59e0b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #111827;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+    margin-top: 0.15rem;
+  }
+  
+  .dark .icon-circle {
+    background: #f59e0b;
+    color: #111827;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+  }
+  
+  .title-text {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .title-label {
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: #111827;
+  }
+  
+  :global(.dark) .title-label,
+  .dark .title-label {
+    color: #ffffff !important;
+  }
+  
+  .title-subtext {
+    font-size: 0.95rem;
+    color: #6b7280;
+    display: block;
+  }
+  
+  .dark .title-subtext {
+    color: #d1d5db;
+  }
+  
+  .presentation-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
   }
   
   .controls-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 2rem;
-    background: white;
-    border-bottom: 1px solid #e5e7eb;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 0.5rem 0 0.5rem 0;
+    background: transparent;
+    border-bottom: none;
+    box-shadow: none;
   }
   
   .controls-left,
   .controls-right {
     display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .controls-right {
+    justify-content: flex-end;
+  }
+  
+  .btn-group {
+    display: flex;
     gap: 0.5rem;
     align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .export-controls {
+    position: relative;
+  }
+  
+  .export-dropdown {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    min-width: 200px;
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+    z-index: 20;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  
+  .dark .export-dropdown {
+    background: oklch(var(--popover));
+    border: 1px solid oklch(var(--border));
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .dropdown-item {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border: none;
+    background: transparent;
+    border-radius: 9999px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #92400e;
+    font-weight: 600;
+  }
+  
+  .dark .dropdown-item {
+    color: #111827;
+  }
+
+  .dropdown-item:hover:not(:disabled) {
+    background: #fff7ed;
+  }
+  
+  .dark .dropdown-item:hover:not(:disabled) {
+    background: #fef3c7;
+    color: #111827;
   }
   
   .btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    background: white;
+    padding: 0.55rem 1.25rem;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 9999px;
+    background: #fff7ed;
+    color: #92400e;
     cursor: pointer;
     font-size: 0.9rem;
+    font-weight: 600;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
   }
   
-  .btn:hover:not(:disabled) {
-    background: #f5f5f5;
+  .dark .btn {
+    border: 1px solid rgba(249, 115, 22, 0.8); /* orange border */
+    background: #6b7280; /* grey background */
+    color: white; /* white text */
   }
   
-  .btn.active {
-    background: #007bff;
+  .dark .btn svg {
     color: white;
-    border-color: #007bff;
+  }
+  
+  .dark .btn svg path,
+  .dark .btn svg circle,
+  .dark .btn svg rect {
+    fill: white;
+    stroke: white;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: #fde68a;
+    border-color: rgba(217, 119, 6, 0.9);
+  }
+  
+  .dark .btn:hover:not(:disabled) {
+    background: #4b5563; /* darker grey on hover */
+    border-color: rgba(249, 115, 22, 1); /* brighter orange border on hover */
+    color: white;
+  }
+
+  .btn.active {
+    background: #f59e0b;
+    color: #111827;
+    border-color: #d97706;
+  }
+  
+  .dark .btn.active {
+    background: #4b5563; /* grey background */
+    color: white;
+    border-color: rgba(249, 115, 22, 1); /* orange border */
+  }
+  
+  .btn.secondary {
+    background: #f59e0b;
+    color: #111827;
+    border-color: #d97706;
+  }
+  
+  .dark .btn.secondary {
+    background: #6b7280; /* grey background */
+    color: white;
+    border-color: rgba(249, 115, 22, 0.8); /* orange border */
+  }
+  
+  .btn.large {
+    min-width: 170px;
+    justify-content: center;
+    font-size: 0.95rem;
+  }
+  
+  .btn.navigation {
+    background: #fff7ed;
+  }
+  
+  .dark .btn.navigation {
+    background: #6b7280; /* grey background */
+    color: white;
+    border-color: rgba(249, 115, 22, 0.8); /* orange border */
+  }
+  
+  .theme-toggle-chip {
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: #fff7ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  }
+  
+  .dark .theme-toggle-chip {
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: #fef3c7; /* yellow background */
+    box-shadow: var(--shadow-xs);
   }
   
   .btn-primary {
@@ -2329,8 +2605,19 @@
     border-color: #28a745;
   }
   
+  .dark .btn-primary {
+    background: #6b7280; /* grey background */
+    color: white;
+    border-color: rgba(249, 115, 22, 0.8); /* orange border */
+  }
+  
   .btn-primary:hover:not(:disabled) {
     background: #218838;
+  }
+  
+  .dark .btn-primary:hover:not(:disabled) {
+    background: #4b5563; /* darker grey on hover */
+    border-color: rgba(249, 115, 22, 1); /* brighter orange border on hover */
   }
   
   .btn:disabled {
@@ -2344,13 +2631,127 @@
     color: #666;
   }
   
-  .slide-navigation {
+  .dark .slide-counter {
+    color: #d1d5db;
+  }
+  
+  .slide-workspace {
+    position: relative;
+    min-height: 720px;
+    width: 100%;
+  }
+
+  .slide-stage {
     display: flex;
-    gap: 0.5rem;
-    padding: 1rem 2rem;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+    transition: margin 0.3s ease, transform 0.3s ease;
+  }
+  
+  .slide-stage.panel-open {
+    margin-right: 380px;
+    transform: translateX(-12px);
+  }
+
+  .slide-navigation {
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+  }
+
+  .nav-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(251, 191, 36, 0.35);
     background: white;
-    border-bottom: 1px solid #e5e7eb;
-    overflow-x: auto;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+  
+  .dark .nav-card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #1f2937;
+  }
+
+  .nav-card:hover {
+    border-color: #f59e0b;
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.25);
+  }
+  
+  .dark .nav-card:hover {
+    border-color: oklch(var(--ring));
+    box-shadow: var(--shadow-md);
+  }
+
+  .nav-card.active {
+    border-color: #f59e0b;
+    box-shadow: 0 12px 24px rgba(245, 158, 11, 0.3);
+  }
+  
+  .dark .nav-card.active {
+    border-color: #ca8a04;
+    box-shadow: 0 12px 24px rgba(202, 138, 4, 0.3);
+    background: #374151;
+  }
+
+  .slide-index {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #b45309;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  
+  .dark .slide-index {
+    background: #4b5563;
+    color: #d1d5db;
+  }
+
+  .nav-card.active .slide-index {
+    background: #f59e0b;
+    color: #111827;
+  }
+  
+  .dark .nav-card.active .slide-index {
+    background: #ca8a04;
+    color: #fef3c7;
+  }
+
+  .slide-meta {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
+
+  .slide-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.2rem;
+  }
+  
+  .dark .slide-name {
+    color: #ffffff;
+  }
+
+  .slide-hint {
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+  
+  .dark .slide-hint {
+    color: #d1d5db;
   }
   
   .nav-item {
@@ -2364,9 +2765,21 @@
     transition: all 0.2s;
   }
   
+  .dark .nav-item {
+    border: 1px solid oklch(var(--border));
+    background: oklch(var(--card));
+    color: oklch(var(--foreground));
+  }
+  
   .nav-item:hover {
     background: #f5f5f5;
     border-color: #007bff;
+  }
+  
+  .dark .nav-item:hover {
+    background: oklch(var(--accent));
+    color: oklch(var(--accent-foreground));
+    border-color: oklch(var(--ring));
   }
   
   .nav-item.active {
@@ -2375,14 +2788,21 @@
     border-color: #007bff;
   }
   
+  .dark .nav-item.active {
+    background: oklch(var(--primary));
+    color: oklch(var(--primary-foreground));
+    border-color: oklch(var(--primary));
+  }
+  
   .slide-viewer {
+    position: relative;
     flex: 1;
-    overflow: auto;
+    overflow: visible;
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    background: #f9fafb;
-    padding: 2rem;
+    background: transparent;
+    padding: 2.5rem 0 0;
   }
   
   .slide-container {
@@ -2390,10 +2810,20 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    min-height: 760px;
-    padding: 20px;
-    background: #f9fafb;
+    padding: 0;
+    background: transparent;
     position: relative;
+  }
+  
+  .slide-nav-overlay {
+    position: absolute;
+    top: -2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    z-index: 5;
   }
   
   .slide-wrapper {

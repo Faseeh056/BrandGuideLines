@@ -786,17 +786,20 @@
 
 <style>
   .editing-panel {
-    position: fixed;
+    position: absolute;
     right: 0;
     top: 0;
-    width: 400px;
-    height: 100vh;
+    width: 360px;
+    height: 100%;
     background: white;
-    box-shadow: -2px 0 10px rgba(0,0,0,0.1);
-    z-index: 1000;
+    box-shadow: -12px 0 30px rgba(15, 23, 42, 0.12);
+    z-index: 5;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    border-left: 1px solid rgba(15, 23, 42, 0.08);
+    border-top-left-radius: 18px;
+    border-bottom-left-radius: 18px;
   }
   
   .panel-header {
@@ -885,18 +888,20 @@
   }
   
   .color-picker-btn {
-    width: 40px;
-    height: 40px;
-    border: 2px solid #d1d5db;
-    border-radius: 6px;
+    width: 44px;
+    height: 44px;
+    border: 2px solid rgba(245, 158, 11, 0.6);
+    border-radius: 12px;
     cursor: pointer;
     padding: 0;
-    background: none;
+    background: white;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    transition: transform 0.2s, border-color 0.2s;
   }
   
   .color-picker-btn:hover {
-    border-color: #3b82f6;
-    transform: scale(1.05);
+    border-color: #fbbf24;
+    transform: translateY(-1px) scale(1.03);
   }
   
   .file-input {

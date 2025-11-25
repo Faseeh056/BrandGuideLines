@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { Palette } from 'lucide-svelte';
   
   export let currentBackground: {
     type: 'color' | 'gradient';
@@ -59,7 +60,8 @@
 
 <div class="background-editor">
   <button class="btn-toggle" onclick={() => showEditor = !showEditor}>
-    🎨 Edit Background
+    <Palette class="h-4 w-4" />
+    <span>{showEditor ? 'Hide Background Editor' : 'Edit Background'}</span>
   </button>
   
   {#if showEditor}
@@ -123,17 +125,24 @@
   }
   
   .btn-toggle {
-    padding: 0.5rem 1rem;
-    background: #3B82F6;
-    color: white;
+    padding: 0.55rem 1.1rem;
+    background: #f59e0b;
+    color: #111827;
     border: none;
-    border-radius: 6px;
+    border-radius: 9999px;
     cursor: pointer;
     font-size: 0.9rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.25);
+    transition: all 0.2s;
   }
   
   .btn-toggle:hover {
-    background: #2563EB;
+    background: #fbbf24;
+    transform: translateY(-1px);
   }
   
   .editor-panel {
@@ -179,9 +188,10 @@
   .color-input-group input[type="color"] {
     width: 60px;
     height: 40px;
-    border: none;
-    border-radius: 4px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+    border-radius: 10px;
     cursor: pointer;
+    box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.15);
   }
   
   .color-input-group input[type="text"] {
@@ -198,9 +208,10 @@
   .gradient-color-item input[type="color"] {
     width: 50px;
     height: 35px;
-    border: none;
-    border-radius: 4px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+    border-radius: 10px;
     cursor: pointer;
+    box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.15);
   }
   
   .gradient-color-item input[type="text"] {

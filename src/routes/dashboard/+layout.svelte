@@ -2,12 +2,14 @@
 	import { page } from '$app/stores';
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
-	import { Home, Palette, Search, Sparkles, User, Settings, LogOut } from 'lucide-svelte';
+	import { Home, Palette, Search, Sparkles, User, Settings, LogOut, Folder } from 'lucide-svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-	// Removed client-side auth import - will handle logout differently
+	import BrandCard from '$lib/components/BrandCard.svelte';
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
 	let { children, data } = $props();
+	const isPreviewPage = $derived($page.url.pathname.startsWith('/dashboard/preview-html'));
 
 	// Redirect if not authenticated
 	if (!data?.user) {
@@ -18,7 +20,8 @@
 		{ href: '/dashboard', icon: Home, label: 'Dashboard', exact: true },
 		{ href: '/dashboard/builder', icon: Palette, label: 'Builder' },
 		{ href: '/dashboard/audit', icon: Search, label: 'Audit' },
-		{ href: '/dashboard/creative', icon: Sparkles, label: 'Creative' }
+		{ href: '/dashboard/creative', icon: Sparkles, label: 'Creative' },
+		{ href: '/dashboard/my-brands', icon: Folder, label: 'My Brands' }
 	];
 
 	function isActive(href: string, exact = false) {
@@ -27,16 +30,148 @@
 		}
 		return $page.url.pathname.startsWith(href);
 	}
+
+	// My Brands state
+	let myBrands: any[] = [];
+	let loadingBrands = false;
+
+	async function loadBrands() {
+		if (loadingBrands) return;
+		loadingBrands = true;
+		try {
+			const response = await fetch('/api/brand-guidelines');
+			if (response.ok) {
+				const result = await response.json();
+				if (result.success) {
+					myBrands = result.guidelines || [];
+				}
+			}
+		} catch (error) {
+			console.error('Failed to load brands:', error);
+		} finally {
+			loadingBrands = false;
+		}
+	}
+
+	async function handlePreviewBrand(brand: any) {
+		try {
+			const response = await fetch(`/api/brand-guidelines/${brand.id}`);
+			if (!response.ok) throw new Error('Failed to fetch brand data');
+			
+			const result = await response.json();
+			if (!result.success || !result.guideline) throw new Error('Brand not found');
+
+			const guideline = result.guideline;
+			
+			// Transform to preview_brand_data format
+			const previewData: any = {
+				brandName: guideline.brandName,
+				brand_name: guideline.brandName,
+				brand_domain: guideline.brandDomain || guideline.industry || '',
+				short_description: guideline.shortDescription || '',
+				selectedMood: guideline.mood || '',
+				selectedAudience: guideline.audience || '',
+				brandValues: guideline.brandValues || '',
+				customPrompt: guideline.customPrompt || '',
+				guidelineId: guideline.id,
+				id: guideline.id
+			};
+
+			// Parse JSON fields
+			if (guideline.logoFiles) {
+				try {
+					previewData.logoFiles = typeof guideline.logoFiles === 'string' 
+						? JSON.parse(guideline.logoFiles) 
+						: guideline.logoFiles;
+				} catch (e) {
+					previewData.logoFiles = [];
+				}
+			}
+
+			if (guideline.contactInfo) {
+				try {
+					previewData.contact = typeof guideline.contactInfo === 'string'
+						? JSON.parse(guideline.contactInfo)
+						: guideline.contactInfo;
+				} catch (e) {
+					previewData.contact = {};
+				}
+			}
+
+			// Parse structuredData for stepHistory
+			if (guideline.structuredData) {
+				try {
+					const structuredData = typeof guideline.structuredData === 'string'
+						? JSON.parse(guideline.structuredData)
+						: guideline.structuredData;
+					
+					// Reconstruct stepHistory from structuredData if needed
+					// For now, we'll try to get it from the guideline's stepHistory if stored
+					if (guideline.stepHistory) {
+						try {
+							previewData.stepHistory = typeof guideline.stepHistory === 'string'
+								? JSON.parse(guideline.stepHistory)
+								: guideline.stepHistory;
+						} catch (e) {
+							previewData.stepHistory = [];
+						}
+					} else {
+						previewData.stepHistory = [];
+					}
+				} catch (e) {
+					previewData.stepHistory = [];
+				}
+			} else {
+				previewData.stepHistory = [];
+			}
+
+			// Store in sessionStorage
+			sessionStorage.setItem('preview_brand_data', JSON.stringify(previewData));
+			sessionStorage.setItem('preview_brand_saved', 'true');
+			sessionStorage.setItem('current_guideline_id', guideline.id);
+
+			// Navigate to preview page
+			goto('/dashboard/preview-html');
+		} catch (error) {
+			console.error('Failed to preview brand:', error);
+			alert('Failed to load brand preview. Please try again.');
+		}
+	}
+
+	async function handleDeleteBrand(brand: any) {
+		if (!confirm(`Are you sure you want to delete "${brand.brandName}"? This action cannot be undone.`)) {
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/brand-guidelines/${brand.id}`, {
+				method: 'DELETE'
+			});
+
+			if (!response.ok) throw new Error('Failed to delete brand');
+
+			// Remove from local state
+			myBrands = myBrands.filter(b => b.id !== brand.id);
+		} catch (error) {
+			console.error('Failed to delete brand:', error);
+			alert('Failed to delete brand. Please try again.');
+		}
+	}
+
+	onMount(() => {
+		loadBrands();
+	});
 </script>
 
 <div class="flex h-screen bg-background">
-	<!-- Sidebar -->
-	<aside class="flex w-64 flex-col border-r border-border bg-card">
-		<!-- Logo -->
-		<div class="border-b border-border p-6">
-			<h1 class="text-xl font-bold text-foreground">EternaBrand</h1>
-			<p class="text-sm text-muted-foreground">AI Brand Assistant</p>
-		</div>
+	{#if !isPreviewPage}
+		<!-- Sidebar -->
+		<aside class="flex w-64 flex-col border-r border-border bg-card">
+			<!-- Logo -->
+			<div class="border-b border-border p-6">
+				<h1 class="text-xl font-bold text-foreground">EternaBrand</h1>
+				<p class="text-sm text-muted-foreground">AI Brand Assistant</p>
+			</div>
 
 		<!-- Navigation -->
 		<nav class="flex-1 p-4">
@@ -58,6 +193,24 @@
 					</li>
 				{/each}
 			</ul>
+
+			<Separator class="my-4" />
+
+			<!-- My Brands Section -->
+			<div class="mb-4">
+				<h3 class="mb-3 px-3 text-sm font-semibold text-foreground">My Brands</h3>
+				{#if loadingBrands}
+					<div class="px-3 py-2 text-xs text-muted-foreground">Loading...</div>
+				{:else if myBrands.length === 0}
+					<div class="px-3 py-2 text-xs text-muted-foreground">No brands saved yet</div>
+				{:else}
+					<div class="max-h-64 space-y-2 overflow-y-auto px-3">
+						{#each myBrands.slice(0, 4) as brand}
+							<BrandCard {brand} onPreview={handlePreviewBrand} onDelete={handleDeleteBrand} compact={true} />
+						{/each}
+					</div>
+				{/if}
+			</div>
 
 			<Separator class="my-4" />
 
@@ -85,7 +238,8 @@
 				</Button>
 			</div>
 		</nav>
-	</aside>
+		</aside>
+	{/if}
 
 	<!-- Main Content -->
 	<main class="flex-1 overflow-auto">

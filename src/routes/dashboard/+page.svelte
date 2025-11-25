@@ -7,9 +7,136 @@
 		CardHeader,
 		CardTitle
 	} from '$lib/components/ui/card';
-	import { ArrowRight, Palette, Search, Sparkles, TrendingUp } from 'lucide-svelte';
+	import { ArrowRight, Palette, Search, Sparkles, TrendingUp, Folder } from 'lucide-svelte';
+	import BrandCard from '$lib/components/BrandCard.svelte';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 
 	let { data } = $props();
+
+	let brands: any[] = [];
+	let loadingBrands = false;
+
+	async function loadBrands() {
+		if (loadingBrands) return;
+		loadingBrands = true;
+		try {
+			const response = await fetch('/api/brand-guidelines');
+			if (response.ok) {
+				const result = await response.json();
+				if (result.success) {
+					brands = result.guidelines || [];
+				}
+			}
+		} catch (error) {
+			console.error('Failed to load brands:', error);
+		} finally {
+			loadingBrands = false;
+		}
+	}
+
+	async function handlePreviewBrand(brand: any) {
+		try {
+			const response = await fetch(`/api/brand-guidelines/${brand.id}`);
+			if (!response.ok) throw new Error('Failed to fetch brand data');
+			
+			const result = await response.json();
+			if (!result.success || !result.guideline) throw new Error('Brand not found');
+
+			const guideline = result.guideline;
+			
+			// Transform to preview_brand_data format
+			const previewData: any = {
+				brandName: guideline.brandName,
+				brand_name: guideline.brandName,
+				brand_domain: guideline.brandDomain || guideline.industry || '',
+				short_description: guideline.shortDescription || '',
+				selectedMood: guideline.mood || '',
+				selectedAudience: guideline.audience || '',
+				brandValues: guideline.brandValues || '',
+				customPrompt: guideline.customPrompt || '',
+				guidelineId: guideline.id,
+				id: guideline.id
+			};
+
+			// Parse JSON fields
+			if (guideline.logoFiles) {
+				try {
+					previewData.logoFiles = typeof guideline.logoFiles === 'string' 
+						? JSON.parse(guideline.logoFiles) 
+						: guideline.logoFiles;
+				} catch (e) {
+					previewData.logoFiles = [];
+				}
+			}
+
+			if (guideline.contactInfo) {
+				try {
+					previewData.contact = typeof guideline.contactInfo === 'string'
+						? JSON.parse(guideline.contactInfo)
+						: guideline.contactInfo;
+				} catch (e) {
+					previewData.contact = {};
+				}
+			}
+
+			// Parse structuredData for stepHistory
+			if (guideline.structuredData) {
+				try {
+					if (guideline.stepHistory) {
+						try {
+							previewData.stepHistory = typeof guideline.stepHistory === 'string'
+								? JSON.parse(guideline.stepHistory)
+								: guideline.stepHistory;
+						} catch (e) {
+							previewData.stepHistory = [];
+						}
+					} else {
+						previewData.stepHistory = [];
+					}
+				} catch (e) {
+					previewData.stepHistory = [];
+				}
+			} else {
+				previewData.stepHistory = [];
+			}
+
+			// Store in sessionStorage
+			sessionStorage.setItem('preview_brand_data', JSON.stringify(previewData));
+			sessionStorage.setItem('preview_brand_saved', 'true');
+			sessionStorage.setItem('current_guideline_id', guideline.id);
+
+			// Navigate to preview page
+			goto('/dashboard/preview-html');
+		} catch (error) {
+			console.error('Failed to preview brand:', error);
+			alert('Failed to load brand preview. Please try again.');
+		}
+	}
+
+	async function handleDeleteBrand(brand: any) {
+		if (!confirm(`Are you sure you want to delete "${brand.brandName}"? This action cannot be undone.`)) {
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/brand-guidelines/${brand.id}`, {
+				method: 'DELETE'
+			});
+
+			if (!response.ok) throw new Error('Failed to delete brand');
+
+			// Reload brands
+			await loadBrands();
+		} catch (error) {
+			console.error('Failed to delete brand:', error);
+			alert('Failed to delete brand. Please try again.');
+		}
+	}
+
+	onMount(() => {
+		loadBrands();
+	});
 </script>
 
 <div class="max-w-6xl">
@@ -66,10 +193,11 @@
 	<!-- Quick Actions -->
 	<div class="mb-8">
 		<h2 class="mb-4 text-xl font-semibold text-foreground">Quick Actions</h2>
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+		<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+			<!-- Top Row: 2 Quick Action Cards -->
 			<!-- Brand Builder -->
-			<Card class="cursor-pointer transition-shadow hover:shadow-md">
-				<CardHeader>
+			<Card class="flex cursor-pointer flex-col transition-shadow hover:shadow-md">
+				<CardHeader class="flex-1">
 					<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
 						<Palette class="h-6 w-6 text-primary" />
 					</div>
@@ -87,8 +215,8 @@
 			</Card>
 
 			<!-- Brand Audit -->
-			<Card class="cursor-pointer transition-shadow hover:shadow-md">
-				<CardHeader>
+			<Card class="flex cursor-pointer flex-col transition-shadow hover:shadow-md">
+				<CardHeader class="flex-1">
 					<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
 						<Search class="h-6 w-6 text-primary" />
 					</div>
@@ -103,11 +231,12 @@
 				</CardContent>
 			</Card>
 
+			<!-- Bottom Row: 2 Cards (Creative + First Brand if exists) -->
 			<!-- Creative Generator -->
-			<Card class="cursor-pointer transition-shadow hover:shadow-md">
-				<CardHeader>
-					<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10">
-						<Sparkles class="h-6 w-6 text-accent-foreground" />
+			<Card class="flex cursor-pointer flex-col transition-shadow hover:shadow-md">
+				<CardHeader class="flex-1">
+					<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+						<Sparkles class="h-6 w-6 text-primary" />
 					</div>
 					<CardTitle class="text-lg">Generate Creative</CardTitle>
 					<CardDescription>Create branded social media and campaign content</CardDescription>
@@ -119,6 +248,28 @@
 					</Button>
 				</CardContent>
 			</Card>
+
+			<!-- First My Brand Card (if exists) -->
+			{#if brands.length > 0}
+				<BrandCard brand={brands[0]} onPreview={handlePreviewBrand} onDelete={handleDeleteBrand} />
+			{:else}
+				<!-- Placeholder or empty card -->
+				<Card class="flex cursor-pointer flex-col transition-shadow hover:shadow-md">
+					<CardHeader class="flex-1">
+						<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+							<Folder class="h-6 w-6 text-primary" />
+						</div>
+						<CardTitle class="text-lg">My Brands</CardTitle>
+						<CardDescription>View and manage your saved brand guidelines</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<Button class="w-full bg-primary text-primary-foreground hover:bg-primary/90" href="/dashboard/my-brands">
+							My Brands
+							<ArrowRight class="ml-2 h-4 w-4" />
+						</Button>
+					</CardContent>
+				</Card>
+			{/if}
 		</div>
 	</div>
 

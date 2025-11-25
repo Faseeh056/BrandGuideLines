@@ -2450,52 +2450,21 @@ Now make ONLY the specific change requested by the user: "${feedback}"`;
 </script>
 
 <Card
-	class="flex h-[1000px] w-[580px] flex-col border-border/50 border-orange-500/20 bg-card/50 shadow-xl backdrop-blur-sm"
+	class="flex h-[1000px] w-[580px] flex-col border-border/50 border-orange-500/20 bg-card/50 shadow-xl backdrop-blur-sm overflow-hidden !py-0 !gap-0"
 >
-	<CardHeader class="flex-shrink-0 space-y-4 border-b border-border/50 pb-4">
+	<CardHeader class="flex-shrink-0 space-y-4 border-b border-border/50 bg-primary/20 p-6">
 		<!-- Header -->
-		<div class="flex items-center justify-between">
-			<div class="flex items-center gap-3">
-				<div>
-					<h2 class="text-lg font-bold text-foreground">Brand Builder Assistant</h2>
-					<p class="text-xs text-muted-foreground">AI-powered questionnaire</p>
-				</div>
-				{#if messages.length > 0}
-					<Button
-						onclick={clearChatMessages}
-						variant="ghost"
-						size="sm"
-						class="h-8 w-8 p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-						title="Clear chat messages"
-					>
-						<Trash2 class="h-4 w-4" />
-					</Button>
-				{/if}
+		<div class="flex flex-col items-center justify-center text-center gap-2">
+			<div>
+				<h2 class="text-2xl font-bold text-foreground">Brand Builder Assistant</h2>
+				<p class="text-xs" style="color: #000000;">AI-powered questionnaire</p>
 			</div>
-			{#if !waitingForConfirmation && currentQuestionIndex >= 0 && currentQuestionIndex < questions.length}
-				<div class="text-right">
-					<div class="text-xs text-muted-foreground">
-						Question {currentQuestionIndex + 1} of {questions.length}
-					</div>
-					<div class="text-sm font-bold text-orange-500">{progressPercentage}%</div>
-				</div>
-			{/if}
 		</div>
-
-		<!-- Progress Bar -->
-		{#if !waitingForConfirmation && currentQuestionIndex >= 0}
-			<div class="relative h-1 overflow-hidden rounded-full bg-muted/30">
-				<div
-					class="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500 ease-out"
-					style="width: {progressPercentage}%"
-				></div>
-			</div>
-		{/if}
 	</CardHeader>
 
-	<CardContent class="flex flex-1 flex-col overflow-hidden p-0">
+	<CardContent class="flex flex-1 flex-col overflow-hidden p-0 bg-background">
 		<!-- Messages Container -->
-		<div bind:this={chatContainer} class="flex-1 space-y-4 overflow-y-auto scroll-smooth p-6">
+		<div bind:this={chatContainer} class="flex-1 space-y-4 overflow-y-auto scroll-smooth p-6 bg-background">
 			{#each messages as message (message.id)}
 				{#if message.type === 'step'}
 					{#if message.stepData}
@@ -2602,7 +2571,7 @@ Now make ONLY the specific change requested by the user: "${feedback}"`;
 		</div>
 
 		<!-- Input Area -->
-		<div class="flex-shrink-0 space-y-3 border-t border-border/50 bg-card/50 p-4">
+		<div class="flex-shrink-0 space-y-3 border-t border-border/50 bg-primary/20 p-4">
 			<!-- Edit Mode Indicator -->
 			{#if isEditingMode && editingQuestionIndex >= 0}
 				{@const questionsToUse = allQuestions.length > 0 ? allQuestions : questions}
