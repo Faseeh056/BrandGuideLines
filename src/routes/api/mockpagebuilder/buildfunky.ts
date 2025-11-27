@@ -58,6 +58,7 @@ interface GeminiCopy {
 }
 
 const DEFAULT_COLORS = ['#facc15', '#0ea5e9', '#f472b6', '#ffffff', '#0f172a'];
+const HEX_COLOR_REGEX = /#(?:[0-9a-fA-F]{3,8})\b/g;
 const DEFAULT_FONT = 'Inter, sans-serif';
 const SYSTEM_FONTS = new Set([
 	'inter',
@@ -279,19 +280,68 @@ function buildGoogleFontImport(fontName: string) {
 }
 
 function extractColors(markup: string, brandData?: Record<string, any>) {
-	const regex = /#(?:[0-9a-fA-F]{3,8})\b/g;
-	const slideMatches = Array.from(new Set(markup.match(regex) || []));
+	const brandPalette = collectBrandPalette(brandData);
+	const slideMatches = Array.from(new Set(markup.match(HEX_COLOR_REGEX) || [])).map((value) =>
+		normalizeHex(value)
+	);
 
-	const dataColors =
-		brandData?.color_palette ||
-		brandData?.colorPalette ||
-		brandData?.brandColors ||
-		brandData?.slides?.brand_colors ||
-		[];
-
-	const palette = [...slideMatches, ...dataColors].filter((color, index, arr) => arr.indexOf(color) === index);
+	const palette = [...brandPalette, ...slideMatches]
+		.filter(Boolean)
+		.filter((color, index, arr) => arr.indexOf(color) === index);
 
 	return palette.length ? palette : DEFAULT_COLORS;
+}
+
+function collectBrandPalette(brandData?: Record<string, any>): string[] {
+	const collected: string[] = [];
+	const pushColor = (value?: string) => {
+		const hex = normalizeHex(value);
+		if (hex) collected.push(hex);
+	};
+
+	if (!brandData) return collected;
+
+	const rawColors = brandData.colors;
+	let parsedColors = rawColors;
+	if (typeof rawColors === 'string') {
+		try {
+			parsedColors = JSON.parse(rawColors);
+		} catch {
+			parsedColors = rawColors;
+		}
+	}
+
+	const semantic = parsedColors?.semantic;
+	if (semantic) {
+		Object.values(semantic).forEach((entry: any) => pushColor(entry?.hex || entry));
+	}
+	const neutral = parsedColors?.neutral;
+	if (neutral) {
+		Object.values(neutral).forEach((entry: any) => pushColor(entry?.hex || entry));
+	}
+	if (Array.isArray(parsedColors?.palette)) {
+		parsedColors.palette.forEach((color: string) => pushColor(color));
+	}
+
+	[
+		brandData.primaryColor,
+		brandData.secondaryColor,
+		brandData.accentColor,
+		brandData.textColor,
+		brandData.backgroundColor,
+		...(Array.isArray(brandData.color_palette) ? brandData.color_palette : []),
+		...(Array.isArray(brandData.colorPalette) ? brandData.colorPalette : []),
+		...(Array.isArray(brandData.brandColors) ? brandData.brandColors : []),
+		...(Array.isArray(brandData.palette) ? brandData.palette : [])
+	].forEach(pushColor);
+
+	return Array.from(new Set(collected));
+}
+
+function normalizeHex(value?: string | null) {
+	if (!value || typeof value !== 'string') return null;
+	const match = value.match(HEX_COLOR_REGEX);
+	return match ? match[0].toLowerCase() : null;
 }
 
 function fillPalette(palette: string[]) {

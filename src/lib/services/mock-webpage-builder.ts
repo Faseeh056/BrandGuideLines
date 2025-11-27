@@ -19,6 +19,7 @@ export interface BuildResult {
 	colors?: Record<string, string>;
 	fontFamily?: string;
 	brandConfig?: Record<string, any>;
+	pageId?: string;
 }
 
 export async function buildMockWebpage(

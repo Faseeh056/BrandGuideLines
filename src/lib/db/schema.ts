@@ -121,6 +121,29 @@ export const logoAssets = pgTable('logo_assets', {
 		.$defaultFn(() => new Date())
 });
 
+export const mockWebpages = pgTable('mock_webpages', {
+	id: text('id')
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	brandGuidelinesId: text('brand_guidelines_id').references(() => brandGuidelines.id, {
+		onDelete: 'cascade'
+	}),
+	brandName: text('brand_name'),
+	theme: text('theme').notNull(),
+	htmlContent: text('html_content').notNull(),
+	brandConfig: text('brand_config'),
+	slidesSnapshot: text('slides_snapshot'),
+	createdAt: timestamp('created_at', { mode: 'date' })
+		.notNull()
+		.$defaultFn(() => new Date()),
+	updatedAt: timestamp('updated_at', { mode: 'date' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
 // PDFs Brand Guidelines table (for audit functionality)
 export const pdfsBrandGuidelines = pgTable('pdfs_brand_guidelines', {
 	id: serial('id').primaryKey(),
@@ -604,3 +627,5 @@ export type ComplianceIssue = typeof complianceIssues.$inferSelect;
 export type NewComplianceIssue = typeof complianceIssues.$inferInsert;
 export type AuditSession = typeof auditSessions.$inferSelect;
 export type NewAuditSession = typeof auditSessions.$inferInsert;
+export type MockWebpage = typeof mockWebpages.$inferSelect;
+export type NewMockWebpage = typeof mockWebpages.$inferInsert;

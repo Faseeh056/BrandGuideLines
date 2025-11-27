@@ -5,7 +5,8 @@ import {
 	loadTempBrandData,
 	saveTempBrandData,
 	updateBuildData,
-	clearTempBrandData
+	clearTempBrandData,
+	clearStoredBuildData
 } from '$lib/services/temp-brand-storage';
 import type { TempBrandData } from '$lib/services/temp-brand-storage';
 import {
@@ -142,6 +143,11 @@ onMount(async () => {
 			mockPageBuild = stored.buildData as MockBuildResult;
 			webpageBuildComplete = true;
 			setMockPageBlob(mockPageBuild.html);
+		} else if (brandData?.guidelineId || brandData?.brandName || brandData?.brand_name) {
+			await fetchMockPageFromDatabase(
+				brandData?.guidelineId,
+				brandData?.brandName || brandData?.brand_name
+			);
 		}
 	} catch (e: any) {
 		error = e?.message || 'Failed to load preview data.';
@@ -226,6 +232,42 @@ async function fetchSlidesFromDatabase(guidelineId: string) {
 	return [];
 }
 
+async function fetchMockPageFromDatabase(guidelineId?: string, brandName?: string) {
+	if (!guidelineId && !brandName) return;
+	const params = new URLSearchParams();
+	if (guidelineId) {
+		params.set('brandGuidelinesId', guidelineId);
+	} else if (brandName) {
+		params.set('brandName', brandName);
+	}
+
+	try {
+		const response = await fetch(`/api/mockpagebuilder?${params.toString()}`);
+		if (!response.ok) {
+			if (response.status === 404) return;
+			throw new Error('Failed to fetch mock webpage');
+		}
+
+		const result = await response.json();
+		if (result?.success && result.page?.htmlContent) {
+			mockPageBuild = {
+				theme: result.page.theme,
+				html: result.page.htmlContent,
+				brandConfig: result.page.brandConfig
+			};
+			setMockPageBlob(result.page.htmlContent);
+			webpageBuildComplete = true;
+
+			updateBuildData({
+				...mockPageBuild,
+				generatedAt: Date.now()
+			});
+		}
+	} catch (err) {
+		console.error('Failed to fetch mock webpage from database:', err);
+	}
+}
+
 	function handleVisitMockWebpage() {
 		if (!webpageBuildComplete || !mockPageBlobUrl) {
 			error = 'No mock webpage available. Please build one first.';
@@ -257,18 +299,40 @@ async function fetchSlidesFromDatabase(guidelineId: string) {
 		URL.revokeObjectURL(url);
 	}
 
-	function handleDeleteMockWebpage() {
-		webpageBuildComplete = false;
-		mockPageBuild = null;
-		buildStepMessage = '';
-
-		if (mockPageBlobUrl) {
-			URL.revokeObjectURL(mockPageBlobUrl);
-			mockPageBlobUrl = null;
-		}
-
-		clearTempBrandData();
+async function handleDeleteMockWebpage() {
+	const params = new URLSearchParams();
+	if (brandData?.guidelineId) {
+		params.set('brandGuidelinesId', brandData.guidelineId);
+	} else if (brandData?.brandName || brandData?.brand_name) {
+		params.set('brandName', brandData?.brandName || brandData?.brand_name);
 	}
+
+	try {
+		if ([...params.keys()].length) {
+			await fetch(`/api/mockpagebuilder?${params.toString()}`, {
+				method: 'DELETE'
+			});
+		}
+	} catch (err) {
+		console.error('Failed to delete mock webpage:', err);
+	}
+
+	webpageBuildComplete = false;
+	mockPageBuild = null;
+	buildStepMessage = '';
+
+	if (mockPageBlobUrl) {
+		URL.revokeObjectURL(mockPageBlobUrl);
+		mockPageBlobUrl = null;
+	}
+
+	clearStoredBuildData();
+
+	// Refresh UI state after deletion so the Visit button resets
+	if (typeof window !== 'undefined') {
+		window.location.reload();
+	}
+}
 </script>
 
 {#if loading}

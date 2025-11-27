@@ -3,6 +3,7 @@ import { env } from '$lib/env';
 import type { ThemeKey } from '$lib/types/theme-content';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const HEX_COLOR_REGEX = /#(?:[0-9a-fA-F]{3}){1,2}\b/g;
 
 /**
  * Lightweight representation of the React template BrandConfig so we can
@@ -228,24 +229,18 @@ function extractBrandInfo(slides: SlideData[], brandData: any, theme: ThemeKey):
 }
 
 function extractColors(slides: SlideData[], brandData: any) {
-	const colorRegex = /#(?:[0-9a-fA-F]{3}){1,2}\b/g;
+	const brandPalette = collectBrandPalette(brandData);
 	const slideColors = new Set<string>();
 
 	slides.forEach((slide) => {
-		const matches = slide.html.match(colorRegex);
-		matches?.forEach((color) => slideColors.add(color));
+		const matches = slide.html.match(HEX_COLOR_REGEX);
+		matches?.forEach((color) => {
+			const hex = normalizeHex(color);
+			if (hex) slideColors.add(hex);
+		});
 	});
 
-	const dataColors = [
-		...(brandData?.color_palette || []),
-		...(brandData?.palette || []),
-		...(brandData?.brandColors || []),
-		...(brandData?.colors || [])
-	]
-		.filter((value: string) => typeof value === 'string' && colorRegex.test(value))
-		.map((value: string) => value.match(colorRegex)?.[0] || value);
-
-	const palette = [...slideColors, ...dataColors].filter((color, index, arr) => arr.indexOf(color) === index);
+	const palette = [...brandPalette, ...slideColors].filter((color, index, arr) => arr.indexOf(color) === index);
 
 	const [primary, secondary, accent, background, text] = [
 		palette[0] || '#f97316',
@@ -256,6 +251,57 @@ function extractColors(slides: SlideData[], brandData: any) {
 	];
 
 	return { primary, secondary, accent, background, text };
+}
+
+function collectBrandPalette(brandData?: Record<string, any>): string[] {
+	const collected: string[] = [];
+	const pushColor = (value?: string) => {
+		const hex = normalizeHex(value);
+		if (hex) collected.push(hex);
+	};
+
+	if (!brandData) return collected;
+
+	const rawColors = brandData.colors;
+	let parsedColors = rawColors;
+	if (typeof rawColors === 'string') {
+		try {
+			parsedColors = JSON.parse(rawColors);
+		} catch {
+			parsedColors = rawColors;
+		}
+	}
+
+	const semantic = parsedColors?.semantic;
+	if (semantic) {
+		Object.values(semantic).forEach((entry: any) => pushColor(entry?.hex || entry));
+	}
+	const neutral = parsedColors?.neutral;
+	if (neutral) {
+		Object.values(neutral).forEach((entry: any) => pushColor(entry?.hex || entry));
+	}
+	if (Array.isArray(parsedColors?.palette)) {
+		parsedColors.palette.forEach((color: string) => pushColor(color));
+	}
+
+	[
+		brandData?.primaryColor,
+		brandData?.secondaryColor,
+		brandData?.accentColor,
+		brandData?.textColor,
+		brandData?.backgroundColor,
+		...(Array.isArray(brandData?.color_palette) ? brandData.color_palette : []),
+		...(Array.isArray(brandData?.palette) ? brandData.palette : []),
+		...(Array.isArray(brandData?.brandColors) ? brandData.brandColors : [])
+	].forEach(pushColor);
+
+	return Array.from(new Set(collected));
+}
+
+function normalizeHex(value?: string | null) {
+	if (!value || typeof value !== 'string') return null;
+	const match = value.match(HEX_COLOR_REGEX);
+	return match ? match[0].toLowerCase() : null;
 }
 
 function extractFonts(slides: SlideData[], brandData: any) {

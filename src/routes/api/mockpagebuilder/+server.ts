@@ -1,6 +1,8 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { and, eq } from 'drizzle-orm';
+import { db, mockWebpages } from '$lib/db';
 import type { ThemeKey } from '$lib/types/theme-content';
 import { buildMinimalisticFromSlides } from './buildminimalsitic';
 import { buildMaximalisticPage } from './buildmaximalistic';
@@ -20,16 +22,80 @@ const THEME_DIR_MAP: Record<ThemeKey, string> = {
 	Futuristic: 'Futuristic'
 };
 
-export const POST: RequestHandler = async ({ request }) => {
+export const GET: RequestHandler = async ({ url, locals }) => {
+	try {
+		const session = await locals.auth();
+		if (!session?.user?.id) {
+			return json({ error: 'Unauthorized' }, { status: 401 });
+		}
+
+		const brandGuidelinesId = url.searchParams.get('brandGuidelinesId');
+		const brandName = url.searchParams.get('brandName');
+
+		if (!brandGuidelinesId && !brandName) {
+			return json({ error: 'brandGuidelinesId or brandName is required' }, { status: 400 });
+		}
+
+		const whereClause = buildMockPageWhereClause(session.user.id, brandGuidelinesId, brandName);
+		const [page] = await db.select().from(mockWebpages).where(whereClause).limit(1);
+
+		if (!page) {
+			return json({ success: false, error: 'Mock page not found' }, { status: 404 });
+		}
+
+		return json({
+			success: true,
+			page: formatMockPage(page)
+		});
+	} catch (error: any) {
+		console.error('[mockpagebuilder] fetch error', error);
+		return json({ error: error?.message || 'Failed to fetch mock page' }, { status: 500 });
+	}
+};
+
+export const DELETE: RequestHandler = async ({ url, locals }) => {
+	try {
+		const session = await locals.auth();
+		if (!session?.user?.id) {
+			return json({ error: 'Unauthorized' }, { status: 401 });
+		}
+
+		const brandGuidelinesId = url.searchParams.get('brandGuidelinesId');
+		const brandName = url.searchParams.get('brandName');
+
+		if (!brandGuidelinesId && !brandName) {
+			return json({ error: 'brandGuidelinesId or brandName is required' }, { status: 400 });
+		}
+
+		const whereClause = buildMockPageWhereClause(session.user.id, brandGuidelinesId, brandName);
+		const deleted = await db.delete(mockWebpages).where(whereClause).returning();
+
+		return json({
+			success: true,
+			deleted: deleted.length
+		});
+	} catch (error: any) {
+		console.error('[mockpagebuilder] delete error', error);
+		return json({ error: error?.message || 'Failed to delete mock page' }, { status: 500 });
+	}
+};
+
+export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const { brandData = {}, slides = [], theme }: BuildRequestBody = await request.json();
 		const normalizedTheme = normalizeTheme(theme || brandData?.selectedTheme);
+		const session = await locals.auth();
+		if (!session?.user?.id) {
+			return json({ error: 'Unauthorized' }, { status: 401 });
+		}
 
 		const build = await buildThemePage(normalizedTheme, brandData, slides);
+		const savedPage = await saveMockPage(session.user.id, brandData, normalizedTheme, build);
 
 		return json({
 			success: true,
 			theme: normalizedTheme,
+			pageId: savedPage.id,
 			...build
 		});
 	} catch (error: any) {
@@ -67,7 +133,7 @@ async function buildThemePage(
 				brandConfig: result.brandConfig,
 				fontImports: result.googleFontImports
 			});
-			return { html, brandConfig: result.brandConfig };
+			return { html, brandConfig: result.brandConfig, slidesUsed: safeSlides };
 		}
 		case 'Maximalistic': {
 			const result = await buildMaximalisticPage({ slides: safeSlides, brandData, theme: 'Maximalistic' });
@@ -77,7 +143,7 @@ async function buildThemePage(
 				templateContent: result.content,
 				fontImports: result.fontImports
 			});
-			return { html, brandConfig: result.brand };
+			return { html, brandConfig: result.brand, slidesUsed: safeSlides };
 		}
 		case 'Funky': {
 			const result = await buildFunkyFromSlides({ slides: safeSlides, brandData });
@@ -86,7 +152,7 @@ async function buildThemePage(
 				brandConfig: result.brandConfig,
 				fontImports: result.googleFontImports
 			});
-			return { html, brandConfig: result.brandConfig };
+			return { html, brandConfig: result.brandConfig, slidesUsed: safeSlides };
 		}
 		case 'Futuristic':
 		default: {
@@ -100,7 +166,7 @@ async function buildThemePage(
 				brandConfig,
 				fontImports: result.googleFontImports
 			});
-			return { html, brandConfig };
+			return { html, brandConfig, slidesUsed: safeSlides };
 		}
 	}
 }
@@ -142,6 +208,83 @@ function ensureSlides(
 			html
 		}
 	];
+}
+
+async function saveMockPage(
+	userId: string,
+	brandData: any,
+	theme: ThemeKey,
+	build: { html: string; brandConfig?: Record<string, any>; slidesUsed: Array<{ name: string; html: string }> }
+) {
+	const brandGuidelinesId =
+		brandData?.guidelineId ||
+		brandData?.brandGuidelinesId ||
+		brandData?.guideline_id ||
+		null;
+	const brandName = brandData?.brandName || brandData?.brand_name || 'Untitled Brand';
+
+	const whereClause = buildMockPageWhereClause(userId, brandGuidelinesId, brandName);
+	const payload = {
+		userId,
+		brandGuidelinesId,
+		brandName,
+		theme,
+		htmlContent: build.html,
+		brandConfig: build.brandConfig ? JSON.stringify(build.brandConfig) : null,
+		slidesSnapshot: JSON.stringify(build.slidesUsed),
+		updatedAt: new Date()
+	};
+
+	const existing = await db.select().from(mockWebpages).where(whereClause).limit(1);
+	if (existing.length) {
+		const [updated] = await db
+			.update(mockWebpages)
+			.set(payload)
+			.where(eq(mockWebpages.id, existing[0].id))
+			.returning();
+		return updated;
+	}
+
+	const [inserted] = await db
+		.insert(mockWebpages)
+		.values({
+			...payload,
+			createdAt: payload.updatedAt
+		})
+		.returning();
+	return inserted;
+}
+
+function buildMockPageWhereClause(userId: string, brandGuidelinesId?: string | null, brandName?: string | null) {
+	if (brandGuidelinesId) {
+		return and(eq(mockWebpages.userId, userId), eq(mockWebpages.brandGuidelinesId, brandGuidelinesId));
+	}
+	if (brandName) {
+		return and(eq(mockWebpages.userId, userId), eq(mockWebpages.brandName, brandName));
+	}
+	throw new Error('brandGuidelinesId or brandName is required');
+}
+
+function formatMockPage(record: typeof mockWebpages.$inferSelect) {
+	return {
+		id: record.id,
+		theme: record.theme,
+		brandGuidelinesId: record.brandGuidelinesId,
+		brandName: record.brandName,
+		htmlContent: record.htmlContent,
+		brandConfig: safeParse(record.brandConfig),
+		slidesSnapshot: safeParse(record.slidesSnapshot),
+		updatedAt: record.updatedAt
+	};
+}
+
+function safeParse(value?: string | null) {
+	if (!value) return null;
+	try {
+		return JSON.parse(value);
+	} catch {
+		return null;
+	}
 }
 
 async function renderReactTemplate(

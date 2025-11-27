@@ -243,41 +243,23 @@ export async function buildFuturisticThemeConfig(
 }
 
 function derivePalette(brandData: any, slides: Slide[]) {
+	const brandPalette = collectBrandPalette(brandData);
+
 	const candidateColors = new Set<string>();
-
-	const pushColor = (value?: string) => {
-		const normalized = normalizeHex(value);
-		if (normalized) {
-			candidateColors.add(normalized);
-		}
-	};
-
 	slides.forEach((slide) => {
 		const matches = slide.html.match(HEX_COLOR_REGEX);
 		if (matches) {
-			matches.forEach(pushColor);
+			matches.forEach((value) => {
+				const normalized = normalizeHex(value);
+				if (normalized) {
+					candidateColors.add(normalized);
+				}
+			});
 		}
 	});
 
-	const brandColorSources = [
-		brandData?.primaryColor,
-		brandData?.secondaryColor,
-		brandData?.accentColor,
-		brandData?.textColor,
-		brandData?.backgroundColor,
-		brandData?.colors?.primary?.hex,
-		brandData?.colors?.secondary?.hex,
-		brandData?.colors?.accent?.hex,
-		brandData?.colors?.text?.hex,
-		brandData?.colors?.background?.hex,
-		...(Array.isArray(brandData?.palette) ? brandData.palette : []),
-		...(Array.isArray(brandData?.colorPalette) ? brandData.colorPalette : []),
-		...(Array.isArray(brandData?.brandColors) ? brandData.brandColors : [])
-	];
-	brandColorSources.forEach(pushColor);
-
 	const defaults = ['#3b82f6', '#8b5cf6', '#06b6d4', '#030617', '#f8fafc'];
-	const palette = Array.from(new Set([...candidateColors, ...defaults])).slice(0, 6);
+	const palette = Array.from(new Set([...brandPalette, ...candidateColors, ...defaults])).slice(0, 6);
 
 	const [primary, secondary, accent, background, text, muted] = [
 		palette[0] || defaults[0],
@@ -365,6 +347,56 @@ function normalizeHex(value?: string): string | null {
 	if (!value || typeof value !== 'string') return null;
 	const match = value.match(HEX_COLOR_REGEX);
 	return match ? match[0].toLowerCase() : null;
+}
+
+function collectBrandPalette(brandData?: Record<string, any>): string[] {
+	const collected: string[] = [];
+	const pushColor = (value?: string) => {
+		const hex = normalizeHex(value);
+		if (hex) collected.push(hex);
+	};
+
+	if (!brandData) return collected;
+
+	const rawColors = brandData.colors;
+	let parsedColors = rawColors;
+	if (typeof rawColors === 'string') {
+		try {
+			parsedColors = JSON.parse(rawColors);
+		} catch {
+			parsedColors = rawColors;
+		}
+	}
+
+	const semantic = parsedColors?.semantic;
+	if (semantic) {
+		Object.values(semantic).forEach((entry: any) => pushColor(entry?.hex || entry));
+	}
+	const neutral = parsedColors?.neutral;
+	if (neutral) {
+		Object.values(neutral).forEach((entry: any) => pushColor(entry?.hex || entry));
+	}
+	if (Array.isArray(parsedColors?.palette)) {
+		parsedColors.palette.forEach((color: string) => pushColor(color));
+	}
+
+	[
+		brandData?.primaryColor,
+		brandData?.secondaryColor,
+		brandData?.accentColor,
+		brandData?.textColor,
+		brandData?.backgroundColor,
+		brandData?.colors?.primary?.hex,
+		brandData?.colors?.secondary?.hex,
+		brandData?.colors?.accent?.hex,
+		brandData?.colors?.text?.hex,
+		brandData?.colors?.background?.hex,
+		...(Array.isArray(brandData?.palette) ? brandData.palette : []),
+		...(Array.isArray(brandData?.colorPalette) ? brandData.colorPalette : []),
+		...(Array.isArray(brandData?.brandColors) ? brandData.brandColors : [])
+	].forEach(pushColor);
+
+	return Array.from(new Set(collected));
 }
 
 function isSystemFont(font: string): boolean {
