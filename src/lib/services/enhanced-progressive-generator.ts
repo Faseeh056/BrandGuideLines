@@ -70,7 +70,7 @@ export async function generateEnhancedProgressiveStep(
 		
 		// Use the API key directly instead of env object
 		const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-			model: 'gemini-2.5-flash',
+			model: 'gemini-2.0-flash',
 			generationConfig: {
 				temperature: 0.8,
 				topP: 0.95,

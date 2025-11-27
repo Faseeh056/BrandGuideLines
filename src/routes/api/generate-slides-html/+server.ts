@@ -8,7 +8,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { convertHtmlToPptx, convertHtmlToPptxFromSlides, buildFilledHtmlSlides } from '$lib/services/html-slide-generator.js';
 import { adaptBrandDataForSlides, validateAdaptedData } from '$lib/services/brand-data-adapter.js';
-import { db, generatedSlides, brandGuidelines, brandBuilderChats } from '$lib/db';
+import { db, generatedSlides, brandGuidelines, brandBuilderChats, brandLogos } from '$lib/db';
 import { eq, and, desc } from 'drizzle-orm';
 import fs from 'fs';
 
@@ -93,7 +93,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Save HTML content to database
 		const brandName = requestData.brandName || brandInput.brandName || 'Unknown Brand';
 		const brandGuidelinesId = await findBrandGuidelinesId(session.user.id, brandName);
-		await saveSlidesToDatabase(htmlSlides, session.user.id, brandGuidelinesId, brandName);
+		await saveSlidesToDatabase(htmlSlides, session.user.id, brandGuidelinesId, brandName, brandInput);
 		
 		// Generate PPTX
 		const pptxPath = await convertHtmlToPptx(brandInput, templateSet);
@@ -544,16 +544,78 @@ function getIconForApplication(name: string): string {
 // Validation now handled by brand-data-adapter.ts
 
 /**
+ * Extract logo from brand data or fetch from brandLogos table
+ */
+async function extractLogoFromBrandData(brandInput: any, brandGuidelinesId?: string): Promise<string | null> {
+	if (!brandInput) {
+		// If no brandInput but we have brandGuidelinesId, try to fetch from brandLogos table
+		if (brandGuidelinesId) {
+			try {
+				const brandLogo = await db
+					.select()
+					.from(brandLogos)
+					.where(eq(brandLogos.id, brandGuidelinesId))
+					.limit(1);
+				
+				if (brandLogo.length > 0 && brandLogo[0].logo) {
+					return brandLogo[0].logo;
+				}
+			} catch (error) {
+				console.warn('Failed to fetch logo from brandLogos table:', error);
+			}
+		}
+		return null;
+	}
+	
+	// Try logoFiles array first (new format)
+	if (Array.isArray(brandInput.logoFiles) && brandInput.logoFiles.length > 0) {
+		const firstLogo = brandInput.logoFiles[0];
+		if (firstLogo?.fileData) return firstLogo.fileData;
+		if (firstLogo?.data) return firstLogo.data;
+	}
+	
+	// Try logo object
+	if (brandInput.logo?.primaryLogoUrl) return brandInput.logo.primaryLogoUrl;
+	if (brandInput.logo?.primary) return brandInput.logo.primary;
+	
+	// Try direct logoData
+	if (brandInput.logoData) return brandInput.logoData;
+	
+	// Fallback: try to fetch from brandLogos table if brandGuidelinesId is available
+	if (brandGuidelinesId) {
+		try {
+			const brandLogo = await db
+				.select()
+				.from(brandLogos)
+				.where(eq(brandLogos.id, brandGuidelinesId))
+				.limit(1);
+			
+			if (brandLogo.length > 0 && brandLogo[0].logo) {
+				return brandLogo[0].logo;
+			}
+		} catch (error) {
+			console.warn('Failed to fetch logo from brandLogos table:', error);
+		}
+	}
+	
+	return null;
+}
+
+/**
  * Save HTML slides to database
  */
 async function saveSlidesToDatabase(
 	slides: Array<{ name: string; html: string }>, 
 	userId: string, 
 	brandGuidelinesId?: string,
-	brandName?: string
+	brandName?: string,
+	brandInput?: any
 ): Promise<void> {
 	try {
 		console.log(`💾 Saving ${slides.length} slides to database...`);
+		
+		// Extract logo from brand data or fetch from brandLogos table
+		const logoData = await extractLogoFromBrandData(brandInput, brandGuidelinesId);
 		
 		// Determine slide type and title from filename
 		const getSlideInfo = (filename: string) => {
@@ -585,6 +647,7 @@ async function saveSlidesToDatabase(
 				slideNumber: slideInfo.order,
 				htmlContent: slide.html,
 				slideType: slideInfo.type,
+				logo: logoData, // Save logo with each slide
 				slideData: JSON.stringify({
 					filename: slide.name,
 					contentLength: slide.html.length,
@@ -593,7 +656,7 @@ async function saveSlidesToDatabase(
 				status: 'completed'
 			});
 			
-			console.log(`✓ Saved slide ${i + 1}: ${slideInfo.title}`);
+			console.log(`✓ Saved slide ${i + 1}: ${slideInfo.title}${logoData ? ' (with logo)' : ''}`);
 		}
 		
 		console.log(`✅ Successfully saved ${slides.length} slides to database`);

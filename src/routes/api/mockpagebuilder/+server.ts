@@ -2,7 +2,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { and, eq } from 'drizzle-orm';
-import { db, mockWebpages } from '$lib/db';
+import { db, mockWebpages, brandGuidelines } from '$lib/db';
 import type { ThemeKey } from '$lib/types/theme-content';
 import { buildMinimalisticFromSlides } from './buildminimalsitic';
 import { buildMaximalisticPage } from './buildmaximalistic';
@@ -89,8 +89,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
-		const build = await buildThemePage(normalizedTheme, brandData, slides);
-		const savedPage = await saveMockPage(session.user.id, brandData, normalizedTheme, build);
+		// Enrich brandData with logo information from database if missing
+		const enrichedBrandData = await enrichBrandDataWithLogo(session.user.id, brandData);
+
+		const build = await buildThemePage(normalizedTheme, enrichedBrandData, slides);
+		const savedPage = await saveMockPage(session.user.id, enrichedBrandData, normalizedTheme, build);
 
 		return json({
 			success: true,
@@ -285,6 +288,107 @@ function safeParse(value?: string | null) {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Enrich brandData with logo information from database if logoUrl is missing
+ */
+async function enrichBrandDataWithLogo(userId: string, brandData: any): Promise<any> {
+	// If logoUrl already exists, return as is
+	if (brandData?.logoUrl || brandData?.logo_url || brandData?.logo?.primaryLogoUrl) {
+		return brandData;
+	}
+
+	// Try to fetch from database using guidelineId
+	const guidelineId = brandData?.guidelineId || brandData?.brandGuidelinesId || brandData?.guideline_id;
+	if (guidelineId) {
+		try {
+			const [guideline] = await db
+				.select()
+				.from(brandGuidelines)
+				.where(and(eq(brandGuidelines.id, guidelineId), eq(brandGuidelines.userId, userId)))
+				.limit(1);
+
+			if (guideline) {
+				return extractLogoFromGuideline(guideline, brandData);
+			}
+		} catch (error) {
+			console.warn('[mockpagebuilder] Failed to fetch guideline for logo:', error);
+		}
+	}
+
+	// Try to fetch by brandName if guidelineId not available
+	const brandName = brandData?.brandName || brandData?.brand_name;
+	if (brandName) {
+		try {
+			const [guideline] = await db
+				.select()
+				.from(brandGuidelines)
+				.where(and(eq(brandGuidelines.brandName, brandName), eq(brandGuidelines.userId, userId)))
+				.orderBy(brandGuidelines.updatedAt)
+				.limit(1);
+
+			if (guideline) {
+				return extractLogoFromGuideline(guideline, brandData);
+			}
+		} catch (error) {
+			console.warn('[mockpagebuilder] Failed to fetch guideline by brandName for logo:', error);
+		}
+	}
+
+	return brandData;
+}
+
+/**
+ * Extract logo URL/data from brand guideline and merge into brandData
+ */
+function extractLogoFromGuideline(guideline: typeof brandGuidelines.$inferSelect, brandData: any): any {
+	const enriched = { ...brandData };
+
+	// Try to get logo from logoFiles (new format)
+	if (guideline.logoFiles) {
+		try {
+			const logoFiles = JSON.parse(guideline.logoFiles);
+			if (Array.isArray(logoFiles) && logoFiles.length > 0) {
+				const firstLogo = logoFiles[0];
+				const logoData = firstLogo?.fileData || firstLogo?.data || firstLogo?.fileUrl || firstLogo?.filePath;
+				
+				if (logoData) {
+					enriched.logoUrl = logoData;
+					enriched.logo_url = logoData;
+					enriched.logoFiles = logoFiles;
+					if (!enriched.logo) {
+						enriched.logo = {
+							primaryLogoUrl: logoData,
+							primary: logoData
+						};
+					}
+				}
+			}
+		} catch (error) {
+			console.warn('[mockpagebuilder] Failed to parse logoFiles:', error);
+		}
+	}
+
+	// Fallback to logoData (base64)
+	if (!enriched.logoUrl && guideline.logoData) {
+		enriched.logoUrl = guideline.logoData;
+		enriched.logo_url = guideline.logoData;
+		if (!enriched.logo) {
+			enriched.logo = {
+				primaryLogoUrl: guideline.logoData,
+				primary: guideline.logoData
+			};
+		}
+	}
+
+	// Fallback to logoPath (legacy)
+	if (!enriched.logoUrl && guideline.logoPath) {
+		enriched.logoUrl = guideline.logoPath;
+		enriched.logo_url = guideline.logoPath;
+	}
+
+	return enriched;
 }
 
 async function renderReactTemplate(

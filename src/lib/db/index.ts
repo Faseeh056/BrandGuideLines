@@ -23,6 +23,7 @@ export {
 	scrapedWebpages,
 	complianceIssues,
 	auditSessions,
-	logoAssets,
+	brandBuilderChats,
+	brandLogos,
 	mockWebpages
 } from './schema.js';

@@ -1,9 +1,9 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/db';
-import { brandBuilderChats } from '$lib/db/schema';
-import { and, eq } from 'drizzle-orm';
-import { saveLogoAsset, getLogoAssetById } from '$lib/server/logo-storage';
+import { brandBuilderChats, brandLogos, brandGuidelines } from '$lib/db/schema';
+import { and, eq, desc } from 'drizzle-orm';
+import { getLogoAssetById } from '$lib/server/logo-storage';
 
 type LogoSnapshot = {
 	brandName: string | null;
@@ -47,44 +47,39 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 	const filename: string | null = body?.filename || null;
 	let mimeType: string | null = body?.mimeType || null;
 
-	if (!storageId && fileUrl && typeof fileUrl === 'string') {
-		const match = fileUrl.match(/\/api\/logos\/([a-f0-9-]+)/i);
-		if (match) {
-			storageId = match[1];
+	// Extract logo data directly - prefer base64 data URL
+	let logoData: string | null = null;
+	
+	if (providedLogoData && providedLogoData.startsWith('data:')) {
+		// Use logo data directly
+		logoData = providedLogoData;
+		const parsed = providedLogoData.match(/^data:([^;]+);base64,(.+)$/);
+		if (parsed) {
+			mimeType = parsed[1];
+		}
+	} else if (fileUrl) {
+		// If fileUrl is provided, use it as logo data
+		logoData = fileUrl;
+	} else if (storageId) {
+		// Legacy: try to get from logo-storage for backward compatibility
+		try {
+			const asset = await getLogoAssetById(storageId);
+			if (asset?.data) {
+				// Convert buffer to base64 data URL
+				const base64 = asset.data.toString('base64');
+				logoData = `data:${asset.mimeType};base64,${base64}`;
+				mimeType = asset.mimeType;
+			}
+		} catch (error) {
+			console.warn('Failed to get logo from storage:', error);
 		}
 	}
-
-	if (!storageId && providedLogoData && providedLogoData.startsWith('data:')) {
-		const parsed = providedLogoData.match(/^data:([^;]+);base64,(.+)$/);
-		if (!parsed) {
-			return json({ success: false, error: 'Invalid logo data provided' }, { status: 400 });
-		}
-		const [, parsedMime, base64] = parsed;
-		mimeType = parsedMime;
-		const buffer = Buffer.from(base64, 'base64');
-		const saved = await saveLogoAsset({
-			buffer,
-			filename: filename || 'logo.svg',
-			mimeType: mimeType || 'image/png',
-			userId: session.user.id,
-			source: body?.source || 'unknown'
-		});
-		storageId = saved.id;
-		fileUrl = saved.fileUrl;
-	} else if (!storageId && !fileUrl) {
+	
+	if (!logoData) {
 		return json(
-			{ success: false, error: 'A stored logo reference is required' },
+			{ success: false, error: 'Logo data is required' },
 			{ status: 400 }
 		);
-	}
-
-	if (!fileUrl && storageId) {
-		fileUrl = `/api/logos/${storageId}`;
-	}
-
-	if (!mimeType && storageId) {
-		const asset = await getLogoAssetById(storageId);
-		mimeType = asset?.mimeType || null;
 	}
 
 	const brandName: string | null =
@@ -94,17 +89,22 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 		brandName,
 		source: (body?.source as LogoSnapshot['source']) || 'unknown',
 		filename,
-		mimeType: mimeType || inferMimeType(providedLogoData),
+		mimeType: mimeType || inferMimeType(logoData),
 		userId: session.user.id,
 		userName: session.user.name || session.user.email,
 		acceptedAt: new Date().toISOString(),
-		assetId: storageId!,
-		fileUrl: fileUrl!
+		assetId: storageId || '',
+		fileUrl: fileUrl || logoData
 	};
 
-	const updatePayload: { latestLogoSnapshot: string; updatedAt: Date; brandName?: string | null } =
-	{
+	const updatePayload: { 
+		latestLogoSnapshot: string; 
+		logo: string | null;
+		updatedAt: Date; 
+		brandName?: string | null 
+	} = {
 		latestLogoSnapshot: JSON.stringify(snapshot),
+		logo: logoData, // Store logo directly in chat table
 		updatedAt: new Date()
 	};
 
@@ -116,10 +116,67 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 		.update(brandBuilderChats)
 		.set(updatePayload)
 		.where(and(eq(brandBuilderChats.id, chatId), eq(brandBuilderChats.userId, session.user.id)))
-		.returning({ id: brandBuilderChats.id });
+		.returning({ id: brandBuilderChats.id, brandName: brandBuilderChats.brandName });
 
 	if (!updated) {
 		return json({ success: false, error: 'Chat not found' }, { status: 404 });
+	}
+
+	// Also save logo to brandLogos table if we can find the brandGuidelinesId
+	// Try to find brandGuidelines by brandName (chatId should match brandGuidelines.id)
+	try {
+		// First try: use chatId as brandGuidelinesId (if they match)
+		let brandGuidelinesId: string | null = chatId;
+		
+		// Verify that this ID exists in brandGuidelines
+		const guidelineCheck = await db
+			.select({ id: brandGuidelines.id })
+			.from(brandGuidelines)
+			.where(and(
+				eq(brandGuidelines.id, chatId),
+				eq(brandGuidelines.userId, session.user.id)
+			))
+			.limit(1);
+
+		// If chatId doesn't match brandGuidelines, try to find by brandName
+		if (guidelineCheck.length === 0 && brandName) {
+			const guidelineByName = await db
+				.select({ id: brandGuidelines.id })
+				.from(brandGuidelines)
+				.where(and(
+					eq(brandGuidelines.brandName, brandName),
+					eq(brandGuidelines.userId, session.user.id)
+				))
+				.orderBy(desc(brandGuidelines.createdAt))
+				.limit(1);
+			
+			if (guidelineByName.length > 0) {
+				brandGuidelinesId = guidelineByName[0].id;
+			} else {
+				brandGuidelinesId = null;
+			}
+		}
+
+		// Save to brandLogos table if we have a valid brandGuidelinesId
+		if (brandGuidelinesId) {
+			await db
+				.insert(brandLogos)
+				.values({
+					id: brandGuidelinesId, // Same as brand_guidelines.id
+					logo: logoData
+				})
+				.onConflictDoUpdate({
+					target: brandLogos.id,
+					set: {
+						logo: logoData,
+						updatedAt: new Date()
+					}
+				});
+			console.log('✅ Logo saved to brandLogos table');
+		}
+	} catch (error) {
+		console.warn('⚠️ Failed to save logo to brandLogos table:', error);
+		// Don't fail the request if brandLogos save fails
 	}
 
 	return json({ success: true, snapshot });

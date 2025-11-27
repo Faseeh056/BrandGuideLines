@@ -5,6 +5,35 @@ import type { BrandConfig } from '../../../../react-templates/Minimalistic/src/s
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Extract logo URL from brandData, checking multiple possible locations
+ */
+function extractLogoUrl(brandData?: any): string {
+	if (!brandData) return '';
+	
+	// Direct logoUrl fields
+	if (brandData.logoUrl) return brandData.logoUrl;
+	if (brandData.logo_url) return brandData.logo_url;
+	
+	// From logo object
+	if (brandData.logo?.primaryLogoUrl) return brandData.logo.primaryLogoUrl;
+	if (brandData.logo?.primary) return brandData.logo.primary;
+	
+	// From logoFiles array (new format)
+	if (Array.isArray(brandData.logoFiles) && brandData.logoFiles.length > 0) {
+		const firstLogo = brandData.logoFiles[0];
+		if (firstLogo?.fileData) return firstLogo.fileData;
+		if (firstLogo?.data) return firstLogo.data;
+		if (firstLogo?.fileUrl) return firstLogo.fileUrl;
+		if (firstLogo?.filePath) return firstLogo.filePath;
+	}
+	
+	// From logoData (base64)
+	if (brandData.logoData) return brandData.logoData;
+	
+	return '';
+}
+
 export interface MinimalisticSlide {
 	name: string;
 	html: string;
@@ -100,7 +129,7 @@ export async function buildMinimalisticFromSlides(options: MinimalisticBuildOpti
 	const brandConfig: BrandConfig = {
 		brandName: insights.brandName,
 		brandDescription: copy.heroDescription || insights.description,
-		logoUrl: options.brandData?.logoUrl || options.brandData?.logo_url || '',
+		logoUrl: extractLogoUrl(options.brandData),
 		colorPalette: buildColorPalette(primary, secondary, accent, background, text),
 		fonts: {
 			heading: insights.fonts.heading,

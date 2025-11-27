@@ -1139,10 +1139,23 @@ ${customPrompt}`;
 		completeGuidelines: BrandGuidelinesSpec;
 		savedGuidelines?: any;
 	}) {
+		console.log('[builder] handleProgressiveComplete called with:', {
+			hasSavedGuidelines: !!data.savedGuidelines,
+			guidelineId: data.savedGuidelines?.id,
+			savedGuidelines: data.savedGuidelines
+		});
+
 		// Store the step history content for display
 		comprehensiveGuidelines = data.completeGuidelines;
 		// Store step history for custom display
 		progressiveStepHistory = data.stepHistory;
+
+		const guidelineId = data.savedGuidelines?.id;
+		if (!guidelineId) {
+			console.error('[builder] ⚠️ WARNING: No guidelineId received from savedGuidelines!', {
+				savedGuidelines: data.savedGuidelines
+			});
+		}
 
 		// Store MINIMAL data for preview page (avoid sessionStorage quota issues)
 		const previewData = {
@@ -1153,20 +1166,27 @@ ${customPrompt}`;
 			// Remove logoFiles - contains large base64 data, will be fetched from DB
 			// logoFiles: logoFiles,
 			brandInput: data.brandInput,
-			guidelineId: data.savedGuidelines?.id // Store just the ID for fetching from DB
+			guidelineId: guidelineId // Store just the ID for fetching from DB
 		};
+
+		console.log('[builder] Saving preview data to sessionStorage:', {
+			guidelineId: previewData.guidelineId,
+			brandName: previewData.brandName
+		});
 
 		try {
 			sessionStorage.setItem('preview_brand_data', JSON.stringify(previewData));
+			console.log('[builder] ✅ Successfully saved preview_brand_data to sessionStorage');
 		} catch (error: any) {
 			// If quota exceeded, try without stepHistory
 			console.error('SessionStorage quota exceeded, trying minimal data:', error);
 			const minimalData = {
 				brandName,
 				brandDomain,
-				guidelineId: data.savedGuidelines?.id
+				guidelineId: guidelineId
 			};
 			sessionStorage.setItem('preview_brand_data', JSON.stringify(minimalData));
+			console.log('[builder] ✅ Saved minimal preview data to sessionStorage');
 		}
 		sessionStorage.setItem('preview_brand_saved', 'false');
 
@@ -1182,6 +1202,9 @@ ${customPrompt}`;
 		const structuredData = data.completeGuidelines || {};
 		const remoteChatId =
 			activeChatStorageKey && activeChatStorageKey !== LOCAL_CHAT_ID ? activeChatStorageKey : undefined;
+
+		const guidelineId = data.savedGuidelines?.id;
+		console.log('[builder] Creating previewBrandData with guidelineId:', guidelineId);
 
 		const previewBrandData = {
 			...structuredData,
@@ -1201,9 +1224,15 @@ ${customPrompt}`;
 			logoFiles: logoFiles.length > 0 ? logoFiles : (structuredData as any)?.logoFiles || [],
 			stepHistory: data.stepHistory,
 			brandInput: data.brandInput,
-			guidelineId: data.savedGuidelines?.id,
+			guidelineId: guidelineId, // Ensure this is set
 			chatId: remoteChatId
 		};
+
+		console.log('[builder] previewBrandData created:', {
+			hasGuidelineId: !!previewBrandData.guidelineId,
+			guidelineId: previewBrandData.guidelineId,
+			brandName: previewBrandData.brandName
+		});
 
 		const rawSlides =
 			(Array.isArray((structuredData as any)?.slidesHtml) && (structuredData as any).slidesHtml) ||
@@ -1239,6 +1268,13 @@ ${customPrompt}`;
 
 		if (!tempSaveSuccess) {
 			console.warn('[builder] Failed to persist temp brand data for preview.');
+		} else {
+			console.log('[builder] ✅ Temp brand data saved successfully for preview:', {
+				hasBrandData: !!previewBrandData,
+				guidelineId: previewBrandData.guidelineId,
+				brandName: previewBrandData.brandName,
+				slidesCount: slidesSnapshot.length
+			});
 		}
 
 		// Redirect to new HTML-based preview page

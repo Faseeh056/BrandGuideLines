@@ -63,8 +63,8 @@ export async function analyzeBrandPrompt(userPrompt: string): Promise<PromptAnal
 		}
 		
 		// Use the API key directly instead of env object
-		// Use gemini-2.5-flash
-		const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: 'gemini-2.5-flash' });
+		// Use gemini-2.0-flash
+		const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 		const prompt = createAnalysisPrompt(userPrompt);
 

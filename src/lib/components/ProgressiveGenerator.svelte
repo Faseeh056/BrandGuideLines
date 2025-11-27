@@ -655,10 +655,21 @@
 			}
 
 			const result = await response.json();
-			console.log('API Response result:', result);
+			console.log('[ProgressiveGenerator] API Response result:', {
+				success: result.success,
+				hasBrandGuidelines: !!result.brandGuidelines,
+				hasSavedGuidelines: !!result.savedGuidelines,
+				guidelineId: result.savedGuidelines?.id,
+				savedGuidelines: result.savedGuidelines
+			});
 
 			if (result.success && result.brandGuidelines) {
-				console.log('Generation completed successfully, calling onComplete');
+				if (!result.savedGuidelines?.id) {
+					console.error('[ProgressiveGenerator] ⚠️ WARNING: savedGuidelines missing or has no ID!', {
+						savedGuidelines: result.savedGuidelines
+					});
+				}
+				console.log('[ProgressiveGenerator] Generation completed successfully, calling onComplete with guidelineId:', result.savedGuidelines?.id);
 				onComplete({
 					stepHistory: cleanStepHistory,
 					brandInput: brandInput,

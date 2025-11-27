@@ -5,7 +5,7 @@ import { env } from '$lib/env';
 import { saveLogoAsset } from '$lib/server/logo-storage';
 
 /**
- * API endpoint for generating professional logos using Gemini 2.5 Flash Image model
+ * API endpoint for generating professional logos using Gemini 2.0 Flash Image model
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -48,9 +48,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Initialize Gemini
 		const genAI = new GoogleGenerativeAI(apiKey);
 		
-		// Use gemini-2.5-flash for generating SVG logo code
-		const model = genAI.getGenerativeModel({ 
-			model: 'gemini-2.5-flash'
+		// Use gemini-2.0-flash for generating SVG logo code
+		const model = genAI.getGenerativeModel({
+			model: 'gemini-2.0-flash'
 		});
 
 		// Build comprehensive prompt for logo generation

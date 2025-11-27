@@ -106,20 +106,7 @@ export const brandGuidelines = pgTable('brand_guidelines', {
 		.$defaultFn(() => new Date())
 });
 
-// Stored logo assets (binary blobs referenced via URLs)
-export const logoAssets = pgTable('logo_assets', {
-	id: text('id')
-		.primaryKey()
-		.$defaultFn(() => crypto.randomUUID()),
-	userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
-	filename: text('filename').notNull(),
-	mimeType: text('mime_type').notNull(),
-	data: text('data').notNull(),
-	source: text('source'),
-	createdAt: timestamp('created_at', { mode: 'date' })
-		.notNull()
-		.$defaultFn(() => new Date())
-});
+// Logo assets table removed - logos are now stored directly in brandBuilderChats and generatedSlides tables
 
 export const mockWebpages = pgTable('mock_webpages', {
 	id: text('id')
@@ -371,6 +358,7 @@ export const generatedSlides = pgTable('generated_slides', {
 	svelteContent: text('svelteContent'), // JSON string of Svelte slide data (SlideData object)
 	slideType: text('slideType').notNull(), // e.g., 'title', 'content', 'thank-you', etc.
 	slideData: text('slideData'), // JSON string of slide-specific data (content, styling, etc.)
+	logo: text('logo'), // Base64 encoded logo image data for this specific slide
 	thumbnailPath: text('thumbnailPath'), // Path to slide thumbnail image
 	thumbnailData: text('thumbnailData'), // Base64 encoded thumbnail image
 	generationSettings: text('generationSettings'), // JSON string of settings used for generation
@@ -398,6 +386,21 @@ export const brandBuilderChats = pgTable('brand_builder_chats', {
 	messages: text('messages'),
 	state: text('state'),
 	latestLogoSnapshot: text('latest_logo_snapshot'),
+	logo: text('logo'), // Base64 encoded logo image data for this chat session
+	createdAt: timestamp('created_at', { mode: 'date' })
+		.notNull()
+		.$defaultFn(() => new Date()),
+	updatedAt: timestamp('updated_at', { mode: 'date' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
+// Brand logos table - stores logo for each brand guideline (chatId = brandGuidelinesId)
+export const brandLogos = pgTable('brand_logos', {
+	id: text('id')
+		.primaryKey()
+		.references(() => brandGuidelines.id, { onDelete: 'cascade' }), // Same as brand_guidelines.id
+	logo: text('logo').notNull(), // Base64 encoded logo image data
 	createdAt: timestamp('created_at', { mode: 'date' })
 		.notNull()
 		.$defaultFn(() => new Date()),

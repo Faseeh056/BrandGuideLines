@@ -20,24 +20,19 @@ export interface BrandConfig {
   industry: string;
   stats: Array<{ value: string; label: string }>;
   features: Array<{ title: string; description: string }>;
-  contact: {
-    email?: string;
-    phone?: string;
-    address?: string;
-  };
+  contact: Record<string, any>;
 }
 
-// Default config
 const defaultConfig: BrandConfig = {
-  brandName: "GROOVE",
-  brandDescription: "Fun, Fresh, and Funky",
+  brandName: "FUNKIFY",
+  brandDescription: "Bold. Funky. Fearless. Express yourself with fashion that speaks your language.",
   logoUrl: "",
   colorPalette: {
-    primary: "#fcd34d",
-    secondary: "#37b7c3",
-    accent: "#ef4444",
-    background: "#ffffff",
-    text: "#0a0a0a",
+    primary: "#9333ea",
+    secondary: "#ec4899",
+    accent: "#f59e0b",
+    background: "#faf5ff",
+    text: "#1f2937",
   },
   fonts: {
     heading: "Inter, sans-serif",
@@ -47,16 +42,16 @@ const defaultConfig: BrandConfig = {
     hero: "",
     gallery: [],
   },
-  industry: "Entertainment",
+  industry: "Fashion",
   stats: [
-    { value: "50k+", label: "Happy Vibes" },
-    { value: "200+", label: "Events" },
-    { value: "24/7", label: "Fun" },
+    { value: "24/7", label: "Creative Flow" },
+    { value: "120+", label: "Happy Clients" },
+    { value: "12", label: "Brand Touchpoints" },
   ],
   features: [
-    { title: "Unique Style", description: "Stand out from the crowd" },
-    { title: "Creative Energy", description: "Bring excitement to life" },
-    { title: "Always Fresh", description: "New ideas every day" },
+    { title: "Joyful Expressions", description: "Turn every interaction into a playful moment." },
+    { title: "Bold Voice", description: "A brand story that never whispers." },
+    { title: "Culture Ready", description: "Made for social, retail, and experiential drops." },
   ],
   contact: {},
 };

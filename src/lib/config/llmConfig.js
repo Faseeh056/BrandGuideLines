@@ -12,7 +12,7 @@ export const LLM_CONFIG = {
   providers: {
     google: {
       name: 'Google AI (Gemini)',
-      models: ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+      models: ['gemini-flash-latest', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
       defaultModel: 'gemini-flash-latest',
       maxTokens: 4000,
       temperature: 0.2,

@@ -1,5 +1,5 @@
-import { db, logoAssets } from '$lib/db';
-import { eq } from 'drizzle-orm';
+// logoAssets table has been removed - logos are now stored in brandLogos table
+// This function now converts buffer to base64 data URL for direct use
 
 type SaveLogoAssetParams = {
 	buffer: Buffer;
@@ -9,53 +9,29 @@ type SaveLogoAssetParams = {
 	source?: string | null;
 };
 
-const buildLogoUrl = (id: string) => `/api/logos/${id}`;
-
 export async function saveLogoAsset({
 	buffer,
 	filename,
-	mimeType,
-	userId,
-	source
+	mimeType
 }: SaveLogoAssetParams): Promise<{ id: string; fileUrl: string }> {
-	const [inserted] = await db
-		.insert(logoAssets)
-		.values({
-			filename,
-			mimeType,
-			data: buffer,
-			userId: userId || null,
-			source: source || null
-		})
-		.returning({ id: logoAssets.id });
-
-	const id = inserted?.id;
-	if (!id) {
-		throw new Error('Failed to persist logo asset');
-	}
-
+	// Convert buffer to base64 data URL instead of storing in database
+	const base64 = buffer.toString('base64');
+	const dataUrl = `data:${mimeType};base64,${base64}`;
+	
+	// Return a mock ID and the data URL
+	// The dataUrl can be used directly without needing an ID
 	return {
-		id,
-		fileUrl: buildLogoUrl(id)
+		id: `data-url-${Date.now()}`, // Mock ID for compatibility
+		fileUrl: dataUrl
 	};
 }
 
 export async function getLogoAssetById(
 	id: string
 ): Promise<{ id: string; filename: string; mimeType: string; data: Buffer } | null> {
-	if (!id) return null;
-	const rows = await db
-		.select({
-			id: logoAssets.id,
-			filename: logoAssets.filename,
-			mimeType: logoAssets.mimeType,
-			data: logoAssets.data
-		})
-		.from(logoAssets)
-		.where(eq(logoAssets.id, id))
-		.limit(1);
-
-	return rows?.[0] || null;
+	// LogoAssets table no longer exists - return null for backward compatibility
+	console.warn('getLogoAssetById called but logoAssets table has been removed');
+	return null;
 }
 
 export function getLogoUrlFromId(id?: string | null): string | null {

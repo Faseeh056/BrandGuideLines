@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/db';
-import { brandGuidelines } from '$lib/db/schema';
+import { brandGuidelines, brandLogos } from '$lib/db/schema';
 import { generateComprehensiveBrandGuidelines } from '$lib/services/gemini';
 import { performGroundingSearch } from '$lib/services/grounding-search';
 import { PowerPointGenerator } from '$lib/services/powerpoint-generator';
@@ -360,11 +360,43 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			})
 			.returning();
 
-		return json({
+		// Save logo to brandLogos table (id = brandGuidelines.id)
+		if (logoData && savedGuidelines[0]?.id) {
+			try {
+				await db
+					.insert(brandLogos)
+					.values({
+						id: savedGuidelines[0].id, // Same as brand_guidelines.id
+						logo: logoData
+					})
+					.onConflictDoUpdate({
+						target: brandLogos.id,
+						set: {
+							logo: logoData,
+							updatedAt: new Date()
+						}
+					});
+				console.log('✅ Logo saved to brandLogos table');
+			} catch (error) {
+				console.warn('⚠️ Failed to save logo to brandLogos table:', error);
+				// Don't fail the request if logo save fails
+			}
+		}
+
+		const responseData = {
 			success: true,
 			brandGuidelines: brandGuidelinesSpec,
 			savedGuidelines: savedGuidelines[0]
+		};
+
+		console.log('[comprehensive API] Returning response with savedGuidelines:', {
+			hasSavedGuidelines: !!savedGuidelines[0],
+			guidelineId: savedGuidelines[0]?.id,
+			brandName: savedGuidelines[0]?.brandName,
+			fullSavedGuidelines: savedGuidelines[0]
 		});
+
+		return json(responseData);
 	} catch (error) {
 		console.error('Error generating comprehensive brand guidelines:', error);
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';

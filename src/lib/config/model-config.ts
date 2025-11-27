@@ -59,7 +59,7 @@ export const GROQ_LIMITS: Record<string, ModelLimits> = {
 // ═══════════════════════════════════════════════════════════════
 
 export const GEMINI_LIMITS: Record<string, ModelLimits> = {
-	'gemini-2.5-flash': {
+	'gemini-2.0-flash': {
 		rpm: 2000, // Much higher limits
 		rpd: 50000,
 		tpm: 1000000,
@@ -77,34 +77,34 @@ export const FALLBACK_CHAINS: Record<TaskType, ModelConfig[]> = {
 		{ model: 'qwen/qwen3-32b', provider: 'groq' }, // 60 RPM - fastest!
 		{ model: 'llama-3.1-8b-instant', provider: 'groq' }, // 30 RPM
 		{ model: 'llama-3.3-70b-versatile', provider: 'groq' }, // 30 RPM
-		{ model: 'gemini-2.5-flash', provider: 'gemini' } // Unlimited backup
+			{ model: 'gemini-2.0-flash', provider: 'gemini' } // Unlimited backup
 	],
 
 	// Complex creative task - use best reasoning models
 	layoutDesign: [
 		{ model: 'llama-3.3-70b-versatile', provider: 'groq' }, // Best reasoning + 12K TPM
 		{ model: 'openai/gpt-oss-120b', provider: 'groq' }, // Good reasoning
-		{ model: 'gemini-2.5-flash', provider: 'gemini' } // Fast and reliable
+			{ model: 'gemini-2.0-flash', provider: 'gemini' } // Fast and reliable
 	],
 
 	// Vision task - only models with vision capability
 	logoAnalysis: [
 		{ model: 'meta-llama/llama-4-scout-17b-16e-instruct', provider: 'groq' }, // 30K TPM - excellent for vision
-		{ model: 'gemini-2.5-flash', provider: 'gemini' } // Vision backup
+			{ model: 'gemini-2.0-flash', provider: 'gemini' } // Vision backup
 	],
 
 	// Logical decision - use fast models
 	overflowDecision: [
 		{ model: 'qwen/qwen3-32b', provider: 'groq' }, // Fast
 		{ model: 'llama-3.3-70b-versatile', provider: 'groq' }, // Good at logic
-		{ model: 'gemini-2.5-flash', provider: 'gemini' } // Backup
+			{ model: 'gemini-2.0-flash', provider: 'gemini' } // Backup
 	],
 
 	// Rule-based validation - use fast models
 	validation: [
 		{ model: 'qwen/qwen3-32b', provider: 'groq' }, // Fastest
 		{ model: 'llama-3.1-8b-instant', provider: 'groq' }, // Fast backup
-		{ model: 'gemini-2.5-flash', provider: 'gemini' } // Always available
+			{ model: 'gemini-2.0-flash', provider: 'gemini' } // Always available
 	]
 };
 

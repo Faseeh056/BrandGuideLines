@@ -76,6 +76,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				slideNumber: slide.slideNumber,
 				slideType: slide.slideType,
 				htmlContent: slide.htmlContent,
+				logo: slide.logo, // Include logo for each slide
 				slideData: slide.slideData ? JSON.parse(slide.slideData) : null,
 				status: slide.status,
 				createdAt: slide.createdAt,

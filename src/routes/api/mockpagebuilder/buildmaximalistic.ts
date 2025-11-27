@@ -6,6 +6,35 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const HEX_COLOR_REGEX = /#(?:[0-9a-fA-F]{3}){1,2}\b/g;
 
 /**
+ * Extract logo URL from brandData, checking multiple possible locations
+ */
+function extractLogoUrl(brandData?: any): string {
+	if (!brandData) return '';
+	
+	// Direct logoUrl fields
+	if (brandData.logoUrl) return brandData.logoUrl;
+	if (brandData.logo_url) return brandData.logo_url;
+	
+	// From logo object
+	if (brandData.logo?.primaryLogoUrl) return brandData.logo.primaryLogoUrl;
+	if (brandData.logo?.primary) return brandData.logo.primary;
+	
+	// From logoFiles array (new format)
+	if (Array.isArray(brandData.logoFiles) && brandData.logoFiles.length > 0) {
+		const firstLogo = brandData.logoFiles[0];
+		if (firstLogo?.fileData) return firstLogo.fileData;
+		if (firstLogo?.data) return firstLogo.data;
+		if (firstLogo?.fileUrl) return firstLogo.fileUrl;
+		if (firstLogo?.filePath) return firstLogo.filePath;
+	}
+	
+	// From logoData (base64)
+	if (brandData.logoData) return brandData.logoData;
+	
+	return '';
+}
+
+/**
  * Lightweight representation of the React template BrandConfig so we can
  * hydrate the Maximalistic UI without importing from the React bundle.
  */
@@ -221,7 +250,7 @@ function extractBrandInfo(slides: SlideData[], brandData: any, theme: ThemeKey):
 		industry,
 		fonts,
 		palette: colors,
-		logoUrl: brandData?.logo_url || brandData?.logoUrl || '',
+		logoUrl: extractLogoUrl(brandData),
 		summary: slideText.slice(0, 2000),
 		stats,
 		features

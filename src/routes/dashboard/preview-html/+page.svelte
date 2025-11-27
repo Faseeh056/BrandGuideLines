@@ -107,13 +107,245 @@ function migrateLegacyPreviewData(): Omit<TempBrandData, 'timestamp'> | null {
 
 onMount(async () => {
 	try {
+		console.log('[preview-html] onMount started');
+		
+		// Check if we have a specific guidelineId from sessionStorage (from My Brands preview)
+		const currentGuidelineId = typeof sessionStorage !== 'undefined' 
+			? sessionStorage.getItem('current_guideline_id') 
+			: null;
+		
+		console.log('[preview-html] currentGuidelineId from sessionStorage:', currentGuidelineId);
+		
 		let stored = loadTempBrandData();
+		console.log('[preview-html] Loaded temp brand data:', {
+			hasStored: !!stored,
+			hasBrandData: !!stored?.brandData,
+			guidelineId: stored?.brandData?.guidelineId,
+			brandName: stored?.brandData?.brandName
+		});
+
+		// Only clear cache if we have a specific guidelineId from My Brands AND it doesn't match
+		// If coming from builder (no currentGuidelineId), use stored data as-is
+		if (stored && currentGuidelineId) {
+			// Only verify match if we're coming from My Brands (currentGuidelineId is set)
+			if (stored.brandData?.guidelineId && stored.brandData.guidelineId !== currentGuidelineId) {
+				// Clear cached data if it doesn't match the requested brand
+				console.log('[preview-html] Clearing cached data - brand mismatch:', {
+					cached: stored.brandData?.guidelineId,
+					requested: currentGuidelineId
+				});
+				clearTempBrandData();
+				stored = null;
+			}
+		}
 
 		if (!stored) {
+			console.log('[preview-html] No stored data, trying to migrate legacy data');
 			const migrated = migrateLegacyPreviewData();
+			console.log('[preview-html] Migrated legacy data:', {
+				hasMigrated: !!migrated,
+				guidelineId: migrated?.brandData?.guidelineId,
+				brandName: migrated?.brandData?.brandName
+			});
 			if (migrated) {
-				saveTempBrandData(migrated);
-				stored = loadTempBrandData();
+				// Only verify match if we have a specific guidelineId from My Brands
+				if (currentGuidelineId && migrated.brandData?.guidelineId && migrated.brandData.guidelineId !== currentGuidelineId) {
+					console.log('[preview-html] Migrated data does not match requested brand, clearing cache');
+					clearTempBrandData();
+					// Clear legacy sessionStorage too
+					if (typeof sessionStorage !== 'undefined') {
+						sessionStorage.removeItem('preview_brand_data');
+					}
+				} else {
+					saveTempBrandData(migrated);
+					stored = loadTempBrandData();
+					console.log('[preview-html] Saved migrated data, reloaded:', {
+						hasStored: !!stored,
+						guidelineId: stored?.brandData?.guidelineId
+					});
+				}
+			}
+		}
+
+		// If still no stored data, try to load from database
+		// Priority: 1) currentGuidelineId (from My Brands), 2) legacy preview_brand_data
+		if (!stored) {
+			console.log('[preview-html] Still no stored data, trying to load from database');
+			
+			let guidelineIdToFetch: string | null = null;
+			
+			// First priority: use currentGuidelineId if set (from My Brands page)
+			if (currentGuidelineId) {
+				guidelineIdToFetch = currentGuidelineId;
+				console.log('[preview-html] Using currentGuidelineId from sessionStorage:', guidelineIdToFetch);
+			} else {
+				// Fallback: try to get from legacy preview_brand_data
+				const legacyRaw = typeof sessionStorage !== 'undefined' 
+					? sessionStorage.getItem('preview_brand_data') 
+					: null;
+				
+				console.log('[preview-html] Legacy preview_brand_data from sessionStorage:', {
+					hasLegacyRaw: !!legacyRaw,
+					preview: legacyRaw?.substring(0, 200)
+				});
+				
+				if (legacyRaw) {
+					try {
+						const legacyData = JSON.parse(legacyRaw);
+						console.log('[preview-html] Parsed legacy data:', {
+							hasGuidelineId: !!legacyData.guidelineId,
+							guidelineId: legacyData.guidelineId,
+							brandName: legacyData.brandName
+						});
+						if (legacyData.guidelineId) {
+							guidelineIdToFetch = legacyData.guidelineId;
+						}
+					} catch (e) {
+						console.warn('[preview-html] Failed to parse legacy data:', e);
+					}
+				}
+			}
+			
+			if (guidelineIdToFetch) {
+				console.log('[preview-html] Fetching brand guidelines from API with ID:', {
+					id: guidelineIdToFetch,
+					idType: typeof guidelineIdToFetch,
+					idLength: guidelineIdToFetch?.length,
+					url: `/api/brand-guidelines/${guidelineIdToFetch}`
+				});
+				// Try to fetch brand data from database
+				const response = await fetch(`/api/brand-guidelines/${guidelineIdToFetch}`);
+				console.log('[preview-html] API response status:', response.status);
+				
+				if (!response.ok) {
+					const errorData = await response.json().catch(() => ({}));
+					console.error('[preview-html] API error response:', {
+						status: response.status,
+						error: errorData
+					});
+				}
+				if (response.ok) {
+					const result = await response.json();
+					console.log('[preview-html] API response result:', {
+						success: result.success,
+						hasGuideline: !!result.guideline,
+						guidelineId: result.guideline?.id
+					});
+					if (result.success && result.guideline) {
+						const guideline = result.guideline;
+						
+						// Try to get stepHistory from structuredData or legacy data
+						let stepHistory: any[] = [];
+						try {
+							if (guideline.structuredData) {
+								const structuredData = typeof guideline.structuredData === 'string' 
+									? JSON.parse(guideline.structuredData) 
+									: guideline.structuredData;
+								stepHistory = structuredData?.stepHistory || [];
+							}
+						} catch (e) {
+							console.warn('[preview-html] Failed to parse structuredData for stepHistory:', e);
+						}
+						
+						// Fallback to legacy data if available
+						if (stepHistory.length === 0) {
+							const legacyRaw = typeof sessionStorage !== 'undefined' 
+								? sessionStorage.getItem('preview_brand_data') 
+								: null;
+							if (legacyRaw) {
+								try {
+									const legacyData = JSON.parse(legacyRaw);
+									stepHistory = legacyData.stepHistory || [];
+								} catch (e) {
+									// Ignore
+								}
+							}
+						}
+						
+						// Build brandData from guideline
+						const brandDataFromDb: any = {
+							brandName: guideline.brandName,
+							brand_name: guideline.brandName,
+							brandDomain: guideline.brandDomain || guideline.industry || '',
+							brand_domain: guideline.brandDomain || guideline.industry || '',
+							shortDescription: guideline.shortDescription || '',
+							short_description: guideline.shortDescription || '',
+							selectedMood: guideline.mood || '',
+							selectedAudience: guideline.audience || '',
+							guidelineId: guideline.id,
+							stepHistory: stepHistory
+						};
+
+								// Parse structuredData to get additional fields
+						try {
+							if (guideline.structuredData) {
+								const structuredData = typeof guideline.structuredData === 'string' 
+									? JSON.parse(guideline.structuredData) 
+									: guideline.structuredData;
+								// Merge structured data into brandDataFromDb
+								Object.assign(brandDataFromDb, structuredData);
+							}
+						} catch (e) {
+							console.warn('[preview-html] Failed to parse structuredData:', e);
+						}
+
+						// Parse JSON fields
+						if (guideline.logoFiles) {
+							try {
+								brandDataFromDb.logoFiles = typeof guideline.logoFiles === 'string' 
+									? JSON.parse(guideline.logoFiles) 
+									: guideline.logoFiles;
+							} catch (e) {
+								brandDataFromDb.logoFiles = [];
+							}
+						}
+
+						// Get logo from brandLogos table
+						if (result.logo) {
+							brandDataFromDb.logoUrl = result.logo;
+							brandDataFromDb.logo_url = result.logo;
+							brandDataFromDb.logoFiles = [{ fileData: result.logo }];
+							brandDataFromDb.logo = {
+								primaryLogoUrl: result.logo,
+								primary: result.logo
+							};
+						}
+
+						// Try to get userInput from legacy data if available
+						let userInput: any = {};
+						const legacyRaw = typeof sessionStorage !== 'undefined' 
+							? sessionStorage.getItem('preview_brand_data') 
+							: null;
+						if (legacyRaw) {
+							try {
+								const legacyData = JSON.parse(legacyRaw);
+								userInput = legacyData.brandInput || {};
+							} catch (e) {
+								// Ignore
+							}
+						}
+
+						// Save to temp storage
+						saveTempBrandData({
+							userInput: userInput,
+							selectedTheme: inferThemeFromMood(guideline.mood || ''),
+							brandData: brandDataFromDb,
+							slides: []
+						});
+						stored = loadTempBrandData();
+						console.log('[preview-html] ✅ Loaded brand data from database and saved to temp storage:', {
+							hasStored: !!stored,
+							guidelineId: stored?.brandData?.guidelineId,
+							brandName: stored?.brandData?.brandName
+						});
+					} else {
+						console.error('[preview-html] API returned success but no guideline data');
+					}
+				} else {
+					console.error('[preview-html] Failed to fetch brand guidelines, status:', response.status);
+				}
+			} else {
+				console.warn('[preview-html] No guidelineId available to fetch from database');
 			}
 		}
 
@@ -125,9 +357,11 @@ onMount(async () => {
 		previewTheme = stored.selectedTheme || inferThemeFromBrandData(brandData);
 		slides = stored.slides || [];
 
-		if ((!slides || slides.length === 0) && brandData?.guidelineId) {
+		// Always fetch fresh slides from database to ensure correct logo per slide
+		if (brandData?.guidelineId) {
 			const fetchedSlides = await fetchSlidesFromDatabase(brandData.guidelineId);
 			if (fetchedSlides.length) {
+				// Update slides with fresh data from database (includes correct logos)
 				slides = fetchedSlides;
 				saveTempBrandData({
 					userInput: stored.userInput,
@@ -136,6 +370,44 @@ onMount(async () => {
 					slides: fetchedSlides,
 					buildData: stored.buildData
 				});
+			}
+		}
+
+		// Fetch logo from database if missing - prioritize logo from first slide if available
+		if ((!brandData?.logoUrl && !brandData?.logo_url && !brandData?.logoFiles?.[0]?.fileData) && brandData?.guidelineId) {
+			// First try to get logo from slides (each slide has its own logo now)
+			const slideLogo = slides.find(s => s.logo)?.logo;
+			if (slideLogo) {
+				brandData = { 
+					...brandData, 
+					logoUrl: slideLogo,
+					logo_url: slideLogo,
+					logoFiles: [{ fileData: slideLogo }],
+					logo: {
+						primaryLogoUrl: slideLogo,
+						primary: slideLogo
+					}
+				};
+				saveTempBrandData({
+					userInput: stored.userInput,
+					selectedTheme: stored.selectedTheme,
+					brandData,
+					slides: slides,
+					buildData: stored.buildData
+				});
+			} else {
+				// Fallback to fetching from brand guidelines
+				const fetchedLogo = await fetchLogoFromDatabase(brandData.guidelineId);
+				if (fetchedLogo) {
+					brandData = { ...brandData, ...fetchedLogo };
+					saveTempBrandData({
+						userInput: stored.userInput,
+						selectedTheme: stored.selectedTheme,
+						brandData,
+						slides: slides,
+						buildData: stored.buildData
+					});
+				}
 			}
 		}
 
@@ -222,7 +494,8 @@ async function fetchSlidesFromDatabase(guidelineId: string) {
 			return result.slides
 				.map((slide: any) => ({
 					name: slide.slideTitle || slide.brandName || `Slide ${slide.slideNumber || ''}`.trim(),
-					html: slide.htmlContent || ''
+					html: slide.htmlContent || '',
+					logo: slide.logo || null // Include logo from each slide
 				}))
 				.filter((slide: { name: string; html: string }) => slide.html);
 		}
@@ -230,6 +503,78 @@ async function fetchSlidesFromDatabase(guidelineId: string) {
 		console.error('Failed to fetch slides from database:', err);
 	}
 	return [];
+}
+
+async function fetchLogoFromDatabase(guidelineId: string) {
+	try {
+		const response = await fetch(`/api/brand-guidelines/${guidelineId}`);
+		if (!response.ok) {
+			console.warn('Failed to fetch brand guideline for logo:', response.statusText);
+			return null;
+		}
+		const result = await response.json();
+		if (result?.success && result?.guideline) {
+			const guideline = result.guideline;
+			const logoData: any = {};
+
+			// First priority: Get logo from brandLogos table (new table)
+			if (result.logo) {
+				logoData.logoUrl = result.logo;
+				logoData.logo_url = result.logo;
+				logoData.logoFiles = [{ fileData: result.logo }];
+				logoData.logo = {
+					primaryLogoUrl: result.logo,
+					primary: result.logo
+				};
+				return logoData;
+			}
+
+			// Second priority: Try to get logo from logoFiles (new format)
+			if (guideline.logoFiles) {
+				try {
+					const logoFiles = JSON.parse(guideline.logoFiles);
+					if (Array.isArray(logoFiles) && logoFiles.length > 0) {
+						const firstLogo = logoFiles[0];
+						const logoUrl = firstLogo?.fileData || firstLogo?.data || firstLogo?.fileUrl || firstLogo?.filePath;
+						
+						if (logoUrl) {
+							logoData.logoUrl = logoUrl;
+							logoData.logo_url = logoUrl;
+							logoData.logoFiles = logoFiles;
+							logoData.logo = {
+								primaryLogoUrl: logoUrl,
+								primary: logoUrl
+							};
+							return logoData;
+						}
+					}
+				} catch (error) {
+					console.warn('Failed to parse logoFiles:', error);
+				}
+			}
+
+			// Fallback to logoData (base64)
+			if (guideline.logoData) {
+				logoData.logoUrl = guideline.logoData;
+				logoData.logo_url = guideline.logoData;
+				logoData.logo = {
+					primaryLogoUrl: guideline.logoData,
+					primary: guideline.logoData
+				};
+				return logoData;
+			}
+
+			// Fallback to logoPath (legacy)
+			if (guideline.logoPath) {
+				logoData.logoUrl = guideline.logoPath;
+				logoData.logo_url = guideline.logoPath;
+				return logoData;
+			}
+		}
+	} catch (err) {
+		console.error('Failed to fetch logo from database:', err);
+	}
+	return null;
 }
 
 async function fetchMockPageFromDatabase(guidelineId?: string, brandName?: string) {

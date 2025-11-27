@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { buildFilledHtmlSlides } from '$lib/services/html-slide-generator';
 import { adaptBrandDataForSlides } from '$lib/services/brand-data-adapter';
-import { db, generatedSlides, brandGuidelines } from '$lib/db';
+import { db, generatedSlides, brandGuidelines, brandLogos } from '$lib/db';
 import { eq, and } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -86,13 +86,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         // Save HTML content to generatedSlides table
         const brandName = body.brandName || brandInput.brandName || 'Unknown Brand';
         const brandGuidelinesId = await findBrandGuidelinesId(userId, brandName);
-        await saveSlidesToDatabase(slides, userId, brandGuidelinesId || undefined, brandName);
+        await saveSlidesToDatabase(slides, userId, brandGuidelinesId || undefined, brandName, brandInput);
         
         // Also save Svelte slide data automatically (same way as HTML)
         try {
             const { buildFilledSvelteSlides } = await import('$lib/services/svelte-slide-generator');
             const svelteSlides = await buildFilledSvelteSlides(brandInput);
-            await saveSvelteSlidesToDatabase(svelteSlides, userId, brandGuidelinesId || undefined, brandName);
+            await saveSvelteSlidesToDatabase(svelteSlides, userId, brandGuidelinesId || undefined, brandName, brandInput);
             console.log('✅ Svelte slides saved successfully');
         } catch (error) {
             console.error('❌ Error saving Svelte slides:', error);
@@ -150,16 +150,78 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 };
 
 /**
+ * Extract logo from brand data or fetch from brandLogos table
+ */
+async function extractLogoFromBrandData(brandInput: any, brandGuidelinesId?: string): Promise<string | null> {
+	if (!brandInput) {
+		// If no brandInput but we have brandGuidelinesId, try to fetch from brandLogos table
+		if (brandGuidelinesId) {
+			try {
+				const brandLogo = await db
+					.select()
+					.from(brandLogos)
+					.where(eq(brandLogos.id, brandGuidelinesId))
+					.limit(1);
+				
+				if (brandLogo.length > 0 && brandLogo[0].logo) {
+					return brandLogo[0].logo;
+				}
+			} catch (error) {
+				console.warn('Failed to fetch logo from brandLogos table:', error);
+			}
+		}
+		return null;
+	}
+	
+	// Try logoFiles array first (new format)
+	if (Array.isArray(brandInput.logoFiles) && brandInput.logoFiles.length > 0) {
+		const firstLogo = brandInput.logoFiles[0];
+		if (firstLogo?.fileData) return firstLogo.fileData;
+		if (firstLogo?.data) return firstLogo.data;
+	}
+	
+	// Try logo object
+	if (brandInput.logo?.primaryLogoUrl) return brandInput.logo.primaryLogoUrl;
+	if (brandInput.logo?.primary) return brandInput.logo.primary;
+	
+	// Try direct logoData
+	if (brandInput.logoData) return brandInput.logoData;
+	
+	// Fallback: try to fetch from brandLogos table if brandGuidelinesId is available
+	if (brandGuidelinesId) {
+		try {
+			const brandLogo = await db
+				.select()
+				.from(brandLogos)
+				.where(eq(brandLogos.id, brandGuidelinesId))
+				.limit(1);
+			
+			if (brandLogo.length > 0 && brandLogo[0].logo) {
+				return brandLogo[0].logo;
+			}
+		} catch (error) {
+			console.warn('Failed to fetch logo from brandLogos table:', error);
+		}
+	}
+	
+	return null;
+}
+
+/**
  * Save HTML slides to database
  */
 async function saveSlidesToDatabase(
 	slides: Array<{ name: string; html: string }>, 
 	userId: string, 
 	brandGuidelinesId?: string,
-	brandName?: string
+	brandName?: string,
+	brandInput?: any
 ): Promise<void> {
 	try {
 		console.log(`💾 Saving ${slides.length} HTML slides to generatedSlides table...`);
+		
+		// Extract logo from brand data or fetch from brandLogos table
+		const logoData = await extractLogoFromBrandData(brandInput, brandGuidelinesId);
 		
 		// Determine slide type and title from filename
 		const getSlideInfo = (filename: string) => {
@@ -209,16 +271,17 @@ async function saveSlidesToDatabase(
 				.limit(1);
 			
 			if (existingSlide && existingSlide.length > 0) {
-				// Update existing slide with HTML content
+				// Update existing slide with HTML content and logo
 				await db
 					.update(generatedSlides)
 					.set({
 						htmlContent: slide.html,
+						logo: logoData, // Update logo with each slide
 						updatedAt: new Date()
 					})
 					.where(eq(generatedSlides.id, existingSlide[0].id));
 				
-				console.log(`✓ Updated HTML slide: ${slideInfo.title}`);
+				console.log(`✓ Updated HTML slide: ${slideInfo.title}${logoData ? ' (with logo)' : ''}`);
 			} else {
 				// Insert new slide
 				await db.insert(generatedSlides).values({
@@ -230,6 +293,7 @@ async function saveSlidesToDatabase(
 					htmlContent: slide.html,
 					svelteContent: '', // Will be filled when Svelte slides are generated
 					slideType: slideInfo.type,
+					logo: logoData, // Save logo with each slide
 					slideData: JSON.stringify({
 						filename: slide.name,
 						contentLength: slide.html.length,
@@ -238,7 +302,7 @@ async function saveSlidesToDatabase(
 					status: 'completed'
 				});
 				
-				console.log(`✓ Inserted HTML slide: ${slideInfo.title}`);
+				console.log(`✓ Inserted HTML slide: ${slideInfo.title}${logoData ? ' (with logo)' : ''}`);
 			}
 		}
 		
@@ -257,10 +321,14 @@ async function saveSvelteSlidesToDatabase(
 	slides: Array<{ id: string; type: string; layout: any; elements: any[] }>, 
 	userId: string, 
 	brandGuidelinesId?: string,
-	brandName?: string
+	brandName?: string,
+	brandInput?: any
 ): Promise<void> {
 	try {
 		console.log(`💾 Saving ${slides.length} Svelte slides to generatedSlides table...`);
+		
+		// Extract logo from brand data or fetch from brandLogos table
+		const logoData = await extractLogoFromBrandData(brandInput, brandGuidelinesId);
 		
 		// Map slide types to titles and orders (same as HTML slides)
 		// Handle both the 'type' field and map 'content'/'closing' to their actual types
@@ -333,16 +401,17 @@ async function saveSvelteSlidesToDatabase(
 				.limit(1);
 			
 			if (existingSlide && existingSlide.length > 0) {
-				// Update existing slide with Svelte content
+				// Update existing slide with Svelte content and logo
 				await db
 					.update(generatedSlides)
 					.set({
 						svelteContent,
+						logo: logoData, // Update logo with each slide
 						updatedAt: new Date()
 					})
 					.where(eq(generatedSlides.id, existingSlide[0].id));
 				
-				console.log(`✓ Updated Svelte slide: ${slideInfo.title}`);
+				console.log(`✓ Updated Svelte slide: ${slideInfo.title}${logoData ? ' (with logo)' : ''}`);
 			} else {
 				// Insert new slide (htmlContent will be empty initially if HTML slides haven't been generated yet)
 				await db.insert(generatedSlides).values({
@@ -354,6 +423,7 @@ async function saveSvelteSlidesToDatabase(
 					htmlContent: '', // Will be filled when HTML slides are generated
 					svelteContent,
 					slideType: actualType, // Use the mapped type, not the original
+					logo: logoData, // Save logo with each slide
 					slideData: JSON.stringify({
 						slideId: slideData.id,
 						elementCount: slideData.elements?.length || 0,
@@ -362,7 +432,7 @@ async function saveSvelteSlidesToDatabase(
 					status: 'completed'
 				});
 				
-				console.log(`✓ Inserted new Svelte slide: ${slideInfo.title}`);
+				console.log(`✓ Inserted new Svelte slide: ${slideInfo.title}${logoData ? ' (with logo)' : ''}`);
 			}
 		}
 		

@@ -105,6 +105,36 @@ interface FuturisticBrandConfig {
 const HEX_COLOR_REGEX = /#(?:[0-9a-fA-F]{3}){1,2}\b/g;
 const FONT_FAMILY_REGEX = /font-family\s*:\s*([^;"']+)/gi;
 const TEXT_REGEX = />\s*([^<>]+?)\s*</g;
+
+/**
+ * Extract logo URL from brandData, checking multiple possible locations
+ */
+function extractLogoUrl(brandData?: any): string {
+	if (!brandData) return '';
+	
+	// Direct logoUrl fields
+	if (brandData.logoUrl) return brandData.logoUrl;
+	if (brandData.logo_url) return brandData.logo_url;
+	
+	// From logo object
+	if (brandData.logo?.primaryLogoUrl) return brandData.logo.primaryLogoUrl;
+	if (brandData.logo?.primary) return brandData.logo.primary;
+	
+	// From logoFiles array (new format)
+	if (Array.isArray(brandData.logoFiles) && brandData.logoFiles.length > 0) {
+		const firstLogo = brandData.logoFiles[0];
+		if (firstLogo?.fileData) return firstLogo.fileData;
+		if (firstLogo?.data) return firstLogo.data;
+		if (firstLogo?.fileUrl) return firstLogo.fileUrl;
+		if (firstLogo?.filePath) return firstLogo.filePath;
+	}
+	
+	// From logoData (base64)
+	if (brandData.logoData) return brandData.logoData;
+	
+	return '';
+}
+
 const SYSTEM_FONTS = [
 	'Arial',
 	'Helvetica',
@@ -148,7 +178,7 @@ export async function buildFuturisticThemeConfig(
 	const brandConfig: FuturisticBrandConfig = {
 		brandName,
 		brandDescription: copy.heroDescription,
-		logoUrl: brandData?.logo_url || brandData?.logoUrl || '',
+		logoUrl: extractLogoUrl(brandData),
 		colorPalette: {
 			primary: palette.primary,
 			secondary: palette.secondary,
