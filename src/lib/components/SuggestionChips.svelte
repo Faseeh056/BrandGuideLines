@@ -5,7 +5,7 @@
 	export let onSelect: (suggestion: string) => void;
 </script>
 
-<div class="flex flex-wrap gap-2 ml-14 animate-in fade-in slide-in-from-bottom-2 duration-300">
+<div class="flex flex-wrap gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
 	{#each suggestions as suggestion}
 		<Button
 			variant="outline"

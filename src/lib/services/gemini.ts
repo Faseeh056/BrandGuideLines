@@ -61,7 +61,7 @@ export interface BrandGuidelineResponse {
 }
 
 /**
- * Use Gemini 2.5 Flash to optimize slide layout and prevent overflow
+ * Use Gemini 2.0 Flash to optimize slide layout and prevent overflow
  */
 export async function optimizeSlideLayoutWithGemini(
 	template: any, 

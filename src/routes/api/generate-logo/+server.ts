@@ -78,89 +78,257 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Check if user provided enhancement feedback
 		const enhancementPrompt = body.enhancementPrompt || body.feedback || '';
-		
-		// Build color guidance based on industry and style
-		let colorGuidance = '';
-		if (industry && style) {
-			colorGuidance = `\n\nCOLOR REQUIREMENTS (CRITICAL - MUST FOLLOW EXACTLY):\n`;
-			colorGuidance += `- Industry: ${industry} - Use colors appropriate for this industry (e.g., healthcare: blues/teals for trust; tech: modern blues/purples; finance: deep blues/greens; fashion: bold/vibrant colors; food: warm/orange tones)\n`;
-			colorGuidance += `- Style/Vibe: ${style} - Colors must match this aesthetic:\n`;
-			
-			if (style.toLowerCase().includes('minimalistic') || style.toLowerCase().includes('minimal')) {
-				colorGuidance += `  * Use 1-2 colors maximum, clean and simple palette (e.g., single brand color + neutral gray/black)\n`;
-			} else if (style.toLowerCase().includes('maximalistic') || style.toLowerCase().includes('bold')) {
-				colorGuidance += `  * Use 2-3 vibrant, high-contrast colors that pop (e.g., bright primary + complementary accent + neutral)\n`;
-			} else if (style.toLowerCase().includes('professional') || style.toLowerCase().includes('corporate')) {
-				colorGuidance += `  * Use professional, trustworthy colors (e.g., deep blue/navy + accent color + neutral gray)\n`;
-			} else if (style.toLowerCase().includes('playful') || style.toLowerCase().includes('funky')) {
-				colorGuidance += `  * Use energetic, fun colors (e.g., bright primary + secondary + accent)\n`;
-			} else if (style.toLowerCase().includes('elegant') || style.toLowerCase().includes('luxury')) {
-				colorGuidance += `  * Use sophisticated, refined colors (e.g., deep rich color + gold/metallic accent + neutral)\n`;
-			} else if (style.toLowerCase().includes('futuristic') || style.toLowerCase().includes('modern')) {
-				colorGuidance += `  * Use contemporary, tech-forward colors (e.g., electric blue/purple + cyan + dark neutral)\n`;
-			} else {
-				colorGuidance += `  * Use 2-3 harmonious colors that reflect the ${style} aesthetic\n`;
+
+		// Build sophisticated style direction based on brand style
+		const getStyleDirection = (brandStyle: string): string => {
+			const s = brandStyle?.toLowerCase() || '';
+			if (s.includes('minimalistic') || s.includes('minimal')) {
+				return `MINIMALIST AESTHETIC:
+- Maximum 2 colors (one primary brand color + one neutral)
+- Clean geometric shapes with mathematical precision
+- Extensive negative space - let the logo breathe
+- Ultra-thin or medium-weight sans-serif typography
+- No gradients, no shadows, no textures
+- Think: Apple, Muji, Braun - sophisticated simplicity
+- The mark should be reducible to a single memorable shape`;
 			}
-			
-			colorGuidance += `- These exact colors MUST be used in the SVG logo code\n`;
-			colorGuidance += `- Ensure colors are industry-appropriate and style-appropriate\n`;
-			colorGuidance += `- Colors must work on both light and dark backgrounds\n`;
-		}
+			if (s.includes('maximalistic') || s.includes('bold') || s.includes('vibrant')) {
+				return `MAXIMALIST/BOLD AESTHETIC:
+- 3-4 vibrant, high-saturation colors with strong contrast
+- Dynamic, energetic shapes with visual weight
+- Layered elements creating depth and interest
+- Bold, impactful typography with character
+- Gradients encouraged for modern depth
+- Think: Spotify, Discord, Slack - bold and memorable
+- Make a strong visual statement that commands attention`;
+			}
+			if (s.includes('funky') || s.includes('playful') || s.includes('creative')) {
+				return `FUNKY/PLAYFUL AESTHETIC:
+- Unexpected color combinations - break conventional rules
+- Organic, hand-drawn feel or quirky geometric shapes
+- Asymmetry and visual surprise elements
+- Rounded, friendly typography with personality
+- Motion implied through shape arrangement
+- Think: Mailchimp, Dropbox, Headspace - friendly and fun
+- Inject personality and warmth into every element`;
+			}
+			if (s.includes('futuristic') || s.includes('tech') || s.includes('modern')) {
+				return `FUTURISTIC/TECH AESTHETIC:
+- Neon accents: electric blue, cyan, magenta, purple
+- Geometric precision with tech-inspired shapes
+- Angular elements suggesting innovation
+- Clean sans-serif or custom tech typography
+- Subtle gradients suggesting light and energy
+- Think: Tesla, SpaceX, Stripe - cutting-edge innovation
+- Convey forward-thinking technology and progress`;
+			}
+			if (s.includes('elegant') || s.includes('luxury') || s.includes('premium')) {
+				return `ELEGANT/LUXURY AESTHETIC:
+- Refined palette: deep navy, burgundy, forest green + gold/champagne accents
+- Sophisticated serif or elegant sans-serif typography
+- Refined details and perfect proportions
+- Subtle use of metallic tones (gold gradient: #D4AF37 to #F4E4BC)
+- Generous spacing and balanced composition
+- Think: Chanel, Rolex, Mercedes - timeless sophistication
+- Every element should feel considered and premium`;
+			}
+			if (s.includes('professional') || s.includes('corporate') || s.includes('business')) {
+				return `PROFESSIONAL/CORPORATE AESTHETIC:
+- Trust-building colors: deep blues, teals, confident grays
+- Clean, structured geometric forms
+- Balanced, symmetrical compositions
+- Professional sans-serif typography with excellent legibility
+- Conservative but distinctive design choices
+- Think: IBM, Microsoft, Deloitte - trustworthy expertise
+- Communicate reliability, competence, and authority`;
+			}
+			return `BALANCED PROFESSIONAL AESTHETIC:
+- 2-3 harmonious colors with clear hierarchy
+- Clean, memorable mark with distinctive character
+- Professional typography appropriate to industry
+- Balanced composition that works at all sizes
+- Timeless design that won't feel dated
+- Focus on clarity, memorability, and versatility`;
+		};
 
-		const prompt = `You are a senior professional logo designer and SVG specialist. Create a single, unique, high-quality SVG logo for the brand described below.
+		// Build industry-specific design direction
+		const getIndustryDirection = (brandIndustry: string): string => {
+			const ind = brandIndustry?.toLowerCase() || '';
+			if (ind.includes('tech') || ind.includes('software') || ind.includes('saas') || ind.includes('ai')) {
+				return `TECH/SOFTWARE INDUSTRY:
+- Abstract geometric marks suggesting connectivity, data, or innovation
+- Modern color palette: blues, purples, teals, or bold primaries
+- Clean sans-serif typography suggesting precision
+- Shapes: nodes, connections, circuits, abstract data visualization
+- Convey: innovation, efficiency, intelligence, progress`;
+			}
+			if (ind.includes('health') || ind.includes('medical') || ind.includes('wellness') || ind.includes('pharma')) {
+				return `HEALTHCARE/WELLNESS INDUSTRY:
+- Trust-inducing colors: calming blues, healing greens, clean whites
+- Organic shapes suggesting care, growth, vitality
+- Symbols: crosses, hearts, leaves, human figures, DNA helix
+- Professional yet approachable typography
+- Convey: trust, care, health, professionalism, hope`;
+			}
+			if (ind.includes('finance') || ind.includes('bank') || ind.includes('invest') || ind.includes('insurance')) {
+				return `FINANCE/BANKING INDUSTRY:
+- Stability colors: deep navy, forest green, burgundy, gold accents
+- Strong, solid geometric shapes suggesting security
+- Symbols: shields, pillars, upward arrows, abstract growth charts
+- Authoritative serif or clean sans-serif typography
+- Convey: trust, security, growth, prosperity, stability`;
+			}
+			if (ind.includes('food') || ind.includes('restaurant') || ind.includes('cafe') || ind.includes('bakery')) {
+				return `FOOD/RESTAURANT INDUSTRY:
+- Appetite-inducing colors: warm oranges, reds, natural browns, fresh greens
+- Organic, rounded shapes suggesting freshness and flavor
+- Symbols: utensils, chef hats, plates, ingredients, steam
+- Friendly, approachable typography with warmth
+- Convey: freshness, quality, taste, hospitality, comfort`;
+			}
+			if (ind.includes('fashion') || ind.includes('apparel') || ind.includes('clothing') || ind.includes('beauty')) {
+				return `FASHION/BEAUTY INDUSTRY:
+- Sophisticated palette: black, white, gold, blush, bold accents
+- Elegant, refined shapes with style and flair
+- Minimalist or dramatic depending on brand positioning
+- Fashion-forward typography: elegant serifs or modern sans
+- Convey: style, elegance, confidence, beauty, aspiration`;
+			}
+			if (ind.includes('education') || ind.includes('learning') || ind.includes('school') || ind.includes('academy')) {
+				return `EDUCATION/LEARNING INDUSTRY:
+- Inspiring colors: blues, greens, warm yellows, optimistic oranges
+- Symbols: books, graduation caps, lightbulbs, growth metaphors
+- Approachable yet authoritative design
+- Clear, readable typography suggesting knowledge
+- Convey: knowledge, growth, opportunity, achievement, wisdom`;
+			}
+			if (ind.includes('retail') || ind.includes('ecommerce') || ind.includes('shop') || ind.includes('store')) {
+				return `RETAIL/E-COMMERCE INDUSTRY:
+- Versatile, memorable color palette that stands out
+- Dynamic shapes suggesting activity and choice
+- Symbols: shopping bags, tags, arrows, abstract commerce
+- Friendly, accessible typography
+- Convey: value, variety, convenience, trust, excitement`;
+			}
+			if (ind.includes('real estate') || ind.includes('property') || ind.includes('housing')) {
+				return `REAL ESTATE INDUSTRY:
+- Trust colors: blues, greens, warm neutrals, gold accents
+- Symbols: houses, rooflines, keys, doors, skylines
+- Solid, grounded geometric shapes
+- Professional, trustworthy typography
+- Convey: home, security, investment, trust, quality`;
+			}
+			if (ind.includes('travel') || ind.includes('tourism') || ind.includes('hospitality') || ind.includes('hotel')) {
+				return `TRAVEL/HOSPITALITY INDUSTRY:
+- Inspiring colors: sky blues, sunset oranges, ocean teals, nature greens
+- Dynamic shapes suggesting movement and adventure
+- Symbols: globes, planes, compasses, waves, landmarks
+- Inviting, adventurous typography
+- Convey: adventure, relaxation, discovery, comfort, escape`;
+			}
+			if (ind.includes('fitness') || ind.includes('sports') || ind.includes('gym') || ind.includes('athletic')) {
+				return `FITNESS/SPORTS INDUSTRY:
+- Energetic colors: bold reds, oranges, electric blues, dynamic blacks
+- Powerful, dynamic shapes suggesting motion and strength
+- Angular, athletic forms with energy
+- Bold, impactful typography with strength
+- Convey: energy, strength, achievement, motivation, power`;
+			}
+			return `GENERAL INDUSTRY:
+- Select colors that resonate with your specific market
+- Create a distinctive mark that communicates your unique value
+- Typography should match your brand personality
+- Balance memorability with professionalism
+- Ensure the design works across all applications`;
+		};
 
+		const styleDirection = getStyleDirection(style);
+		const industryDirection = getIndustryDirection(industry);
+
+		const prompt = `You are an elite brand identity designer who has created iconic logos for Fortune 500 companies. Your logos are featured in design museums. You understand that a great logo is not just an image—it's the visual soul of a brand.
+
+BRAND BRIEF:
 ${brandContext}
-${enhancementPrompt ? `\n\nUSER ENHANCEMENT REQUEST:\n${enhancementPrompt}\n\nPlease incorporate these changes while maintaining professional quality and brand consistency.` : ''}
+${enhancementPrompt ? `\nCLIENT FEEDBACK FOR REVISION:\n${enhancementPrompt}\nIncorporate this feedback while maintaining design excellence.` : ''}
 
-STRICT REQUIREMENTS & GUARDRAILS (MANDATORY - NO EXCEPTIONS):
+═══════════════════════════════════════════════════════════════
+STYLE DIRECTION - FOLLOW THIS EXACTLY:
+═══════════════════════════════════════════════════════════════
+${styleDirection}
 
-1. Output **ONLY** valid, standalone SVG markup (start with "<svg" and end with "</svg>"). No markdown, no code fences, no explanations, no extra text, no multiple-choice variants — exactly one <svg>...</svg>.
+═══════════════════════════════════════════════════════════════
+INDUSTRY CONTEXT - INCORPORATE THESE ELEMENTS:
+═══════════════════════════════════════════════════════════════
+${industryDirection}
 
-2. Do not reference or embed external resources (no external fonts, images, CSS, or scripts). Use vector shapes, paths, and system-safe font-family fallbacks only.
+═══════════════════════════════════════════════════════════════
+ELITE DESIGN PRINCIPLES (NON-NEGOTIABLE):
+═══════════════════════════════════════════════════════════════
 
-3. The SVG must have a transparent background and be resolution-independent (fully scalable).
+1. MEMORABILITY: The logo must be instantly recognizable and memorable. A child should be able to draw it from memory. Think Nike swoosh, Apple apple, Twitter bird.
 
-4. Include a suitable viewBox that reflects the artwork (for example "0 0 400 200" for a horizontal logo) and set width/height attributes only if necessary.
+2. SCALABILITY: Must look perfect from 16px favicon to billboard size. Test mentally at both extremes.
 
-5. Ensure the brand name "${brandName}" is clearly visible, legible at small sizes (32px) and balanced at large sizes. Use readable, professional typography and include a sensible font-family stack (primary font name plus generic fallback).
+3. VERSATILITY: Works on light backgrounds, dark backgrounds, single color, reversed. No design that only works in one context.
 
-6. **COLOR REQUIREMENT (CRITICAL)**: ${colorGuidance || `Choose a refined color palette that matches the ${style || 'professional'} style and ${industry || 'brand'} industry — prefer 2–3 harmonious colors. Ensure sufficient contrast for accessibility (text readable on transparent and light/dark backgrounds).`}
+4. TIMELESSNESS: Avoid trendy effects that will date the logo. Classic design principles over fleeting trends.
 
-7. Keep shapes and paths clean and optimized: avoid unnecessary nodes, group related elements with <g>, and use unique ID attributes when needed.
+5. DISTINCTIVENESS: Must stand apart from competitors. No generic shapes or overused symbols.
 
-8. No raster elements (PNG/JPEG). No embedded base64 bitmaps.
+6. MEANINGFUL: Every element should have purpose. The mark should tell the brand story visually.
 
-9. Include minimal accessibility metadata: a concise <title> and <desc> inside the SVG describing the logo and brand.
+7. BALANCE: Perfect visual weight distribution. Professional kerning in typography. Harmonious proportions.
 
-10. Do not include comments, editor metadata, or proprietary tool cruft (Inkscape/Illustrator metadata).
+═══════════════════════════════════════════════════════════════
+TECHNICAL REQUIREMENTS (STRICT):
+═══════════════════════════════════════════════════════════════
 
-11. Use semantic structure: organize logo mark and wordmark into logical groups (e.g., <g id="mark"> and <g id="wordmark">).
+OUTPUT: Return ONLY valid SVG code. Start with <svg, end with </svg>. No markdown, no explanations, no code fences.
 
-12. Avoid text as outlines only — keep text elements as <text> when feasible so the logo remains editable, unless converting to paths is necessary for exact visual fidelity.
+STRUCTURE:
+- viewBox="0 0 400 120" (horizontal logo format)
+- Include xmlns="http://www.w3.org/2000/svg"
+- Group mark in <g id="mark">, text in <g id="wordmark">
+- Include <title>${brandName} Logo</title> and <desc>
 
-13. Ensure the SVG is safe: no script, no foreignObject, no event handlers, and no external links.
+TYPOGRAPHY:
+- Use <text> elements (not paths) for editability
+- Font stack: "Inter, system-ui, -apple-system, sans-serif" for modern
+- Font stack: "Georgia, Cambria, serif" for elegant
+- letter-spacing for refined kerning
+- Appropriate font-weight for brand personality
 
-14. Produce a compact, well-formed SVG with reasonable attribute naming and no duplicate IDs.
+COLORS:
+- Use specific hex values (not named colors)
+- Define a clear color hierarchy (primary, secondary, accent)
+- Ensure WCAG AA contrast compliance
+- Colors must match BOTH the style (${style || 'professional'}) AND industry (${industry || 'general'})
 
-DESIGN GUIDANCE (follow but do not output explanations):
+SHAPES:
+- Clean, optimized paths with minimal nodes
+- Precise geometric shapes using rect, circle, ellipse, polygon
+- Use transforms for positioning rather than absolute coordinates
+- No unnecessary complexity
 
-- Style: clean, modern, timeless, and distinctive. Must reflect "${style || 'professional'}" aesthetic.
+FORBIDDEN:
+- No raster images or base64
+- No external resources
+- No scripts or event handlers
+- No filters or complex effects that don't scale
+- No gradients with more than 3 stops
+- No text as paths unless absolutely necessary
 
-- Proportions: make the mark and logotype work well when stacked and when horizontal.
+═══════════════════════════════════════════════════════════════
+CREATE THE LOGO NOW
+═══════════════════════════════════════════════════════════════
 
-- Industry relevance: include relevant symbol(s) or abstract mark that reflect the brand context and "${industry || 'the brand'}" industry in a tasteful, professional manner. The logo must be immediately recognizable as belonging to the ${industry || 'brand'} industry.
+Design a logo for "${brandName}" that will become iconic. The logo should:
+- Perfectly embody the ${style || 'professional'} aesthetic
+- Clearly communicate the ${industry || 'brand'} industry
+- Be worthy of a world-class brand
+- Stand the test of time
 
-- Typography: choose a style matching the brand (e.g., geometric sans for futuristic; humanist sans for friendly; serif only if explicitly appropriate), then include a fallback stack.
-
-- Color: ${industry && style ? `Use colors that are BOTH industry-appropriate for ${industry} AND style-appropriate for ${style}. The colors must be clearly visible in the SVG code with specific hex values.` : `Suggest a primary color and one or two accent/neutral colors through the chosen palette in the SVG code itself.`}
-
-- Accuracy: The logo must be unique, professional, and accurately represent the brand "${brandName}" in the ${industry || 'specified'} industry with a ${style || 'professional'} aesthetic.
-
-OUTPUT FORMAT:
-
-Return ONLY the complete SVG code. No additional text, no explanation. The SVG must include <title> and <desc>, proper namespaces (xmlns), and be valid XML/SVG. The colors used in the logo MUST match the industry and style requirements specified above.
-
-Now generate the SVG.`;
+Output the SVG code only.`;
 
 		console.log('[generate-logo] Generating logo SVG with Gemini...');
 

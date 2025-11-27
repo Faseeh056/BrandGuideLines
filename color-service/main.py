@@ -310,7 +310,7 @@ def generate_brand_colors(image_bytes: bytes, palette: Dict[str, Any], api_key: 
     """Generate professional brand color system using Gemini AI."""
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
 
         # Convert image bytes to PIL Image
         from PIL import Image
@@ -356,7 +356,7 @@ def generate_typography_from_logo(image_bytes: bytes, brand_info: Dict[str, str]
     """Generate typography recommendations from logo using Gemini AI."""
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
 
         # Convert image bytes to PIL Image
         from PIL import Image

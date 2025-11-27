@@ -133,99 +133,77 @@ export async function analyzeBrandPrompt(userPrompt: string): Promise<PromptAnal
 }
 
 function createAnalysisPrompt(userPrompt: string): string {
-	const promptLength = userPrompt.length;
-	const isLongPrompt = promptLength > 200;
-	const isShortPrompt = promptLength < 50;
-	
-	return `You are an expert brand analyst with deep understanding of brand guidelines creation. Your task is to perform a COMPREHENSIVE and DEEP analysis of the user's prompt, whether it's short or long.
+	return `You are an expert brand analyst. Extract brand information from the user's prompt with HIGH PRECISION.
 
-ANALYSIS APPROACH:
-${isLongPrompt ? `
-This is a LONG prompt (${promptLength} characters). Perform DEEP analysis:
-- Extract ALL mentioned information, even if subtle or implied
-- Look for context clues and related information
-- Identify patterns and connections between mentioned elements
-- Extract industry-specific details, use cases, and requirements
-- Note any brand values, mission, or vision statements
-- Identify target demographics, psychographics, and user personas
-- Extract style preferences, design directions, and aesthetic choices
-- Look for technical requirements, platforms, or applications
-` : isShortPrompt ? `
-This is a SHORT prompt (${promptLength} characters). Perform FOCUSED analysis:
-- Extract every piece of information, no matter how small
-- Look for implicit meanings and context
-- Identify what can be inferred from the brand name itself
-- Note any style keywords or industry hints
-- Extract any audience indicators
-` : `
-This is a MEDIUM prompt (${promptLength} characters). Perform BALANCED analysis:
-- Extract all explicit information
-- Look for implicit context and connections
-- Identify missing critical information
-`}
+CRITICAL: Only extract information that is EXPLICITLY STATED or VERY CLEARLY IMPLIED. Do NOT guess or infer loosely.
 
-CRITICAL EXTRACTION RULES:
-1. Extract information that is EXPLICITLY mentioned
-2. Also extract information that is CLEARLY IMPLIED from context
-3. For brand names, analyze if they suggest industry or style (e.g., "TechFlow" suggests tech/SaaS)
-4. Look for synonyms and related terms (e.g., "startup" = tech/SaaS, "app" = mobile/software)
-5. For style, recognize: minimalistic, maximalistic, funky, futuristic, retro, vintage, playful, professional, bold, modern, classic, elegant, clean, vibrant, sophisticated, edgy, warm, cool, corporate, creative
-6. Extract partial information even if incomplete (e.g., "tech company" even if specific industry unclear)
-7. Identify use cases: website, mobile app, packaging, print, social media, etc.
-8. Extract brand personality traits mentioned or implied
+ALLOWED STYLE VALUES (IMPORTANT - use ONLY these exact values):
+- "Minimalistic" - clean, simple, minimal design
+- "Maximalistic" - bold, busy, maximalist design
+- "Funky" - playful, quirky, creative, fun design
+- "Futuristic" - modern, tech-forward, innovative design
 
-FIELD-SPECIFIC EXTRACTION GUIDELINES:
+If user mentions style keywords, map them to ONE of these four:
+- clean, simple, minimal, elegant, sleek → "Minimalistic"
+- bold, busy, ornate, elaborate, rich → "Maximalistic"
+- playful, fun, quirky, creative, colorful, vibrant → "Funky"
+- modern, tech, innovative, cutting-edge, futuristic, high-tech → "Futuristic"
 
-brandName: Extract any company name, brand name, product name, or project name mentioned. If multiple, prioritize the main brand.
+If style is unclear or not mentioned, set style to null.
 
-industry: Extract industry, sector, domain, or business type. Look for:
-- Direct mentions: "SaaS", "healthcare", "fintech", "e-commerce"
-- Indirect mentions: "startup" (often tech/SaaS), "app" (software/mobile), "retail" (e-commerce)
-- Context clues: product type, service type, target market type
+EXTRACTION RULES:
 
-style: Extract aesthetic, design direction, or visual style. Look for:
-- Direct style words: minimalistic, modern, bold, etc.
-- Mood words: professional, playful, serious, friendly
-- Design direction: clean, vibrant, sophisticated, edgy
-- Color preferences: bright, muted, monochrome, colorful
+1. brandName: Extract ONLY if a specific name is mentioned (in quotes, capitalized, or clearly identified as the brand/company name). Do NOT guess.
 
-audience: Extract target audience, customer base, or user personas. Look for:
-- Demographics: age ranges, professions, locations
-- Psychographics: lifestyles, interests, behaviors
-- User types: professionals, students, consumers, businesses
-- Market segments: B2B, B2C, enterprise, SMB
+2. industry: Extract ONLY if explicitly mentioned OR very clearly implied by context:
+   - "SaaS company" → "SaaS"
+   - "healthcare startup" → "Healthcare"
+   - "e-commerce store" → "E-commerce"
+   - "restaurant" → "Food & Beverage"
+   - Do NOT extract industry just from brand name alone
 
-description: Extract brand description, mission, product description, or what the brand does.
+3. style: Extract ONLY if user mentions style/design preferences. Map to ONE of the four allowed values above. Set to null if not mentioned.
 
-values: Extract brand values, mission statement, vision, principles, or core beliefs.
+4. audience: Extract ONLY if target audience/customers are explicitly mentioned.
+
+5. description: Extract if user describes what the brand/company does.
+
+6. values: Extract if user mentions brand values, mission, or principles.
 
 EXAMPLES:
 
-Example 1 - Long Detailed Prompt:
-User: "I'm launching a new fintech startup called 'WealthBridge' that helps young professionals (ages 25-40) manage their investments through a mobile-first platform. We want a modern, trustworthy brand that feels approachable but professional. Our values are transparency, empowerment, and simplicity. The brand will be used across our mobile app, website, and marketing materials."
-Analysis:
+Example 1 - Complete Information:
+User: "Create brand guidelines for TechFlow, a minimalistic SaaS company for enterprise businesses"
 {
-  "brandName": "WealthBridge",
-  "industry": "Fintech",
-  "style": "Modern / Professional / Approachable",
-  "audience": "Young professionals ages 25-40",
-  "description": "Fintech startup helping young professionals manage investments through mobile-first platform",
-  "values": "Transparency, empowerment, simplicity",
+  "brandName": "TechFlow",
+  "industry": "SaaS",
+  "style": "Minimalistic",
+  "audience": "Enterprise businesses",
+  "description": "SaaS company for enterprise",
+  "values": null,
   "hasCompleteInfo": true,
   "missingFields": [],
-  "extractedInfo": {
-    "use_cases": ["mobile app", "website", "marketing materials"],
-    "platform": "mobile-first",
-    "personality": "approachable but professional",
-    "trustworthy": true
-  }
+  "extractedInfo": {}
 }
 
-Example 2 - Short Prompt:
-User: "Brand for PixelFarm"
-Analysis:
+Example 2 - Partial Information:
+User: "Brand for my coffee shop called Bean & Brew"
 {
-  "brandName": "PixelFarm",
+  "brandName": "Bean & Brew",
+  "industry": "Food & Beverage",
+  "style": null,
+  "audience": null,
+  "description": "Coffee shop",
+  "values": null,
+  "hasCompleteInfo": false,
+  "missingFields": ["style"],
+  "extractedInfo": {}
+}
+
+Example 3 - Minimal Information:
+User: "Need brand guidelines for Acme Corp"
+{
+  "brandName": "Acme Corp",
   "industry": null,
   "style": null,
   "audience": null,
@@ -233,48 +211,57 @@ Analysis:
   "values": null,
   "hasCompleteInfo": false,
   "missingFields": ["industry", "style"],
-  "extractedInfo": {
-    "name_suggests": "design/creative/tech related (pixel suggests digital/design)"
-  }
+  "extractedInfo": {}
 }
 
-Example 3 - Medium Prompt with Context:
-User: "Create guidelines for 'GreenLeaf', an eco-friendly skincare brand targeting millennials who care about sustainability. We want a natural, organic feel."
-Analysis:
+Example 4 - Style Mapping:
+User: "Create a fun, playful brand for KidZone toy company"
 {
-  "brandName": "GreenLeaf",
-  "industry": "Skincare / Beauty / E-commerce",
-  "style": "Natural / Organic",
-  "audience": "Millennials who care about sustainability",
-  "description": "Eco-friendly skincare brand",
-  "values": "Sustainability, eco-friendly",
+  "brandName": "KidZone",
+  "industry": "Retail",
+  "style": "Funky",
+  "audience": null,
+  "description": "Toy company",
+  "values": null,
   "hasCompleteInfo": true,
   "missingFields": [],
   "extractedInfo": {
-    "niche": "eco-friendly skincare",
-    "target_demographic": "millennials",
-    "brand_focus": "sustainability"
+    "original_style_keywords": "fun, playful"
   }
 }
 
-NOW PERFORM DEEP ANALYSIS OF THIS PROMPT:
+Example 5 - Tech/Modern Style:
+User: "Build brand for NexGen, a cutting-edge AI startup"
+{
+  "brandName": "NexGen",
+  "industry": "Technology & Software",
+  "style": "Futuristic",
+  "audience": null,
+  "description": "AI startup",
+  "values": null,
+  "hasCompleteInfo": true,
+  "missingFields": [],
+  "extractedInfo": {
+    "original_style_keywords": "cutting-edge"
+  }
+}
+
+NOW ANALYZE THIS PROMPT:
 "${userPrompt}"
 
-OUTPUT FORMAT (return ONLY valid JSON, no markdown, no code blocks):
+OUTPUT (return ONLY valid JSON, no markdown):
 {
-  "brandName": "extracted brand name or null",
-  "industry": "extracted industry or null",
-  "style": "extracted style or null",
-  "audience": "extracted target audience or null",
-  "description": "extracted description or null",
-  "values": "extracted values/mission or null",
-  "hasCompleteInfo": true/false,
-  "missingFields": ["array of missing critical field names"],
-  "extractedInfo": {
-    "any additional extracted information as key-value pairs"
-  }
+  "brandName": "string or null",
+  "industry": "string or null",
+  "style": "Minimalistic" | "Maximalistic" | "Funky" | "Futuristic" | null,
+  "audience": "string or null",
+  "description": "string or null",
+  "values": "string or null",
+  "hasCompleteInfo": boolean,
+  "missingFields": ["array of missing: brandName, industry, style"],
+  "extractedInfo": {}
 }
 
-Return ONLY the JSON object, no additional text.`;
+Return ONLY the JSON object.`;
 }
 
