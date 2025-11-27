@@ -224,43 +224,45 @@ export function getEssentialQuestions(analysis: {
 		});
 	}
 
-	// Industry (if missing)
-	if (!analysis.industry) {
-		questions.push({
-			id: 'industry',
-			question: 'What industry does your brand operate in?',
-			type: 'text-with-suggestions',
-			required: true,
-			icon: '🎯',
-			helper: 'Choose from common industries or type your own',
-			suggestions: [
-				'SaaS',
-				'Fintech',
-				'Healthcare',
-				'E-commerce',
-				'Retail',
-				'Technology & Software',
-				'Education & Learning',
-				'Food & Beverage',
-				'Fashion & Luxury',
-				'Real Estate',
-				'Consulting & Professional Services',
-				'Non-profit & Social Impact',
-				'Finance & Banking',
-				'Healthcare & Medical',
-				'Manufacturing & Industrial',
-				'Travel & Hospitality',
-				'Entertainment & Media',
-				'Automotive',
-				'Energy & Utilities',
-				'Legal Services',
-				'Marketing & Advertising',
-				'Sports & Fitness',
-				'Beauty & Personal Care',
-				'Creative Agency & Design'
-			]
-		});
-	}
+	// Industry (always ask so user can confirm or override inferred info)
+	const industryQuestionText = analysis.industry
+		? `You mentioned "${analysis.industry}". Please confirm this industry or choose a different one:`
+		: 'What industry does your brand operate in?';
+
+	questions.push({
+		id: 'industry',
+		question: industryQuestionText,
+		type: 'text-with-suggestions',
+		required: true,
+		icon: '🎯',
+		helper: 'Choose from common industries or type your own',
+		suggestions: [
+			'SaaS',
+			'Fintech',
+			'Healthcare',
+			'E-commerce',
+			'Retail',
+			'Technology & Software',
+			'Education & Learning',
+			'Food & Beverage',
+			'Fashion & Luxury',
+			'Real Estate',
+			'Consulting & Professional Services',
+			'Non-profit & Social Impact',
+			'Finance & Banking',
+			'Healthcare & Medical',
+			'Manufacturing & Industrial',
+			'Travel & Hospitality',
+			'Entertainment & Media',
+			'Automotive',
+			'Energy & Utilities',
+			'Legal Services',
+			'Marketing & Advertising',
+			'Sports & Fitness',
+			'Beauty & Personal Care',
+			'Creative Agency & Design'
+		]
+	});
 
 	// Style/Vibe (ALWAYS ASK - even if mentioned)
 	// Limited to 4 options for mock webpage generation

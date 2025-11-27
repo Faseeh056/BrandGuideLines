@@ -106,69 +106,34 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 					if (logoFile.fileData && !logoFile.filePath) {
 						console.log('Saving logo to filesystem first for color extraction');
 						
-						try {
-							// Create uploads directory if it doesn't exist
-							const uploadsDir = join(process.cwd(), 'static', 'uploads', 'logos');
-							if (!existsSync(uploadsDir)) {
-								await mkdir(uploadsDir, { recursive: true });
-							}
-							
-							// Determine file extension and MIME type
-							const isSvg = logoFile.fileData.includes('data:image/svg+xml') || logoFile.filename.endsWith('.svg');
-							const mimeType = isSvg ? 'image/svg+xml' : (logoFile.fileData.match(/data:([^;]+)/)?.[1] || 'image/png');
-							const extension = isSvg ? '.svg' : (logoFile.filename.match(/\.\w+$/) || ['.png'])[0];
-							
-							// Generate unique filename
-							const timestamp = Date.now();
-							const sanitizedName = logoFile.filename.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '');
-							const filename = `${timestamp}-${sanitizedName}${extension}`;
-							savedFilePath = join(uploadsDir, filename);
-							
-							// Extract base64 data
-							const base64Data = logoFile.fileData.includes(',') 
-								? logoFile.fileData.split(',')[1] 
-								: logoFile.fileData;
-							
-							// Decode and save to file
-							const binaryData = Buffer.from(base64Data, 'base64');
-							await writeFile(savedFilePath, binaryData);
-							
-							console.log('Logo saved to:', savedFilePath);
-							
-							// Read the saved file and create File object
-							const fileBuffer = readFileSync(savedFilePath);
-							logoFileObj = new File([fileBuffer], filename, { type: mimeType });
-							
-							// Update logoFile to include the saved path
-							logoFile.filePath = `/uploads/logos/${filename}`;
-						} catch (saveError) {
-							console.error('Failed to save logo to filesystem:', saveError);
-							// Fall back to creating File from base64
-							const base64Data = logoFile.fileData.includes(',') 
-								? logoFile.fileData.split(',')[1] 
-								: logoFile.fileData;
-							const binaryData = Buffer.from(base64Data, 'base64');
-							const mimeType = logoFile.fileData.match(/data:([^;]+)/)?.[1] || 'image/png';
-							logoFileObj = new File([binaryData], logoFile.filename, { type: mimeType });
-						}
+						// New behavior: create File directly from base64 data stored in DB.
+						const isSvg =
+							logoFile.fileData.includes('data:image/svg+xml') ||
+							logoFile.filename.endsWith('.svg');
+						const mimeType =
+							logoFile.fileData.match(/data:([^;]+)/)?.[1] ||
+							(isSvg ? 'image/svg+xml' : 'image/png');
+
+						const base64Data = logoFile.fileData.includes(',')
+							? logoFile.fileData.split(',')[1]
+							: logoFile.fileData;
+
+						const binaryData = Buffer.from(base64Data, 'base64');
+						logoFileObj = new File([binaryData], logoFile.filename, { type: mimeType });
 					} else if (logoFile.filePath) {
-						console.log('Using existing file path for color extraction');
-						// Read from filesystem
-						const logoPath = join(process.cwd(), 'static', logoFile.filePath);
-						
-						if (existsSync(logoPath)) {
-							const fileBuffer = readFileSync(logoPath);
-							const mimeType = logoFile.filename.endsWith('.svg') ? 'image/svg+xml' : 'image/png';
-							logoFileObj = new File([fileBuffer], logoFile.filename, { type: mimeType });
+						console.log('Using existing file path for color extraction (legacy support)');
+						// Legacy support: only fetch from URL, do not read/write local files
+						const url = logoFile.filePath.startsWith('http')
+							? logoFile.filePath
+							: `http://localhost:5173${logoFile.filePath}`;
+						const response = await fetch(url);
+						if (response.ok) {
+							const logoBlob = await response.blob();
+							logoFileObj = new File([logoBlob], logoFile.filename, {
+								type: logoBlob.type
+							});
 						} else {
-							// Try to fetch from URL
-							const response = await fetch(`http://localhost:5173${logoFile.filePath}`);
-							if (response.ok) {
-								const logoBlob = await response.blob();
-								logoFileObj = new File([logoBlob], logoFile.filename, { type: logoBlob.type });
-							} else {
-								throw new Error('Logo file not found at path: ' + logoFile.filePath);
-							}
+							throw new Error('Logo file not found at path: ' + logoFile.filePath);
 						}
 					} else {
 						throw new Error('No logo file data available for color extraction');

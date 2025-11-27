@@ -14,12 +14,16 @@ export interface TempBrandData {
 	slides: Array<{ name: string; html: string }>;
 	timestamp: number;
 	buildData?: {
+		theme: string;
+		html: string;
 		images: {
 			hero: string | null;
 			gallery: string[];
 		};
 		content: Record<string, any>;
-		customizedHtml?: string;
+		colors?: Record<string, string>;
+		fontFamily?: string;
+		generatedAt?: number;
 	};
 }
 
@@ -147,5 +151,22 @@ export function mergeTempBrandData(additionalData: Partial<TempBrandData>): bool
 		console.error('Failed to merge temp brand data:', error);
 		return false;
 	}
+}
+
+/**
+ * Remove stored mock webpage build data but keep other cached fields intact
+ */
+export function clearStoredBuildData(): boolean {
+	if (!browser) return false;
+
+	const existing = loadTempBrandData();
+	if (!existing) return false;
+
+	// Create a clean copy without buildData
+	const { buildData, ...cleanData } = existing;
+	
+	// Save back without timestamp (saveTempBrandData will add a new one)
+	const { timestamp, ...dataToSave } = cleanData;
+	return saveTempBrandData(dataToSave as Omit<TempBrandData, 'timestamp'>);
 }
 

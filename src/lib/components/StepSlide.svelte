@@ -725,22 +725,28 @@ function getIconAccent(index: number): string {
 							logoData = logoFile.fileData;
 						}
 					} else if (logoFile.filePath) {
-						// Old format: try to fetch from file path
-						const response = await fetch(`/uploads/logos/${logoFile.filename}`);
-						if (response.ok) {
-							const blob = await response.blob();
-							const reader = new FileReader();
-							reader.onload = () => {
-								allLogoData.push({
-									filename: logoFile.filename,
-									data: reader.result as string
-								});
-								// Set first logo as primary
-								if (logoFile === logoFiles[0]) {
-									logoData = reader.result as string;
-								}
-							};
-							reader.readAsDataURL(blob);
+						// Legacy support: try to fetch from URL if provided, but prefer DB/base64
+						try {
+							const url = logoFile.filePath.startsWith('http')
+								? logoFile.filePath
+								: logoFile.filePath;
+							const response = await fetch(url);
+							if (response.ok) {
+								const blob = await response.blob();
+								const reader = new FileReader();
+								reader.onload = () => {
+									allLogoData.push({
+										filename: logoFile.filename,
+										data: reader.result as string
+									});
+									if (logoFile === logoFiles[0]) {
+										logoData = reader.result as string;
+									}
+								};
+								reader.readAsDataURL(blob);
+							}
+						} catch (err) {
+							console.warn('Could not fetch legacy logo filePath', err);
 						}
 					}
 				} catch (error) {

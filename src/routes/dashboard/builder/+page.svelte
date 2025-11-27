@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { Button } from '$lib/components/ui/button';
+import { enhance } from '$app/forms';
+import { Button } from '$lib/components/ui/button';
 	import {
 		Card,
 		CardContent,
@@ -34,7 +34,9 @@
 	import { downloadBrandGuidelinesPptx } from '$lib/utils/pptx-client';
 	import ProgressiveGenerator from '$lib/components/ProgressiveGenerator.svelte';
 	import ThemeSelect from '$lib/components/ThemeSelect.svelte';
-	import BrandBuilderChatbot from '$lib/components/BrandBuilderChatbot.svelte';
+import BrandBuilderChatbot from '$lib/components/BrandBuilderChatbot.svelte';
+import { saveTempBrandData } from '$lib/services/temp-brand-storage';
+import { inferThemeFromMood } from '$lib/utils/theme-utils';
 
 	// Form fields
 	let brandName = '';
@@ -56,6 +58,7 @@
 		fileData?: string;
 		aiGenerated?: boolean;
 	};
+
 
 	// UI state
 	let logoFile: File | null = null;
@@ -1154,6 +1157,73 @@ ${customPrompt}`;
 			sessionStorage.setItem('preview_brand_data', JSON.stringify(minimalData));
 		}
 		sessionStorage.setItem('preview_brand_saved', 'false');
+
+		const contactSnapshot = {
+			name: contactName,
+			email: contactEmail,
+			role: contactRole,
+			company: contactCompany,
+			website: brandDomain,
+			phone: ''
+		};
+
+		const structuredData = data.completeGuidelines || {};
+		const previewBrandData = {
+			...structuredData,
+			brandName: structuredData?.brandName || (structuredData as any)?.brand_name || brandName,
+			brand_name: (structuredData as any)?.brand_name || brandName,
+			brandDomain: structuredData?.brandDomain || (structuredData as any)?.brand_domain || brandDomain,
+			brand_domain: (structuredData as any)?.brand_domain || brandDomain,
+			shortDescription:
+				(structuredData as any)?.shortDescription ||
+				(structuredData as any)?.short_description ||
+				shortDescription,
+			short_description: (structuredData as any)?.short_description || shortDescription,
+			values: (structuredData as any)?.values || brandValues,
+			selectedMood: selectedMood || (structuredData as any)?.selectedMood,
+			selectedAudience: selectedAudience || (structuredData as any)?.selectedAudience,
+			contact: structuredData?.contact || (structuredData as any)?.legal_contact || contactSnapshot,
+			logoFiles: logoFiles.length > 0 ? logoFiles : (structuredData as any)?.logoFiles || [],
+			stepHistory: data.stepHistory,
+			brandInput: data.brandInput,
+			guidelineId: data.savedGuidelines?.id
+		};
+
+		const rawSlides =
+			(Array.isArray((structuredData as any)?.slidesHtml) && (structuredData as any).slidesHtml) ||
+			(Array.isArray((structuredData as any)?.slides) && (structuredData as any).slides) ||
+			[];
+		const slidesSnapshot = (Array.isArray(rawSlides) ? rawSlides : []).map(
+			(slide: any, index: number) => ({
+				name: slide?.name || `Slide ${index + 1}`,
+				html: slide?.html || slide?.content || ''
+			})
+		);
+
+		const userInputSnapshot = {
+			brandName,
+			brandDomain,
+			shortDescription,
+			brandValues,
+			selectedMood,
+			selectedAudience,
+			customPrompt,
+			contactName,
+			contactEmail,
+			contactRole,
+			contactCompany
+		};
+
+		const tempSaveSuccess = saveTempBrandData({
+			userInput: userInputSnapshot,
+			selectedTheme: inferThemeFromMood(selectedMood),
+			brandData: previewBrandData,
+			slides: slidesSnapshot
+		});
+
+		if (!tempSaveSuccess) {
+			console.warn('[builder] Failed to persist temp brand data for preview.');
+		}
 
 		// Redirect to new HTML-based preview page
 		goto('/dashboard/preview-html');

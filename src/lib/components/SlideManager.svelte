@@ -22,7 +22,10 @@ import {
 	Folder,
 	Save as SaveIcon,
 	Loader2,
-	Presentation as PresentationIcon
+	Presentation as PresentationIcon,
+	Globe,
+	Download,
+	Trash2
 } from 'lucide-svelte';
 import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   
@@ -35,6 +38,14 @@ export let onSaveSlides:
 	| ((payload: { brandDataSnapshot: any; slidesHtml: Array<{ name: string; html: string }> }) => void | Promise<void>)
 	| null = null;
 export let isSavingSlides = false;
+
+// Mock webpage controls (optional, provided by parent preview-html page)
+export let onBuildMockWebpage: (() => void | Promise<void>) | null = null;
+export let onVisitMockWebpage: (() => void | Promise<void>) | null = null;
+export let onDownloadMockWebpage: (() => void | Promise<void>) | null = null;
+export let onDeleteMockWebpage: (() => void | Promise<void>) | null = null;
+export let isBuildingMockWebpage = false;
+export let hasMockWebpage = false;
   
   // Component refs
 let coverSlideRef: CoverSlide;
@@ -1912,16 +1923,67 @@ $: colorSignature = JSON.stringify({
       <div class="theme-toggle-chip">
         <ThemeToggle />
       </div>
-      {#if onGoToBrands}
-        <a
-          href="/dashboard/my-brands"
-          class="btn secondary large"
-          onclick={() => onGoToBrands?.()}
-        >
-          <Folder class="h-4 w-4" />
-          Go to My Brands
-        </a>
-      {/if}
+      <div class="btn-group">
+        {#if onGoToBrands}
+          <a
+            href="/dashboard/my-brands"
+            class="btn secondary large"
+            onclick={() => onGoToBrands?.()}
+          >
+            <Folder class="h-4 w-4" />
+            Go to My Brands
+          </a>
+        {/if}
+
+        {#if onBuildMockWebpage}
+          {#if !hasMockWebpage}
+            <button
+              class="btn large btn-build"
+              class:loading={isBuildingMockWebpage}
+              disabled={isBuildingMockWebpage}
+              onclick={() => onBuildMockWebpage?.()}
+            >
+              {#if isBuildingMockWebpage}
+                <Loader2 class="h-4 w-4 animate-spin" />
+                Building Mock Webpage...
+              {:else}
+                <Globe class="h-4 w-4" />
+                Build Mock Webpage
+              {/if}
+            </button>
+          {:else}
+            {#if onVisitMockWebpage}
+              <button
+                class="btn large btn-visit"
+                onclick={() => onVisitMockWebpage?.()}
+              >
+                <Globe class="h-4 w-4" />
+                Visit Mock Webpage
+              </button>
+            {/if}
+
+            {#if onDownloadMockWebpage}
+              <button
+                class="btn navigation"
+                onclick={() => onDownloadMockWebpage?.()}
+              >
+                <Download class="h-4 w-4" />
+                Download HTML
+              </button>
+            {/if}
+
+            {#if onDeleteMockWebpage}
+              <button
+                class="btn btn-delete"
+                onclick={() => onDeleteMockWebpage?.()}
+              >
+                <Trash2 class="h-4 w-4" />
+                Delete
+              </button>
+            {/if}
+          {/if}
+        {/if}
+      </div>
     </div>
   </div>
   <!-- Controls -->
@@ -2557,6 +2619,46 @@ $: colorSignature = JSON.stringify({
     background: #f59e0b;
     color: #111827;
     border-color: #d97706;
+  }
+
+  /* Mock webpage buttons */
+  .btn-build {
+    background: #f97316; /* orange */
+    color: #111827;
+    border-color: #ea580c;
+  }
+
+  .btn-build.loading {
+    background: #ea580c; /* darker orange while building */
+    border-color: #c2410c;
+    color: #111827;
+  }
+
+  .btn-build:hover:not(:disabled):not(.loading) {
+    background: #ea580c;
+    border-color: #c2410c;
+  }
+
+  .btn-visit {
+    background: #16a34a; /* green */
+    color: #ffffff;
+    border-color: #16a34a;
+  }
+
+  .btn-visit:hover:not(:disabled) {
+    background: #15803d;
+    border-color: #15803d;
+  }
+
+  .btn-delete {
+    background: #ef4444; /* red */
+    color: #ffffff;
+    border-color: #dc2626;
+  }
+
+  .btn-delete:hover:not(:disabled) {
+    background: #dc2626;
+    border-color: #b91c1c;
   }
   
   .dark .btn.secondary {

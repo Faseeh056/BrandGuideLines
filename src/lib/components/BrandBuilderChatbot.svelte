@@ -2450,11 +2450,11 @@ Now make ONLY the specific change requested by the user: "${feedback}"`;
 </script>
 
 <Card
-	class="flex h-[1000px] w-[580px] flex-col border-border/50 border-orange-500/20 bg-card/50 shadow-xl backdrop-blur-sm overflow-hidden !py-0 !gap-0"
+	class="flex h-[1000px] w-[580px] flex-col !gap-0 overflow-hidden border-border/50 border-orange-500/20 bg-card/50 !py-0 shadow-xl backdrop-blur-sm"
 >
 	<CardHeader class="flex-shrink-0 space-y-4 border-b border-border/50 bg-primary/20 p-6">
 		<!-- Header -->
-		<div class="flex flex-col items-center justify-center text-center gap-2">
+		<div class="flex flex-col items-center justify-center gap-2 text-center">
 			<div>
 				<h2 class="text-2xl font-bold text-foreground">Brand Builder Assistant</h2>
 				<p class="text-xs" style="color: #000000;">AI-powered questionnaire</p>
@@ -2462,9 +2462,12 @@ Now make ONLY the specific change requested by the user: "${feedback}"`;
 		</div>
 	</CardHeader>
 
-	<CardContent class="flex flex-1 flex-col overflow-hidden p-0 bg-background">
+	<CardContent class="flex flex-1 flex-col overflow-hidden bg-background p-0">
 		<!-- Messages Container -->
-		<div bind:this={chatContainer} class="flex-1 space-y-4 overflow-y-auto scroll-smooth p-6 bg-background">
+		<div
+			bind:this={chatContainer}
+			class="flex-1 space-y-4 overflow-y-auto scroll-smooth bg-background p-6"
+		>
 			{#each messages as message (message.id)}
 				{#if message.type === 'step'}
 					{#if message.stepData}
