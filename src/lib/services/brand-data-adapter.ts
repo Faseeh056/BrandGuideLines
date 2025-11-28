@@ -360,7 +360,7 @@ function extractFontSample(text: string, fontName: string): string | null {
 /**
  * Parse brand introduction data from first step content
  */
-function parseBrandIntroduction(text: string): {
+function parseBrandIntroduction(content: string | any): {
     positioningStatement: string;
     brandVoice: string;
     brandTone: string;
@@ -375,10 +375,22 @@ function parseBrandIntroduction(text: string): {
         brandPersonality: 'Our brand personality'
     };
     
-    if (!text) {
+    if (!content) {
         console.log('⚠️ No content in first step');
         return result;
     }
+    
+    // If structured object, extract fields directly
+    if (typeof content === 'object' && content !== null) {
+        return {
+            positioningStatement: content.positioning_statement || content.positioningStatement || content.positioning || result.positioningStatement,
+            brandVoice: content.brand_voice || content.voice || content.voice_and_tone?.guidelines || result.brandVoice,
+            brandTone: content.brand_tone || content.tone || content.voice_and_tone?.adjectives?.join(', ') || result.brandTone,
+            brandPersonality: content.brand_personality || content.personality || content.voice_and_tone?.sample_lines?.join(' ') || result.brandPersonality
+        };
+    }
+    
+    const text = String(content || '');
     
     // Extract positioning statement - look for patterns like "Positioning:" or "Brand Statement:"
     const positioningMatch = text.match(/(?:Positioning|Brand Statement|Positioning Statement)[:\s]*(.+?)(?=\n\n|\n(?:Voice|Tone|Personality)|$)/is);
@@ -416,7 +428,7 @@ function parseBrandIntroduction(text: string): {
     }
     
     // If no specific patterns found, try to extract from general content
-    if (result.positioningStatement === 'Our brand positioning statement') {
+    if (result.positioningStatement === 'Our brand positioning statement' && text) {
         // Look for the first substantial paragraph as positioning statement
         const paragraphs = text.split('\n\n').filter(p => p.trim().length > 20);
         if (paragraphs.length > 0) {
@@ -471,7 +483,7 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 		content: s.content
 	}));
 
-	console.log('🔍 Normalized steps:', steps.map(s => ({
+	console.log('🔍 Normalized steps:', steps.map((s: any) => ({
 		stepId: s.stepId,
 		stepTitle: s.stepTitle,
 		contentLength: s.content?.length
@@ -479,10 +491,12 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 
 	console.log('🔍 Processing steps:', {
 		stepsCount: steps.length,
-		stepIds: steps.map(s => s.stepId),
+		stepIds: steps.map((s: any) => s.stepId),
 		positioningStep: (() => {
-			const content = steps.find(s => s.stepId === 'brand-positioning')?.content;
-			return typeof content === 'string' ? content.substring(0, 100) : content;
+			const content = steps.find((s: any) => s.stepId === 'brand-positioning')?.content;
+			if (!content) return undefined;
+			const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
+			return contentStr.substring(0, 100);
 		})()
 	});
 
@@ -517,9 +531,13 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 	console.log('🔍 Positioning step found:', {
 		hasPositioningStep: !!positioningStep,
 		stepId: positioningStep?.stepId,
-		contentType: typeof positioningContent,
-		contentLength: typeof positioningContent === 'string' ? positioningContent.length : 'N/A',
-		contentPreview: positioningContentPreview
+		contentLength: positioningStep?.content?.length,
+		contentPreview: (() => {
+			const content = positioningStep?.content;
+			if (!content) return undefined;
+			const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
+			return contentStr.substring(0, 200);
+		})()
 	});
 
 	// Debug: Show the full content structure
@@ -555,7 +573,8 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 	// If no content was parsed, try a simple fallback
 	if (!positioning.mission && !positioning.vision && positioningStep?.content) {
 		console.log('🔍 No content parsed, trying fallback extraction...');
-		const content = positioningContentForParsing;
+		const rawContent = positioningStep.content;
+		const content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
 		
 		// Simple fallback: use first paragraph as mission if it's substantial
 		const paragraphs = content.split('\n\n').filter(p => p.trim().length > 20);
@@ -615,7 +634,9 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 		contentLength: typographyStep?.content?.length,
 		contentPreview: (() => {
 			const content = typographyStep?.content;
-			return typeof content === 'string' ? content.substring(0, 200) : content;
+			if (!content) return undefined;
+			const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
+			return contentStr.substring(0, 200);
 		})()
 	});
 
@@ -763,7 +784,9 @@ export function adaptBrandDataForSlides(frontendData: any): any {
 		stepHistoryLength: adapted.stepHistory?.length || 0,
 		iconographyStep: (() => {
 			const content = adapted.stepHistory?.find((s: any) => s.step === 'iconography')?.content;
-			return typeof content === 'string' ? content.substring(0, 100) : content || 'No iconography step';
+			if (!content) return 'No iconography step';
+			const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
+			return contentStr.substring(0, 100);
 		})()
 	});
 	

@@ -25,19 +25,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         // Debug: Log the actual stepHistory structure
         if (body.stepHistory && body.stepHistory.length > 0) {
-            const firstStepContent = body.stepHistory[0].content;
-            const contentPreview = typeof firstStepContent === 'string' 
-                ? firstStepContent.substring(0, 200)
-                : typeof firstStepContent === 'object' 
-                    ? JSON.stringify(firstStepContent).substring(0, 200)
-                    : String(firstStepContent || '').substring(0, 200);
-            
+            const firstContent = body.stepHistory[0].content;
+            const preview =
+                typeof firstContent === 'string'
+                    ? firstContent.substring(0, 200)
+                    : JSON.stringify(firstContent).substring(0, 200);
             console.log('🔍 First step details:', {
                 step: body.stepHistory[0].step,
                 title: body.stepHistory[0].title,
-                contentType: typeof firstStepContent,
-                contentLength: typeof firstStepContent === 'string' ? firstStepContent.length : 'N/A',
-                contentPreview
+                contentType: typeof firstContent,
+                contentPreview: preview
             });
         }
 
@@ -47,11 +44,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             generatedSteps: body.stepHistory || body.generatedSteps || []
         });
 
+        const missionPreview =
+            typeof brandInput.mission === 'string'
+                ? brandInput.mission.substring(0, 50)
+                : JSON.stringify(brandInput.mission || '').substring(0, 50);
+        const visionPreview =
+            typeof brandInput.vision === 'string'
+                ? brandInput.vision.substring(0, 50)
+                : JSON.stringify(brandInput.vision || '').substring(0, 50);
         console.log('🔍 Adapted brand input:', {
             brandName: brandInput.brandName,
-            mission: typeof brandInput.mission === 'string' ? brandInput.mission.substring(0, 50) : brandInput.mission,
-            vision: typeof brandInput.vision === 'string' ? brandInput.vision.substring(0, 50) : brandInput.vision,
-            valuesCount: brandInput.values?.length
+            mission: missionPreview,
+            vision: visionPreview,
+            valuesCount: Array.isArray(brandInput.values) ? brandInput.values.length : 0
         });
 
         // Get template set from request (if provided)
