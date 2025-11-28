@@ -2747,6 +2747,7 @@
           <div class="flex items-center gap-2">
             <!-- Toggle between HTML iframe and Svelte components -->
               <button
+              type="button"
               class="px-3 py-2 border rounded transition-colors {useSvelteComponents ? 'bg-green-500 text-white border-green-600' : 'bg-muted text-foreground hover:bg-gray-300'}" 
               onclick={() => useSvelteComponents = !useSvelteComponents}
               title={useSvelteComponents ? 'Switch to HTML iframe view' : 'Switch to Svelte component view (editable PPTX)'}

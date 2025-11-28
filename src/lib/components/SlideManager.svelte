@@ -2635,6 +2635,16 @@
   // Export dropdown state
   let showExportDropdown = false;
   let exportDropdownRef: HTMLDivElement;
+  let googleSlidesUrl = '';
+  let showGoogleSlidesPreview = false;
+  $: googleSlidesEmbedUrl = googleSlidesUrl ? buildGoogleSlidesEmbedUrl(googleSlidesUrl) : '';
+
+  function buildGoogleSlidesEmbedUrl(url: string): string {
+    if (!url) return '';
+    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (!match || !match[1]) return '';
+    return `https://docs.google.com/presentation/d/${match[1]}/embed?start=false&loop=false&delayms=3000`;
+  }
   
   async function downloadAllSlidesPPTX() {
     if (isDownloading) return;
@@ -2798,6 +2808,8 @@
         // Open Google Slides in new tab
         window.open(result.url, '_blank');
         alert(`✅ Google Slides presentation created!\n\nYou can view and edit it here:\n${result.url}`);
+        googleSlidesUrl = result.url;
+        showGoogleSlidesPreview = true;
       } else {
         throw new Error('Invalid response from server');
       }
@@ -2922,6 +2934,16 @@
         Next →
       </button>
     </div>
+
+      {#if googleSlidesUrl}
+        <button
+          type="button"
+          class="btn-outline"
+          onclick={() => showGoogleSlidesPreview = !showGoogleSlidesPreview}
+        >
+          {showGoogleSlidesPreview ? 'Show Svelte Preview' : 'Show Google Slides Preview'}
+        </button>
+      {/if}
   </div>
   
   <!-- Slide Navigation -->
@@ -2939,6 +2961,19 @@
   
   <!-- Slide Viewer -->
   <div class="slide-viewer">
+    {#if showGoogleSlidesPreview && googleSlidesEmbedUrl}
+      <div class="google-slides-frame">
+        <iframe
+          title="Google Slides Preview"
+          src={googleSlidesEmbedUrl}
+          allowfullscreen
+          loading="lazy"
+        />
+        <p class="google-slides-note">
+          This preview shows the exported Google Slides deck. Use the toggle above to return to the editable Svelte view.
+        </p>
+      </div>
+    {:else}
     <div class="slide-container">
       {#if effectiveSlideVibe === 'minimalist'}
         <div class="slide-wrapper" class:hidden={currentSlideIndex !== 0}>
@@ -3528,6 +3563,7 @@
       {/each}
       {/if}
     </div>
+    {/if}
   </div>
   
   <!-- Editing Panel -->
@@ -3598,6 +3634,20 @@
     background: #218838;
   }
   
+  .btn-outline {
+    padding: 0.5rem 1rem;
+    border: 1px dashed #999;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #333;
+  }
+
+  .btn-outline:hover:not(:disabled) {
+    background: #f5f5f5;
+  }
+
   .btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -3659,6 +3709,29 @@
     padding: 20px;
     background: #f9fafb;
     position: relative;
+  }
+
+  .google-slides-frame {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 760px;
+    gap: 1rem;
+  }
+
+  .google-slides-frame iframe {
+    flex: 1;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.15);
+    background: #fff;
+  }
+
+  .google-slides-note {
+    font-size: 0.9rem;
+    color: #475467;
+    text-align: center;
   }
 
   .dynamic-section-slide {
